@@ -9,6 +9,9 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Trust proxy for Railway deployment
+app.set('trust proxy', true);
+
 // Database connection
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -222,10 +225,10 @@ app.post('/api/auth/signup', async (req, res) => {
     // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Create new user with password
+    // Create new user with password (premium = registered user with trial)
     const userResult = await pool.query(
       `INSERT INTO users (username, full_name, password_hash, device_id, user_type, trial_starts_at, trial_expires_at)
-       VALUES ($1, $2, $3, $4, 'standard', NOW(), NOW() + INTERVAL '7 days')
+       VALUES ($1, $2, $3, $4, 'premium', NOW(), NOW() + INTERVAL '7 days')
        RETURNING id, username, full_name, user_type, trial_expires_at`,
       [email, fullName, passwordHash, deviceId]
     );
