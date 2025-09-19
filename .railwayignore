@@ -1,0 +1,19 @@
+# Ignore Flutter app files during Railway deployment
+lib/
+android/
+ios/
+windows/
+web/
+test/
+assets/
+pubspec.yaml
+pubspec.lock
+analysis_options.yaml
+.metadata
+.flutter-plugins
+.flutter-plugins-dependencies
+.dart_tool/
+build/
+
+# Only deploy backend
+!backend/
