@@ -1,14 +1,14 @@
 [variables]
-NIXPACKS_BUILD_PHASE = "backend"
+NIXPACKS_NO_GENERATE_DOCKERFILE = "1"
 
 [phases.setup]
-nixPkgs = ["nodejs-18_x", "npm"]
+nixPkgs = ["nodejs-18_x"]
 
 [phases.install]
-cmds = ["cd backend && npm ci"]
+cmds = ["cp -r backend/* . && npm ci --only=production"]
 
 [phases.build]
-cmds = ["echo 'Backend build complete'"]
+cmds = ["echo 'Backend setup complete'"]
 
 [start]
-cmd = "cd backend && npm start"
+cmd = "node server.js"
