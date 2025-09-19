@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 import '../services/database_helper.dart';
@@ -38,7 +39,22 @@ class HybridAuthProvider extends ChangeNotifier {
   }
 
   Future<void> _checkBackendConnectivity() async {
-    _isOnline = await ApiService.isBackendHealthy();
+    print('Checking backend connectivity...');
+
+    // Try the health check
+    final healthCheck = await ApiService.isBackendHealthy();
+    print('Health check result: $healthCheck');
+
+    // In release mode, always assume online to allow API attempts
+    // This prevents the app from being stuck in offline mode due to health check issues
+    if (!kDebugMode) {
+      _isOnline = true;
+      print('Release mode: Forcing online mode to allow API attempts');
+    } else {
+      _isOnline = healthCheck;
+      print('Debug mode: Backend is online: $_isOnline');
+    }
+
     notifyListeners();
   }
   
@@ -79,7 +95,7 @@ class HybridAuthProvider extends ChangeNotifier {
       }
 
       // Sync vehicles with backend
-      final localVehicles = await _dbHelper.getAllVehicles();
+      final localVehicles = await _dbHelper.getVehicles();
       if (localVehicles.isNotEmpty) {
         final vehicleMaps = localVehicles.map((v) => v.toJson()).toList();
         await ApiService.syncVehicles(localVehicles);
@@ -263,6 +279,10 @@ class HybridAuthProvider extends ChangeNotifier {
   }
 
   Future<bool> guestSignup(String email, String fullName, {String? password}) async {
+    print('=== HybridAuthProvider guestSignup ===');
+    print('Email: $email, FullName: $fullName, HasPassword: ${password != null}');
+    print('Is Online: $_isOnline');
+
     _isLoading = true;
     notifyListeners();
 
@@ -275,11 +295,15 @@ class HybridAuthProvider extends ChangeNotifier {
 
         // If password is provided, use the full signup endpoint
         if (password != null && password.isNotEmpty) {
+          print('Using full signup endpoint with password');
           backendResponse = await ApiService.signup(email, password, fullName);
         } else {
-          // Otherwise use guest signup
+          // Otherwise use guest signup - use email as username
+          print('Using guest signup endpoint');
           backendResponse = await ApiService.guestSignup(email, fullName);
         }
+
+        print('Backend response: $backendResponse');
 
         if (backendResponse != null) {
           final userData = backendResponse['user'] ?? backendResponse;

@@ -86,15 +86,17 @@ class ApiService {
 
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/api/auth/refresh'),
+        Uri.parse('$apiUrl/auth/refresh'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'refreshToken': _refreshToken}),
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        await _storeTokens(data['token'], data['refreshToken']);
-        return true;
+        if (data['success'] == true && data['data'] != null) {
+          await _storeTokens(data['data']['token'], data['data']['refreshToken']);
+          return true;
+        }
       }
     } catch (e) {
       print('Error refreshing token: $e');
@@ -108,7 +110,7 @@ class ApiService {
     String endpoint, {
     Map<String, dynamic>? body,
   }) async {
-    final url = Uri.parse('$baseUrl$endpoint');
+    final url = Uri.parse('$apiUrl$endpoint');
     
     http.Response response;
     
@@ -176,7 +178,7 @@ class ApiService {
       final deviceId = await DeviceInfoHelper.getDeviceId();
       
       final response = await http.post(
-        Uri.parse('$baseUrl/api/auth/login'),
+        Uri.parse('$apiUrl/auth/login'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'username': username,
@@ -187,8 +189,11 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        await _storeTokens(data['token'], data['refreshToken']);
-        return data;
+        if (data['success'] == true && data['data'] != null) {
+          await _storeTokens(data['data']['token'], data['data']['refreshToken'], userId: data['data']['user']['id'].toString());
+          return data['data'];
+        }
+        return null;
       } else {
         final error = jsonDecode(response.body);
         throw Exception(error['message'] ?? 'Login failed');
@@ -202,29 +207,43 @@ class ApiService {
   static Future<Map<String, dynamic>?> guestSignup(String username, String fullName) async {
     try {
       final deviceId = await DeviceInfoHelper.getDeviceId();
+      print('=== GUEST SIGNUP DEBUG ===');
+      print('Username: $username');
+      print('FullName: $fullName');
+      print('DeviceId: $deviceId');
+      print('API URL: $apiUrl/auth/guest-signup');
 
       final response = await http.post(
-        Uri.parse('$baseUrl/api/auth/guest-signup'),
+        Uri.parse('$apiUrl/auth/guest-signup'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'email': username,  // Using email as username
           'username': username,
           'fullName': fullName,
           'deviceId': deviceId,
         }),
-      );
+      ).timeout(const Duration(seconds: 10));
 
-      if (response.statusCode == 201) {
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        await _storeTokens(data['token'], data['refreshToken']);
-        return data;
+        if (data['success'] == true && data['data'] != null) {
+          await _storeTokens(data['data']['token'], data['data']['refreshToken'], userId: data['data']['user']['id'].toString());
+          print('Guest signup successful, tokens stored');
+          return data['data'];
+        }
+        print('Response success false or data null');
+        return null;
       } else {
+        print('Guest signup failed with status ${response.statusCode}');
         final error = jsonDecode(response.body);
-        throw Exception(error['message'] ?? 'Signup failed');
+        throw Exception(error['error'] ?? error['message'] ?? 'Signup failed');
       }
     } catch (e) {
-      print('Signup error: $e');
-      return null;
+      print('Guest signup exception: $e');
+      print('Stack trace: ${StackTrace.current}');
+      rethrow;
     }
   }
 
@@ -233,7 +252,7 @@ class ApiService {
       final deviceId = await DeviceInfoHelper.getDeviceId();
 
       final response = await http.post(
-        Uri.parse('$baseUrl/api/auth/signup'),
+        Uri.parse('$apiUrl/auth/signup'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'email': email,
@@ -246,10 +265,11 @@ class ApiService {
 
       if (response.statusCode == 201 || response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (data['token'] != null) {
-          await _storeTokens(data['token'], data['refreshToken'] ?? data['token']);
+        if (data['success'] == true && data['data'] != null) {
+          await _storeTokens(data['data']['token'], data['data']['refreshToken'], userId: data['data']['user']['id'].toString());
+          return data['data'];
         }
-        return data;
+        return null;
       } else {
         final error = jsonDecode(response.body);
         throw Exception(error['message'] ?? 'Signup failed');
@@ -264,7 +284,7 @@ class ApiService {
     try {
       // Try to call logout endpoint if we have a token
       if (_authToken != null) {
-        await _makeRequest('POST', '/api/auth/logout');
+        await _makeRequest('POST', '/auth/logout');
       }
     } catch (e) {
       print('Logout API error: $e');
@@ -279,12 +299,14 @@ class ApiService {
   // Vehicle endpoints
   static Future<List<Vehicle>?> getVehicles() async {
     try {
-      final response = await _makeRequest('GET', '/api/vehicles');
+      final response = await _makeRequest('GET', '/vehicles');
       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final List<dynamic> vehiclesJson = data['vehicles'];
-        return vehiclesJson.map((json) => Vehicle.fromJson(json)).toList();
+        if (data['success'] == true && data['data'] != null) {
+          final List<dynamic> vehiclesJson = data['data']['vehicles'];
+          return vehiclesJson.map((json) => Vehicle.fromJson(json)).toList();
+        }
       }
     } catch (e) {
       print('Get vehicles error: $e');
@@ -294,11 +316,13 @@ class ApiService {
 
   static Future<Vehicle?> addVehicle(Vehicle vehicle) async {
     try {
-      final response = await _makeRequest('POST', '/api/vehicles', body: vehicle.toJson());
+      final response = await _makeRequest('POST', '/vehicles', body: vehicle.toJson());
       
-      if (response.statusCode == 201) {
+      if (response.statusCode == 201 || response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return Vehicle.fromJson(data['vehicle']);
+        if (data['success'] == true && data['data'] != null) {
+          return Vehicle.fromJson(data['data']['vehicle']);
+        }
       }
     } catch (e) {
       print('Add vehicle error: $e');
@@ -308,11 +332,13 @@ class ApiService {
 
   static Future<Vehicle?> updateVehicle(Vehicle vehicle) async {
     try {
-      final response = await _makeRequest('PUT', '/api/vehicles/${vehicle.id}', body: vehicle.toJson());
+      final response = await _makeRequest('PUT', '/vehicles/${vehicle.id}', body: vehicle.toJson());
       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return Vehicle.fromJson(data['vehicle']);
+        if (data['success'] == true && data['data'] != null) {
+          return Vehicle.fromJson(data['data']['vehicle']);
+        }
       }
     } catch (e) {
       print('Update vehicle error: $e');
@@ -322,7 +348,7 @@ class ApiService {
 
   static Future<bool> deleteVehicle(String vehicleId) async {
     try {
-      final response = await _makeRequest('DELETE', '/api/vehicles/$vehicleId');
+      final response = await _makeRequest('DELETE', '/vehicles/$vehicleId');
       return response.statusCode == 200;
     } catch (e) {
       print('Delete vehicle error: $e');
@@ -333,7 +359,7 @@ class ApiService {
   // Sync local data to backend
   static Future<bool> syncVehicles(List<Vehicle> localVehicles) async {
     try {
-      final response = await _makeRequest('POST', '/api/vehicles/sync', 
+      final response = await _makeRequest('POST', '/vehicles/sync', 
         body: {'vehicles': localVehicles.map((v) => v.toJson()).toList()});
       
       return response.statusCode == 200;
@@ -346,10 +372,13 @@ class ApiService {
   // Settings endpoints
   static Future<Map<String, dynamic>?> getSettings() async {
     try {
-      final response = await _makeRequest('GET', '/api/settings');
+      final response = await _makeRequest('GET', '/settings');
       
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        final data = jsonDecode(response.body);
+        if (data['success'] == true && data['data'] != null) {
+          return data['data'];
+        }
       }
     } catch (e) {
       print('Get settings error: $e');
@@ -359,7 +388,7 @@ class ApiService {
 
   static Future<bool> updateSettings(Map<String, dynamic> settings) async {
     try {
-      final response = await _makeRequest('PUT', '/api/settings', body: settings);
+      final response = await _makeRequest('PUT', '/settings', body: settings);
       return response.statusCode == 200;
     } catch (e) {
       print('Update settings error: $e');
@@ -370,9 +399,32 @@ class ApiService {
   // Health check
   static Future<bool> isBackendHealthy() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/health'));
-      return response.statusCode == 200;
+      print('=== HEALTH CHECK DEBUG ===');
+      print('Checking URL: $baseUrl/health');
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/health'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 10));
+
+      print('Health check response: ${response.statusCode}');
+      print('Health check body: ${response.body}');
+
+      // Accept any 2xx status as healthy
+      final isHealthy = response.statusCode >= 200 && response.statusCode < 300;
+      print('Backend is healthy: $isHealthy');
+
+      return isHealthy;
     } catch (e) {
+      print('Backend health check exception: $e');
+      print('Stack trace: ${StackTrace.current}');
+
+      // For release builds, assume online if we can't check
+      // This allows the app to try API calls even if health check fails
+      if (!kDebugMode) {
+        print('Release mode: Assuming backend is online');
+        return true;
+      }
       return false;
     }
   }

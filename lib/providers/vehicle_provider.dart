@@ -163,7 +163,7 @@ class VehicleProvider with ChangeNotifier {
       if (isOnline) {
         final backendVehicles = await ApiService.getVehicles();
         if (backendVehicles != null) {
-          _vehicles = backendVehicles.map((v) => Vehicle.fromJson(v)).toList();
+          _vehicles = backendVehicles.map((v) => v is Vehicle ? v : Vehicle.fromJson(v as Map<String, dynamic>)).toList();
         }
       } else {
         // Load from local database if offline

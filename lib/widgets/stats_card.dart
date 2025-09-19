@@ -74,6 +74,8 @@ class StatsCard extends StatelessWidget {
                     fontSize: AppFontSize.xs,
                     color: AppColors.textSecondary,
                   ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ],

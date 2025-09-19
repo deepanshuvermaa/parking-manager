@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 
 class PrinterDevice {
   final String id;
@@ -121,31 +123,53 @@ class BluetoothProvider with ChangeNotifier {
 
   Future<bool> _requestPermissions() async {
     try {
-      // Request all necessary Bluetooth permissions
-      Map<Permission, PermissionStatus> statuses = await [
-        Permission.bluetooth,
-        Permission.bluetoothScan,
-        Permission.bluetoothConnect,
-        Permission.bluetoothAdvertise,
-        Permission.location,
-        Permission.locationWhenInUse,
-      ].request();
+      debugPrint('=== BLUETOOTH PERMISSION CHECK ===');
 
-      // Check if critical permissions are granted
-      bool bluetoothGranted =
-          statuses[Permission.bluetoothScan] == PermissionStatus.granted ||
-          statuses[Permission.bluetooth] == PermissionStatus.granted;
+      // Check Android SDK version
+      if (Platform.isAndroid) {
+        final androidInfo = await DeviceInfoPlugin().androidInfo;
+        debugPrint('Android SDK: ${androidInfo.version.sdkInt}');
 
-      bool locationGranted =
-          statuses[Permission.location] == PermissionStatus.granted ||
-          statuses[Permission.locationWhenInUse] == PermissionStatus.granted;
+        // For Android 12+ (SDK 31+), check new Bluetooth permissions
+        if (androidInfo.version.sdkInt >= 31) {
+          Map<Permission, PermissionStatus> statuses = await [
+            Permission.bluetoothScan,
+            Permission.bluetoothConnect,
+          ].request();
 
-      if (!bluetoothGranted || !locationGranted) {
-        debugPrint('Critical permissions not granted. Bluetooth: $bluetoothGranted, Location: $locationGranted');
-        _lastError = 'Please grant Bluetooth and Location permissions to use printer';
-        return false;
+          bool granted = statuses[Permission.bluetoothScan] == PermissionStatus.granted &&
+                        statuses[Permission.bluetoothConnect] == PermissionStatus.granted;
+
+          debugPrint('Bluetooth permissions (Android 12+): $granted');
+          debugPrint('Scan: ${statuses[Permission.bluetoothScan]}, Connect: ${statuses[Permission.bluetoothConnect]}');
+
+          if (!granted) {
+            _lastError = 'Please grant Bluetooth permissions in Settings';
+            return false;
+          }
+          return true;
+        } else {
+          // For older Android versions
+          Map<Permission, PermissionStatus> statuses = await [
+            Permission.bluetooth,
+            Permission.location,
+          ].request();
+
+          bool granted = (statuses[Permission.bluetooth] == PermissionStatus.granted ||
+                         statuses[Permission.bluetooth] == null) && // null means not required
+                        statuses[Permission.location] == PermissionStatus.granted;
+
+          debugPrint('Bluetooth permissions (Android <12): $granted');
+
+          if (!granted) {
+            _lastError = 'Please grant Bluetooth and Location permissions';
+            return false;
+          }
+          return true;
+        }
       }
 
+      // For iOS or other platforms
       return true;
     } catch (e) {
       debugPrint('Permission request error: $e');
@@ -176,6 +200,7 @@ class BluetoothProvider with ChangeNotifier {
     try {
       _discoveredDevices.clear();
       _devices.clear();
+      _isScanning = true;  // Set scanning state to true
       notifyListeners();
 
       debugPrint('Starting Bluetooth scan...');
@@ -213,6 +238,15 @@ class BluetoothProvider with ChangeNotifier {
         }
       }
       _updateDevicesList();
+
+      // Listen for scan complete
+      FlutterBluePlus.isScanning.listen((scanning) {
+        if (!scanning && _isScanning) {
+          debugPrint('Scan completed, found ${_devices.length} devices');
+          _isScanning = false;
+          notifyListeners();
+        }
+      });
 
     } catch (e) {
       debugPrint('Scan error: $e');
