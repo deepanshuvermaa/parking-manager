@@ -1,0 +1,48 @@
+{
+  "permissions": {
+    "allow": [
+<<<<<<< HEAD
+      "Bash(dir:*)",
+      "Bash(flutter pub:*)",
+      "Bash(curl:*)",
+      "Bash(unzip:*)",
+      "Bash(export:*)",
+      "Bash(C:flutterbinflutter.bat pub get)",
+      "Bash(echo $OS)",
+      "Bash(C:\\flutter\\bin\\flutter.bat pub get)",
+      "Bash(\"C:\\Users\\Asus\\flutter_sdk\\flutter\\bin\\flutter.bat\" pub get)",
+      "Bash(\"C:\\Users\\Asus\\flutter_sdk\\flutter\\bin\\flutter.bat\" run -d chrome)",
+      "Read(C:\\Users\\Asus\\Downloads/**)",
+      "Bash(\"C:\\Users\\Asus\\flutter_sdk\\flutter\\bin\\flutter.bat\" build apk --release)",
+      "Bash(\"C:\\Users\\Asus\\flutter_sdk\\flutter\\bin\\flutter.bat\" analyze lib)",
+      "Bash(\"C:\\Users\\Asus\\flutter_sdk\\flutter\\bin\\flutter.bat\" --version)",
+      "Bash(\"C:\\Users\\Asus\\flutter_sdk\\flutter\\bin\\flutter.bat\" clean)",
+      "Bash(\"C:\\Users\\Asus\\flutter_sdk\\flutter\\bin\\flutter.bat\" build apk --debug)",
+      "Bash(cmd /c java:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Read(C:\\Users\\Asus\\Quickbill\\admin-panel/**)",
+      "Read(C:\\Users\\Asus\\Quickbill\\admin-panel/**)",
+      "Read(C:\\Users\\Asus\\Quickbill\\admin-panel/**)",
+      "Read(C:\\Users\\Asus\\Quickbill\\admin-panel/**)",
+      "Bash(git remote set-url:*)",
+      "Bash(git fetch:*)",
+      "Read(C:\\Users\\Asus\\Quickbill/**)",
+      "Bash(git init:*)",
+      "Bash(copy:*)",
+      "Bash(git remote add:*)",
+      "Bash(git config:*)",
+      "Bash(cat:*)",
+      "Bash(npm ls:*)"
+=======
+      "Read(C:\\Users\\Asus\\Quickbill\\admin-panel/**)",
+      "Read(C:\\Users\\Asus\\Quickbill\\admin-panel/**)",
+      "Bash(grep:*)",
+      "Bash(git checkout:*)"
+>>>>>>> backend-deployment
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

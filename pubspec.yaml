@@ -1,0 +1,81 @@
+name: parkease_manager
+description: Complete parking management system with Bluetooth thermal printing for Android
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # Core
+  cupertino_icons: ^1.0.2
+  
+  # State Management
+  provider: ^6.1.1
+  shared_preferences: ^2.2.2
+  
+  # Bluetooth
+  flutter_blue_plus: ^1.32.7
+  permission_handler: ^11.2.0
+  
+  # UI
+  google_fonts: ^6.1.0
+  flutter_svg: ^2.0.9
+  lottie: ^3.0.0
+  
+  # Utilities
+  intl: ^0.18.1
+  qr_flutter: ^4.1.0
+  path_provider: ^2.1.2
+  pdf: ^3.10.7
+  share_plus: ^7.2.2
+  
+  # Database
+  sqflite: ^2.3.0
+  path: ^1.8.3
+  
+  # HTTP Client
+  http: ^1.1.0
+  
+  # Security
+  crypto: ^3.0.3
+  
+  # Device Info
+  device_info_plus: ^10.1.0
+  
+  # Image Picker
+  image_picker: ^1.0.7
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/images/
+    - assets/icons/
+    - assets/fonts/
+
+# Flutter launcher icons configuration
+flutter_launcher_icons:
+  android: true
+  ios: false  # Skip iOS on Windows
+  web:
+    generate: true
+    image_path: "assets/icons/app_icon.png"
+    background_color: "#ffffff"
+    theme_color: "#1976D2"
+  windows:
+    generate: true
+    image_path: "assets/icons/app_icon.png"
+    icon_size: 48
+  image_path: "assets/icons/app_icon.png"
+  adaptive_icon_background: "#ffffff"
+  adaptive_icon_foreground: "assets/icons/app_icon.png"
