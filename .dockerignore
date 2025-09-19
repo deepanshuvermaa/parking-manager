@@ -1,0 +1,11 @@
+# Ignore everything except backend
+*
+!backend/
+
+# But ignore these inside backend
+backend/node_modules/
+backend/.env
+backend/.env.*
+backend/npm-debug.log*
+backend/dist/
+backend/build/
