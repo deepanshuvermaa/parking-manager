@@ -263,20 +263,26 @@ class ApiService {
         }),
       );
 
+      print('Signup response status: ${response.statusCode}');
+      print('Signup response body: ${response.body}');
+
       if (response.statusCode == 201 || response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['success'] == true && data['data'] != null) {
           await _storeTokens(data['data']['token'], data['data']['refreshToken'], userId: data['data']['user']['id'].toString());
           return data['data'];
         }
+        print('Signup failed: success is false or data is null');
         return null;
       } else {
         final error = jsonDecode(response.body);
-        throw Exception(error['message'] ?? 'Signup failed');
+        print('Signup error response: ${error['error'] ?? error['message'] ?? 'Unknown error'}');
+        throw Exception(error['error'] ?? error['message'] ?? 'Signup failed');
       }
     } catch (e) {
-      print('Signup error: $e');
-      return null;
+      print('Signup exception: $e');
+      print('Stack trace: ${StackTrace.current}');
+      rethrow;
     }
   }
 

@@ -146,10 +146,12 @@ class _GuestSignupScreenState extends State<GuestSignupScreen> {
           ),
         );
       } else {
+        // Show more detailed error message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Failed to create account'),
+            content: const Text('Failed to create account. Please check your connection and try again.'),
             backgroundColor: AppColors.error,
+            duration: const Duration(seconds: 4),
           ),
         );
       }

@@ -232,15 +232,15 @@ class HybridAuthProvider extends ChangeNotifier {
         final backendResponse = await ApiService.login(username, password);
         if (backendResponse != null) {
           user = User(
-            id: backendResponse['user']['id'],
+            id: backendResponse['user']['id'].toString(),
             username: backendResponse['user']['username'],
             password: '',
             fullName: backendResponse['user']['fullName'],
-            role: backendResponse['user']['role'],
-            createdAt: DateTime.parse(backendResponse['user']['createdAt']),
+            role: backendResponse['user']['userType'] ?? 'guest',  // Fixed: userType not role
+            createdAt: DateTime.now(),  // Fixed: backend doesn't send createdAt
             isGuest: backendResponse['user']['isGuest'] ?? false,
-            trialEndDate: backendResponse['user']['trialEndDate'] != null
-                ? DateTime.parse(backendResponse['user']['trialEndDate'])
+            trialEndDate: backendResponse['user']['trialExpiresAt'] != null  // Fixed: trialExpiresAt not trialEndDate
+                ? DateTime.parse(backendResponse['user']['trialExpiresAt'])
                 : DateTime.now().add(const Duration(days: 7)),
           );
           
@@ -308,19 +308,17 @@ class HybridAuthProvider extends ChangeNotifier {
         if (backendResponse != null) {
           final userData = backendResponse['user'] ?? backendResponse;
           user = User(
-            id: userData['id'] ?? userData['_id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
+            id: (userData['id'] ?? userData['_id'] ?? DateTime.now().millisecondsSinceEpoch).toString(),
             username: userData['username'] ?? userData['email'] ?? email,
             email: userData['email'] ?? email,
             password: '',
             fullName: userData['fullName'] ?? fullName,
-            role: userData['role'] ?? 'guest',
-            createdAt: userData['createdAt'] != null
-                ? DateTime.parse(userData['createdAt'])
-                : DateTime.now(),
-            isGuest: userData['isGuest'] ?? true,
-            trialEndDate: userData['trialEndDate'] != null
-                ? DateTime.parse(userData['trialEndDate'])
-                : DateTime.now().add(const Duration(days: 3)),
+            role: userData['userType'] ?? userData['role'] ?? 'guest',  // Fixed: check userType first
+            createdAt: DateTime.now(),  // Fixed: always use current time since backend doesn't send it
+            isGuest: userData['isGuest'] ?? (password == null),  // Guest if no password
+            trialEndDate: userData['trialExpiresAt'] != null  // Fixed: trialExpiresAt not trialEndDate
+                ? DateTime.parse(userData['trialExpiresAt'])
+                : DateTime.now().add(Duration(days: password != null ? 7 : 3)),  // 7 days for registered, 3 for guest
           );
 
           // Store in local database
@@ -360,13 +358,14 @@ class HybridAuthProvider extends ChangeNotifier {
         
         return true;
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('Guest signup error: $e');
+      debugPrint('Stack trace: $stackTrace');
     } finally {
       _isLoading = false;
       notifyListeners();
     }
-    
+
     return false;
   }
 

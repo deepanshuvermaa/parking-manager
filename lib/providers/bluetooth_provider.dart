@@ -34,6 +34,7 @@ class BluetoothProvider with ChangeNotifier {
   StreamSubscription<List<ScanResult>>? _scanSubscription;
   StreamSubscription<BluetoothAdapterState>? _stateSubscription;
   StreamSubscription<bool>? _isScanningSubscription;
+  StreamSubscription<bool>? _scanCompleteSubscription;  // Add separate subscription for scan complete
   BluetoothCharacteristic? _writeCharacteristic;
   final Map<String, PrinterDevice> _discoveredDevices = {};
   Timer? _autoScanTimer;
@@ -239,8 +240,11 @@ class BluetoothProvider with ChangeNotifier {
       }
       _updateDevicesList();
 
-      // Listen for scan complete
-      FlutterBluePlus.isScanning.listen((scanning) {
+      // Cancel any existing scan complete listener to prevent duplicates
+      _scanCompleteSubscription?.cancel();
+
+      // Listen for scan complete with proper subscription management
+      _scanCompleteSubscription = FlutterBluePlus.isScanning.listen((scanning) {
         if (!scanning && _isScanning) {
           debugPrint('Scan completed, found ${_devices.length} devices');
           _isScanning = false;
@@ -389,6 +393,8 @@ class BluetoothProvider with ChangeNotifier {
       await FlutterBluePlus.stopScan();
       _scanSubscription?.cancel();
       _scanSubscription = null;
+      _scanCompleteSubscription?.cancel();  // Cancel scan complete listener too
+      _scanCompleteSubscription = null;
       debugPrint('Bluetooth scan stopped');
     } catch (e) {
       debugPrint('Stop scan error: $e');
