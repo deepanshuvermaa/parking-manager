@@ -19,15 +19,22 @@ const pool = new Pool({
 });
 
 // Middleware
-// CORS configuration with dynamic localhost port support
+// CORS configuration - Allow mobile apps and localhost
 app.use(cors({
   origin: function(origin, callback) {
-    // Allow any localhost port for development
-    if (!origin || origin.startsWith('http://localhost:') || origin.startsWith('https://deepanshuvermaa.github.io')) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
+    // Allow requests with no origin (mobile apps)
+    if (!origin) {
+      return callback(null, true);
     }
+
+    // Allow any localhost port for development
+    if (origin.startsWith('http://localhost:') ||
+        origin.startsWith('https://deepanshuvermaa.github.io')) {
+      return callback(null, true);
+    }
+
+    // Allow all origins for now (can be restricted later)
+    return callback(null, true);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
