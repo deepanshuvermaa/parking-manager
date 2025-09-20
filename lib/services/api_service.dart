@@ -10,10 +10,8 @@ import '../services/device_info_helper.dart';
 import '../config/app_config.dart';
 
 class ApiService {
-  // Base URL - Change for production
-  static String get baseUrl => kDebugMode
-      ? 'http://localhost:3000'
-      : 'https://parkease-production-6679.up.railway.app';
+  // Base URL - Force production URL
+  static const String baseUrl = 'https://parkease-production-6679.up.railway.app';
 
   static String get apiUrl => '$baseUrl/api';
 
@@ -251,20 +249,36 @@ class ApiService {
     try {
       final deviceId = await DeviceInfoHelper.getDeviceId();
 
+      print('=== API SERVICE SIGNUP DEBUG ===');
+      print('API URL: $apiUrl/auth/signup');
+      print('Email: $email');
+      print('Password: ${password.replaceAll(RegExp(r'.'), '*')}');
+      print('Full Name: $fullName');
+      print('Device ID: $deviceId');
+      print('Base URL: $baseUrl');
+
+      final requestBody = {
+        'email': email,
+        'password': password,
+        'fullName': fullName,
+        'deviceId': deviceId,
+        'isTrialUser': true,
+      };
+
+      print('Request body: ${jsonEncode(requestBody)}');
+      print('Headers: {Content-Type: application/json}');
+      print('Starting HTTP request...');
+
       final response = await http.post(
         Uri.parse('$apiUrl/auth/signup'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'email': email,
-          'password': password,
-          'fullName': fullName,
-          'deviceId': deviceId,
-          'isTrialUser': true,
-        }),
-      );
+        body: jsonEncode(requestBody),
+      ).timeout(const Duration(seconds: 15));
 
-      print('Signup response status: ${response.statusCode}');
-      print('Signup response body: ${response.body}');
+      print('✅ HTTP request completed');
+      print('Response status: ${response.statusCode}');
+      print('Response headers: ${response.headers}');
+      print('Response body: ${response.body}');
 
       if (response.statusCode == 201 || response.statusCode == 200) {
         final data = jsonDecode(response.body);

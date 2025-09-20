@@ -16,6 +16,7 @@ class HybridAuthProvider extends ChangeNotifier {
   final DatabaseHelper _dbHelper = DatabaseHelper();
   String? _deviceId;
   Timer? _sessionCheckTimer;
+  String? _lastError;
 
   User? get currentUser => _currentUser;
   bool get isAuthenticated => _isAuthenticated;
@@ -25,6 +26,7 @@ class HybridAuthProvider extends ChangeNotifier {
   bool get isGuest => _currentUser?.isGuest ?? false;
   bool get canAccess => _currentUser?.canAccess ?? false;
   int get remainingTrialDays => _currentUser?.remainingTrialDays ?? 0;
+  String? get lastError => _lastError;
 
   HybridAuthProvider() {
     _initializeProvider();
@@ -39,22 +41,9 @@ class HybridAuthProvider extends ChangeNotifier {
   }
 
   Future<void> _checkBackendConnectivity() async {
-    print('Checking backend connectivity...');
-
-    // Try the health check
-    final healthCheck = await ApiService.isBackendHealthy();
-    print('Health check result: $healthCheck');
-
-    // In release mode, always assume online to allow API attempts
-    // This prevents the app from being stuck in offline mode due to health check issues
-    if (!kDebugMode) {
-      _isOnline = true;
-      print('Release mode: Forcing online mode to allow API attempts');
-    } else {
-      _isOnline = healthCheck;
-      print('Debug mode: Backend is online: $_isOnline');
-    }
-
+    print('Skipping health check - forcing online mode');
+    _isOnline = true;
+    print('✅ Online mode enabled');
     notifyListeners();
   }
   
@@ -233,13 +222,14 @@ class HybridAuthProvider extends ChangeNotifier {
         if (backendResponse != null) {
           user = User(
             id: backendResponse['user']['id'].toString(),
-            username: backendResponse['user']['username'],
+            username: backendResponse['user']['username'] ?? backendResponse['user']['email'],
+            email: backendResponse['user']['email'],
             password: '',
             fullName: backendResponse['user']['fullName'],
-            role: backendResponse['user']['userType'] ?? 'guest',  // Fixed: userType not role
-            createdAt: DateTime.now(),  // Fixed: backend doesn't send createdAt
+            role: backendResponse['user']['userType'] ?? 'guest',
+            createdAt: DateTime.now(),
             isGuest: backendResponse['user']['isGuest'] ?? false,
-            trialEndDate: backendResponse['user']['trialExpiresAt'] != null  // Fixed: trialExpiresAt not trialEndDate
+            trialEndDate: backendResponse['user']['trialExpiresAt'] != null
                 ? DateTime.parse(backendResponse['user']['trialExpiresAt'])
                 : DateTime.now().add(const Duration(days: 7)),
           );
@@ -295,30 +285,33 @@ class HybridAuthProvider extends ChangeNotifier {
 
         // If password is provided, use the full signup endpoint
         if (password != null && password.isNotEmpty) {
-          print('Using full signup endpoint with password');
+          print('🔐 Using full signup endpoint with password');
+          print('📧 Email: $email');
+          print('👤 Full Name: $fullName');
+          print('🌐 Online status: $_isOnline');
+
           backendResponse = await ApiService.signup(email, password, fullName);
+          print('📨 Raw backend response: $backendResponse');
         } else {
           // Otherwise use guest signup - use email as username
-          print('Using guest signup endpoint');
+          print('👥 Using guest signup endpoint');
           backendResponse = await ApiService.guestSignup(email, fullName);
         }
-
-        print('Backend response: $backendResponse');
 
         if (backendResponse != null) {
           final userData = backendResponse['user'] ?? backendResponse;
           user = User(
-            id: (userData['id'] ?? userData['_id'] ?? DateTime.now().millisecondsSinceEpoch).toString(),
+            id: userData['id'].toString(),
             username: userData['username'] ?? userData['email'] ?? email,
             email: userData['email'] ?? email,
             password: '',
             fullName: userData['fullName'] ?? fullName,
-            role: userData['userType'] ?? userData['role'] ?? 'guest',  // Fixed: check userType first
-            createdAt: DateTime.now(),  // Fixed: always use current time since backend doesn't send it
-            isGuest: userData['isGuest'] ?? (password == null),  // Guest if no password
-            trialEndDate: userData['trialExpiresAt'] != null  // Fixed: trialExpiresAt not trialEndDate
+            role: userData['userType'] ?? 'guest',
+            createdAt: DateTime.now(),
+            isGuest: userData['isGuest'] ?? (password == null),
+            trialEndDate: userData['trialExpiresAt'] != null
                 ? DateTime.parse(userData['trialExpiresAt'])
-                : DateTime.now().add(Duration(days: password != null ? 7 : 3)),  // 7 days for registered, 3 for guest
+                : DateTime.now().add(Duration(days: password != null ? 7 : 3)),
           );
 
           // Store in local database
@@ -359,8 +352,11 @@ class HybridAuthProvider extends ChangeNotifier {
         return true;
       }
     } catch (e, stackTrace) {
-      debugPrint('Guest signup error: $e');
-      debugPrint('Stack trace: $stackTrace');
+      print('❌ GUEST SIGNUP EXCEPTION: $e');
+      print('📍 Stack trace: $stackTrace');
+      print('🌐 Was online: $_isOnline');
+      print('📧 Email attempted: $email');
+      _lastError = 'DETAILED ERROR: $e';
     } finally {
       _isLoading = false;
       notifyListeners();

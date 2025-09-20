@@ -179,7 +179,7 @@ class BluetoothProvider with ChangeNotifier {
     }
   }
 
-  Future<void> startScan({Duration timeout = const Duration(seconds: 15)}) async {
+  Future<void> startScan({Duration timeout = const Duration(seconds: 20)}) async {
     if (_isScanning) {
       debugPrint('Already scanning');
       return;
@@ -211,6 +211,8 @@ class BluetoothProvider with ChangeNotifier {
         timeout: timeout,
         androidScanMode: AndroidScanMode.lowLatency,
         androidUsesFineLocation: true,
+        continuousUpdates: true,
+        continuousDivisor: 1,
       );
 
       // Listen to scan results
@@ -243,12 +245,22 @@ class BluetoothProvider with ChangeNotifier {
       // Cancel any existing scan complete listener to prevent duplicates
       _scanCompleteSubscription?.cancel();
 
+      // Wait for scan to actually run and give minimum scan time
+      await Future.delayed(const Duration(seconds: 2));
+
       // Listen for scan complete with proper subscription management
       _scanCompleteSubscription = FlutterBluePlus.isScanning.listen((scanning) {
         if (!scanning && _isScanning) {
           debugPrint('Scan completed, found ${_devices.length} devices');
           _isScanning = false;
           notifyListeners();
+        }
+      });
+
+      // Ensure minimum scan duration
+      Future.delayed(const Duration(seconds: 5), () {
+        if (_isScanning && _devices.isEmpty) {
+          debugPrint('No devices found after 5 seconds, continuing scan...');
         }
       });
 
