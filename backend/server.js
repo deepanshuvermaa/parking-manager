@@ -20,7 +20,7 @@ const pool = new Pool({
 
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3001', 'https://deepanshuvermaa.github.io'],
+  origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3103', 'https://deepanshuvermaa.github.io'],
   credentials: true
 }));
 
