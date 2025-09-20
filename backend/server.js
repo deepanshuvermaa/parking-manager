@@ -29,14 +29,14 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Rate limiting - fix trust proxy issue
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.',
-  trustProxy: true
-});
-app.use('/api/', limiter);
+// Rate limiting - temporarily disabled for debugging
+// const limiter = rateLimit({
+//   windowMs: 15 * 60 * 1000, // 15 minutes
+//   max: 100, // limit each IP to 100 requests per windowMs
+//   message: 'Too many requests from this IP, please try again later.',
+//   trustProxy: true
+// });
+// app.use('/api/', limiter);
 
 // JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || 'parkease-super-secret-key-2024';
