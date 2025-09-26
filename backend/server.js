@@ -1005,12 +1005,23 @@ try {
   console.log('⚠️ User Management addon not found or disabled');
 }
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`🚀 ParkEase Backend Server running on port ${PORT}`);
-  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔗 Health check: http://localhost:${PORT}/health`);
-});
+// Run database migrations on startup
+const runStartupMigrations = require('./scripts/startup-migration');
+(async () => {
+  try {
+    await runStartupMigrations(pool);
+  } catch (error) {
+    console.error('Migration error during startup:', error);
+    // Continue running even if migrations fail
+  }
+
+  // Start server
+  app.listen(PORT, () => {
+    console.log(`🚀 ParkEase Backend Server running on port ${PORT}`);
+    console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🔗 Health check: http://localhost:${PORT}/health`);
+  });
+})();
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
