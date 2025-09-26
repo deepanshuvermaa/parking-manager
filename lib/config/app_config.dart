@@ -1,50 +1,89 @@
+import 'package:shared_preferences/shared_preferences.dart';
+
+/// App configuration and feature flags
+/// This allows enabling/disabling features without code changes
 class AppConfig {
-  // Backend Configuration
-  static const String backendUrl = String.fromEnvironment(
-    'BACKEND_URL',
-    defaultValue: 'https://parkease-production-6679.up.railway.app'
-  );
-  
-  // Local development URL (when testing locally)
-  static const String localBackendUrl = 'http://localhost:3000';
-  
-  // Admin Panel Configuration
-  static const String adminPanelUrl = 'https://deepanshuvermaa.github.io/quickbill-admin';
-  
-  // App Configuration
-  static const String appName = 'ParkEase Manager';
-  static const String appVersion = '1.2.1';
-  static const String companyName = 'Go2 Billing Softwares';
-  
-  // Feature Flags
-  static const bool enableBackendSync = true;
-  static const bool enableOfflineMode = true;
-  static const bool enableGuestMode = true;
-  
-  // Default Settings
-  static const int defaultTrialDays = 3;
-  static const int sessionCheckIntervalMinutes = 5;
-  static const int maxRetryAttempts = 3;
-  
-  // API Timeouts (in seconds)
-  static const int connectionTimeout = 30;
-  static const int receiveTimeout = 30;
-  
-  // Local Database
-  static const String databaseName = 'parkease.db';
-  static const int databaseVersion = 1;
-  
-  // Environment Detection
-  static bool get isProduction => 
-      const bool.fromEnvironment('dart.vm.product', defaultValue: false);
-  
-  static bool get isDebug => !isProduction;
-  
-  // Get appropriate backend URL based on environment
-  static String get apiBaseUrl {
-    if (isDebug && const bool.fromEnvironment('USE_LOCAL_BACKEND', defaultValue: false)) {
-      return localBackendUrl;
+  // Feature flags
+  static bool _enableUserManagement = false;
+  static bool _enableAdvancedReports = false;
+  static bool _debugMode = false;
+
+  // Beta users who get early access to features
+  static const List<String> _betaUsers = [
+    'deepanshuverma966@gmail.com',
+    // Add more beta testers here
+  ];
+
+  // Getters
+  static bool get enableUserManagement => _enableUserManagement;
+  static bool get enableAdvancedReports => _enableAdvancedReports;
+  static bool get debugMode => _debugMode;
+
+  /// Initialize app configuration
+  static Future<void> initialize() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    // Check if user is a beta tester
+    final userEmail = prefs.getString('user_email') ?? '';
+    final isBetaUser = _betaUsers.contains(userEmail.toLowerCase());
+
+    // Load feature flags from preferences or defaults
+    _enableUserManagement = prefs.getBool('enable_user_management') ?? isBetaUser;
+    _enableAdvancedReports = prefs.getBool('enable_advanced_reports') ?? false;
+    _debugMode = prefs.getBool('debug_mode') ?? false;
+
+    // For production safety, can override all features
+    final safeMode = prefs.getBool('safe_mode') ?? false;
+    if (safeMode) {
+      _enableUserManagement = false;
+      _enableAdvancedReports = false;
+      print('⚠️ Safe mode enabled - new features disabled');
     }
-    return backendUrl;
+
+    print('📱 App Config initialized:');
+    print('   User Management: $_enableUserManagement');
+    print('   Advanced Reports: $_enableAdvancedReports');
+    print('   Debug Mode: $_debugMode');
+    print('   Beta User: $isBetaUser');
+  }
+
+  /// Enable/disable user management feature
+  static Future<void> setUserManagement(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('enable_user_management', enabled);
+    _enableUserManagement = enabled;
+  }
+
+  /// Enable safe mode (disables all experimental features)
+  static Future<void> enableSafeMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('safe_mode', true);
+    _enableUserManagement = false;
+    _enableAdvancedReports = false;
+    print('🛡️ Safe mode activated - all experimental features disabled');
+  }
+
+  /// Check if current user is owner (for permission checks)
+  static Future<bool> isOwner() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userData = prefs.getString('user_data');
+    if (userData != null) {
+      // Check role in user data
+      return userData.contains('"role":"owner"');
+    }
+    // Default to true for backward compatibility
+    return true;
+  }
+
+  /// Check if feature is available for current user
+  static bool isFeatureAvailable(String feature) {
+    switch (feature) {
+      case 'user_management':
+        return _enableUserManagement;
+      case 'advanced_reports':
+        return _enableAdvancedReports;
+      default:
+        return false;
+    }
   }
 }

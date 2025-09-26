@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/hybrid_auth_provider.dart';
+import '../providers/simplified_auth_provider.dart';
 import '../utils/constants.dart';
 import '../widgets/loading_button.dart';
-import 'dashboard_screen.dart';
 
 class GuestSignupScreen extends StatefulWidget {
   const GuestSignupScreen({super.key});
@@ -15,6 +14,7 @@ class GuestSignupScreen extends StatefulWidget {
 class _GuestSignupScreenState extends State<GuestSignupScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _fullNameController = TextEditingController();
@@ -26,6 +26,7 @@ class _GuestSignupScreenState extends State<GuestSignupScreen> {
   @override
   void dispose() {
     _emailController.dispose();
+    _phoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _fullNameController.dispose();
@@ -49,12 +50,13 @@ class _GuestSignupScreenState extends State<GuestSignupScreen> {
       _isLoading = true;
     });
 
-    final authProvider = context.read<HybridAuthProvider>();
-    // Use email as username for guest signup with password
-    final result = await authProvider.guestSignup(
-      _emailController.text.trim(),  // email used as username
+    final authProvider = context.read<SimplifiedAuthProvider>();
+    // Use the regular signup method
+    final result = await authProvider.signup(
+      _emailController.text.trim(),
+      _passwordController.text.trim(),
       _fullNameController.text.trim(),
-      password: _passwordController.text.trim(),
+      phoneNumber: _phoneController.text.trim(),
     );
 
     if (mounted) {
@@ -135,10 +137,8 @@ class _GuestSignupScreenState extends State<GuestSignupScreen> {
               ElevatedButton(
                 onPressed: () {
                   Navigator.pop(context);
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (_) => const DashboardScreen()),
-                  );
+                  // AuthWrapper will automatically navigate to DashboardScreen
+                  // when SimplifiedAuthProvider's isAuthenticated becomes true
                 },
                 child: const Text('Get Started'),
               ),
@@ -147,9 +147,11 @@ class _GuestSignupScreenState extends State<GuestSignupScreen> {
         );
       } else {
         // Show more detailed error message
+        // Show actual error message from provider
+        final errorMessage = authProvider.lastError ?? 'Failed to create account. Please check your connection and try again.';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Failed to create account. Please check your connection and try again.'),
+            content: Text(errorMessage),
             backgroundColor: AppColors.error,
             duration: const Duration(seconds: 4),
           ),
@@ -276,6 +278,35 @@ class _GuestSignupScreenState extends State<GuestSignupScreen> {
                             if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
                                 .hasMatch(value)) {
                               return 'Please enter a valid email';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Phone Number field
+                        TextFormField(
+                          controller: _phoneController,
+                          keyboardType: TextInputType.phone,
+                          decoration: InputDecoration(
+                            labelText: 'Phone Number',
+                            prefixIcon: const Icon(Icons.phone),
+                            hintText: '+91 9876543210',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter your phone number';
+                            }
+                            // Remove spaces and special characters for validation
+                            final cleanPhone = value.replaceAll(RegExp(r'[^\d+]'), '');
+                            if (cleanPhone.length < 10) {
+                              return 'Please enter a valid phone number';
+                            }
+                            if (!RegExp(r'^(\+91|91|0)?[6-9]\d{9}$').hasMatch(cleanPhone)) {
+                              return 'Please enter a valid Indian phone number';
                             }
                             return null;
                           },

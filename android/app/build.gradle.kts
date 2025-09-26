@@ -21,10 +21,11 @@ android {
 
     defaultConfig {
         applicationId = "com.go2billing.parkease"
-        minSdk = flutter.minSdkVersion
+        minSdk = flutter.minSdkVersion  // Android 5.0 (Lollipop) - Lower for better compatibility
         targetSdk = flutter.targetSdkVersion
         versionCode = 1
         versionName = "1.0.0"
+        multiDexEnabled = true  // Enable multidex for older Android versions
     }
 
     buildTypes {

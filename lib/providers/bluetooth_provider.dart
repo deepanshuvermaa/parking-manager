@@ -111,7 +111,7 @@ class BluetoothProvider with ChangeNotifier {
       // Auto-scan for devices after initialization
       if (_isBluetoothEnabled && _devices.isEmpty) {
         Future.delayed(const Duration(milliseconds: 500), () {
-          startScan(timeout: const Duration(seconds: 10));
+          startScan(timeout: const Duration(seconds: 30));
         });
       }
     } catch (e) {
@@ -179,21 +179,35 @@ class BluetoothProvider with ChangeNotifier {
     }
   }
 
-  Future<void> startScan({Duration timeout = const Duration(seconds: 20)}) async {
+  Future<void> startScan({Duration timeout = const Duration(seconds: 30)}) async {
     if (_isScanning) {
       debugPrint('Already scanning');
       return;
     }
 
+    // First ensure permissions
+    if (!_hasPermissions) {
+      debugPrint('Requesting permissions before scan');
+      _hasPermissions = await _requestPermissions();
+      if (!_hasPermissions) {
+        _lastError = 'Bluetooth permissions required to scan';
+        notifyListeners();
+        return;
+      }
+    }
+
     if (!_isBluetoothEnabled) {
       debugPrint('Bluetooth is not enabled');
+      _lastError = 'Please turn on Bluetooth';
       // Try to turn on Bluetooth
       await FlutterBluePlus.turnOn();
-      await Future.delayed(const Duration(seconds: 2));
+      await Future.delayed(const Duration(seconds: 3));
 
       // Check again
       final state = await FlutterBluePlus.adapterState.first;
       if (state != BluetoothAdapterState.on) {
+        _lastError = 'Bluetooth is off. Please enable it in settings.';
+        notifyListeners();
         return;
       }
     }
@@ -207,12 +221,14 @@ class BluetoothProvider with ChangeNotifier {
       debugPrint('Starting Bluetooth scan...');
 
       // Set scan settings for better discovery
+      debugPrint('Scan will run for ${timeout.inSeconds} seconds');
       await FlutterBluePlus.startScan(
         timeout: timeout,
         androidScanMode: AndroidScanMode.lowLatency,
         androidUsesFineLocation: true,
         continuousUpdates: true,
         continuousDivisor: 1,
+        removeIfGone: const Duration(seconds: 15),
       );
 
       // Listen to scan results
@@ -407,9 +423,13 @@ class BluetoothProvider with ChangeNotifier {
       _scanSubscription = null;
       _scanCompleteSubscription?.cancel();  // Cancel scan complete listener too
       _scanCompleteSubscription = null;
-      debugPrint('Bluetooth scan stopped');
+      _isScanning = false;  // Ensure scanning state is updated
+      debugPrint('Bluetooth scan stopped manually');
+      notifyListeners();
     } catch (e) {
       debugPrint('Stop scan error: $e');
+      _isScanning = false;
+      notifyListeners();
     }
   }
 
@@ -604,7 +624,7 @@ class BluetoothProvider with ChangeNotifier {
       // Amount with double height
       if (receiptData['amount'] != null && receiptData['amount'] != '0.00') {
         bytes.addAll([0x1B, 0x21, 0x10]); // ESC ! n - Double height
-        bytes.addAll('Amount: ₹${receiptData['amount']}\n'.codeUnits);
+        bytes.addAll('Amount: Rs ${receiptData['amount']}\n'.codeUnits);
         bytes.addAll([0x1B, 0x21, 0x00]); // ESC ! 0 - Normal
       }
 
@@ -719,7 +739,7 @@ class BluetoothProvider with ChangeNotifier {
         await connectToDefaultPrinter();
       } else {
         // Scan for devices
-        await startScan(timeout: const Duration(seconds: 5));
+        await startScan(timeout: const Duration(seconds: 30));
         if (_devices.isNotEmpty) {
           await connectToDefaultPrinter();
         }

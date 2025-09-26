@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'config/app_config.dart';
 import 'providers/vehicle_provider.dart';
-import 'providers/bluetooth_provider.dart';
+import 'providers/simplified_bluetooth_provider.dart';
 import 'providers/settings_provider.dart';
-import 'providers/hybrid_auth_provider.dart';
-import 'services/migration_service.dart';
+import 'providers/simplified_auth_provider.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/login_screen.dart';
 import 'utils/constants.dart';
@@ -13,16 +13,8 @@ import 'utils/constants.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  try {
-    // Check and run migration if needed
-    final migrationCompleted = await MigrationService.isMigrationCompleted();
-    if (!migrationCompleted) {
-      await MigrationService.migrateToHybridSystem();
-    }
-  } catch (e) {
-    print('Migration error: $e');
-    // Continue anyway - migration is optional
-  }
+  // Initialize app configuration and feature flags
+  await AppConfig.initialize();
 
   runApp(const ParkEaseApp());
 }
@@ -34,9 +26,9 @@ class ParkEaseApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => HybridAuthProvider()),
+        ChangeNotifierProvider(create: (_) => SimplifiedAuthProvider()),
         ChangeNotifierProvider(create: (_) => VehicleProvider()),
-        ChangeNotifierProvider(create: (_) => BluetoothProvider()),
+        ChangeNotifierProvider(create: (_) => SimplifiedBluetoothProvider()),
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
       ],
       child: MaterialApp(
@@ -102,7 +94,7 @@ class AuthWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<HybridAuthProvider>(
+    return Consumer<SimplifiedAuthProvider>(
       builder: (context, authProvider, _) {
         if (authProvider.isLoading) {
           return const Scaffold(
@@ -112,11 +104,12 @@ class AuthWrapper extends StatelessWidget {
           );
         }
 
+        // Simple check - just isAuthenticated
         if (authProvider.isAuthenticated) {
           return const DashboardScreen();
         }
 
-        return const LoginScreen();
+        return const LoginScreen(); // Back to normal login screen
       },
     );
   }

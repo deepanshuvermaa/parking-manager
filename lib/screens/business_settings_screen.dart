@@ -59,7 +59,8 @@ class _BusinessSettingsScreenState extends State<BusinessSettingsScreen> {
         foregroundColor: Colors.white,
       ),
       body: SafeArea(
-        bottom: false,
+        bottom: true,
+        minimum: const EdgeInsets.only(bottom: 16),
         child: Column(
           children: [
             Expanded(

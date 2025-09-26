@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/hybrid_auth_provider.dart';
+import '../providers/simplified_auth_provider.dart';
 import '../utils/constants.dart';
 import '../widgets/loading_button.dart';
-import 'dashboard_screen.dart';
 import 'guest_signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -35,11 +34,10 @@ class _LoginScreenState extends State<LoginScreen> {
       _isLoading = true;
     });
 
-    final authProvider = context.read<HybridAuthProvider>();
+    final authProvider = context.read<SimplifiedAuthProvider>();
     final success = await authProvider.login(
       _usernameController.text.trim(),
       _passwordController.text,
-      _rememberMe,
     );
 
     if (mounted) {
@@ -48,15 +46,17 @@ class _LoginScreenState extends State<LoginScreen> {
       });
 
       if (success) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const DashboardScreen()),
-        );
+        // Don't navigate manually - AuthWrapper will handle it automatically
+        // when SimplifiedAuthProvider's isAuthenticated becomes true
+        print('✅ Login successful - AuthWrapper will navigate automatically');
       } else {
+        // Show actual error message from provider
+        final errorMessage = authProvider.lastError ?? 'Invalid username or password';
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Invalid username or password'),
+          SnackBar(
+            content: Text(errorMessage),
             backgroundColor: AppColors.error,
+            duration: const Duration(seconds: 4),
           ),
         );
       }

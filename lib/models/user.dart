@@ -38,13 +38,24 @@ class User {
   });
 
   bool get canAccess {
+    // Premium users always have access
     if (subscriptionType == 'premium') return true;
+
+    // Admin users always have access
+    if (role == 'admin') return true;
+
+    // For trial or guest users, check trial expiration
     if (isGuest || subscriptionType == 'trial') {
-      if (trialEndDate != null) {
-        return DateTime.now().isBefore(trialEndDate!);
+      // If no trial end date set, give 7 days from creation
+      if (trialEndDate == null) {
+        final defaultTrialEnd = createdAt.add(Duration(days: 7));
+        return DateTime.now().isBefore(defaultTrialEnd);
       }
+      return DateTime.now().isBefore(trialEndDate!);
     }
-    return false;
+
+    // Default to true for regular users (backwards compatibility)
+    return true;
   }
 
   int get remainingTrialDays {

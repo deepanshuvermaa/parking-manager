@@ -1,4 +1,5 @@
 import 'vehicle_type.dart';
+import 'settings.dart';
 
 class Vehicle {
   final String id;
@@ -32,17 +33,49 @@ class Vehicle {
 
   bool get isActive => exitTime == null;
 
-  double calculateAmount() {
+  double calculateAmount({Settings? settings}) {
     final duration = parkingDuration;
-    final hours = duration.inMinutes / 60.0;
+
+    // Apply grace period if settings provided (should always pass settings!)
+    int gracePeriodMinutes = settings?.gracePeriodMinutes ?? 0;
+    final adjustedDuration = Duration(
+      minutes: duration.inMinutes > gracePeriodMinutes
+        ? duration.inMinutes - gracePeriodMinutes
+        : 0
+    );
+
+    final hours = adjustedDuration.inMinutes / 60.0;
 
     if (vehicleType.flatRate != null) {
-      return vehicleType.flatRate!;
+      double baseAmount = vehicleType.flatRate!;
+
+      // Apply GST if enabled
+      if (settings?.enableGST == true) {
+        final gstAmount = baseAmount * (settings!.gstPercentage / 100);
+        return baseAmount + gstAmount;
+      }
+
+      return baseAmount;
     }
 
-    // Minimum 1 hour charge
+    // Minimum 1 hour charge after grace period
     final chargeableHours = hours < 1 ? 1.0 : hours.ceilToDouble();
-    return chargeableHours * vehicleType.hourlyRate;
+
+    // Use tiered pricing if available, otherwise use hourly rate
+    double baseAmount;
+    if (vehicleType.usesTieredPricing) {
+      baseAmount = vehicleType.calculateTieredAmount(chargeableHours);
+    } else {
+      baseAmount = chargeableHours * vehicleType.hourlyRate;
+    }
+
+    // Apply GST if enabled
+    if (settings?.enableGST == true) {
+      final gstAmount = baseAmount * (settings!.gstPercentage / 100);
+      return baseAmount + gstAmount;
+    }
+
+    return baseAmount;
   }
 
   Vehicle copyWith({

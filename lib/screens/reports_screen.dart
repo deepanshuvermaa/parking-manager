@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/vehicle_provider.dart';
-import '../providers/bluetooth_provider.dart';
+import '../providers/settings_provider.dart';
+import '../providers/simplified_bluetooth_provider.dart';
 import '../models/vehicle.dart';
 import '../utils/constants.dart';
 import '../utils/helpers.dart';
@@ -57,7 +58,8 @@ class _ReportsScreenState extends State<ReportsScreen> with TickerProviderStateM
         ),
       ),
       body: SafeArea(
-        bottom: false,
+        bottom: true,
+        minimum: const EdgeInsets.only(bottom: 16),
         child: TabBarView(
           controller: _tabController,
           children: const [
@@ -189,7 +191,7 @@ class _DailyReportTabState extends State<DailyReportTab> {
                   'Avg. Per Vehicle',
                   totalVehicles > 0
                       ? Helpers.formatCurrency(totalRevenue / totalVehicles)
-                      : '₹0.00',
+                      : context.read<SettingsProvider>().formatCurrency(0),
                   Icons.trending_up,
                   AppColors.accent,
                 ),
@@ -413,12 +415,12 @@ class _DailyReportTabState extends State<DailyReportTab> {
   }
 
   Future<void> _printDailyReport(BuildContext context) async {
-    final bluetoothProvider = context.read<BluetoothProvider>();
+    final bluetoothProvider = context.read<SimplifiedBluetoothProvider>();
     final vehicleProvider = context.read<VehicleProvider>();
 
     if (!bluetoothProvider.isConnected) {
       // Try to connect to default printer
-      await bluetoothProvider.initialize();
+      // Bluetooth already initialized
       if (bluetoothProvider.devices.isEmpty) {
         await bluetoothProvider.startScan();
       }
@@ -486,10 +488,12 @@ ${i + 1}. ${vehicle.vehicleNumber}
     report += '''
 ================================
     END OF REPORT
+--------------------------------
+  Parkease by Go2-Billingsoftware
 ================================
     ''';
 
-    await bluetoothProvider.printText(report);
+    bluetoothProvider.printText(report);
     Helpers.showSnackBar(context, 'Daily report printed successfully');
   }
 }
@@ -607,7 +611,7 @@ class _MonthlyReportTabState extends State<MonthlyReportTab> {
                   'Daily Average',
                   dailyStats.isNotEmpty
                       ? Helpers.formatCurrency(totalRevenue / dailyStats.length)
-                      : '₹0.00',
+                      : context.read<SettingsProvider>().formatCurrency(0),
                   Icons.trending_up,
                   AppColors.accent,
                 ),
@@ -722,12 +726,12 @@ class _MonthlyReportTabState extends State<MonthlyReportTab> {
   }
 
   Future<void> _printMonthlyReport(BuildContext context) async {
-    final bluetoothProvider = context.read<BluetoothProvider>();
+    final bluetoothProvider = context.read<SimplifiedBluetoothProvider>();
     final vehicleProvider = context.read<VehicleProvider>();
 
     if (!bluetoothProvider.isConnected) {
       // Try to connect to default printer
-      await bluetoothProvider.initialize();
+      // Bluetooth already initialized
       if (bluetoothProvider.devices.isEmpty) {
         await bluetoothProvider.startScan();
       }
@@ -776,7 +780,7 @@ Generated: ${Helpers.formatDateTime(DateTime.now())}
 --------------------------------
 Total Vehicles: ${monthVehicles.length}
 Total Revenue: ${Helpers.formatCurrency(totalRevenue)}
-Daily Average: ${dailyStats.isNotEmpty ? Helpers.formatCurrency(totalRevenue / dailyStats.length) : '₹0.00'}
+Daily Average: ${dailyStats.isNotEmpty ? Helpers.formatCurrency(totalRevenue / dailyStats.length) : context.read<SettingsProvider>().formatCurrency(0)}
 --------------------------------
 VEHICLE TYPE BREAKDOWN:
 ''';
@@ -805,10 +809,12 @@ Day ${day.key}: ${Helpers.formatCurrency(day.value)}
     report += '''
 ================================
     END OF REPORT
+--------------------------------
+  Parkease by Go2-Billingsoftware
 ================================
     ''';
 
-    await bluetoothProvider.printText(report);
+    bluetoothProvider.printText(report);
     Helpers.showSnackBar(context, 'Monthly report printed successfully');
   }
 }
@@ -999,7 +1005,7 @@ class _VehicleHistoryTabState extends State<VehicleHistoryTab> {
                     Text(
                       vehicle.totalAmount != null
                           ? Helpers.formatCurrency(vehicle.totalAmount!)
-                          : Helpers.formatCurrency(vehicle.calculateAmount()),
+                          : Helpers.formatCurrency(vehicle.calculateAmount(settings: context.read<SettingsProvider>().settings)),
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         color: AppColors.success,
@@ -1045,12 +1051,12 @@ class _VehicleHistoryTabState extends State<VehicleHistoryTab> {
   }
 
   Future<void> _printHistoryReport(BuildContext context) async {
-    final bluetoothProvider = context.read<BluetoothProvider>();
+    final bluetoothProvider = context.read<SimplifiedBluetoothProvider>();
     final vehicleProvider = context.read<VehicleProvider>();
 
     if (!bluetoothProvider.isConnected) {
       // Try to connect to default printer
-      await bluetoothProvider.initialize();
+      // Bluetooth already initialized
       if (bluetoothProvider.devices.isEmpty) {
         await bluetoothProvider.startScan();
       }
@@ -1106,7 +1112,7 @@ Amount: ${Helpers.formatCurrency(vehicle.totalAmount!)}''';
         report += '''
 Status: ACTIVE
 Duration: ${Helpers.formatDuration(vehicle.parkingDuration)}
-Current: ${Helpers.formatCurrency(vehicle.calculateAmount())}''';
+Current: ${Helpers.formatCurrency(vehicle.calculateAmount(settings: context.read<SettingsProvider>().settings))}''';
       }
 
       if (vehicle.ownerName != null) {
@@ -1119,10 +1125,12 @@ Current: ${Helpers.formatCurrency(vehicle.calculateAmount())}''';
 Showing ${reportVehicles.length} of ${filteredVehicles.length} vehicles
 ================================
     END OF REPORT
+--------------------------------
+  Parkease by Go2-Billingsoftware
 ================================
     ''';
 
-    await bluetoothProvider.printText(report);
+    bluetoothProvider.printText(report);
     Helpers.showSnackBar(context, 'History report printed successfully');
   }
 }

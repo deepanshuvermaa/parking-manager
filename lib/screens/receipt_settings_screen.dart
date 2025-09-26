@@ -266,7 +266,7 @@ class _ReceiptSettingsScreenState extends State<ReceiptSettingsScreen> {
                   const Text('Exit: ${"26/12/2023 12:45 PM"}'),
                   const Text('Duration: 2h 15m'),
                   const SizedBox(height: AppSpacing.sm),
-                  const Text('Amount Paid: ₹45.00'),
+                  Text('Amount Paid: ${context.read<SettingsProvider>().formatCurrency(45.00)}'),
                   if (_showQRCode) ...[
                     const SizedBox(height: AppSpacing.sm),
                     Container(

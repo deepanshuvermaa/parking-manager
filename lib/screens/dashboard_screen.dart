@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/vehicle_provider.dart';
 import '../providers/settings_provider.dart';
-import '../providers/bluetooth_provider.dart';
-import '../providers/hybrid_auth_provider.dart';
+import '../providers/simplified_bluetooth_provider.dart';
+import '../providers/simplified_auth_provider.dart';
 import '../utils/constants.dart';
 import '../utils/helpers.dart';
 import '../widgets/stats_card.dart';
@@ -18,6 +18,7 @@ import 'business_settings_screen.dart';
 import 'vehicle_types_management_screen.dart';
 import 'advanced_settings_screen.dart';
 import 'user_management_screen.dart';
+import 'admin_management_screen.dart';
 import 'login_screen.dart';
 import 'subscription_screen.dart';
 import 'receipt_settings_screen.dart';
@@ -38,28 +39,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _initializeApp() async {
-    final bluetoothProvider = context.read<BluetoothProvider>();
     final settingsProvider = context.read<SettingsProvider>();
-    
     await settingsProvider.loadSettings();
-    
-    if (settingsProvider.settings.autoPrint && 
-        settingsProvider.settings.primaryPrinterId != null) {
-      bluetoothProvider.connectToDefaultPrinter();
-    }
+    // Simplified - no auto-connect on startup
   }
   
   void _checkTrialStatus() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final authProvider = context.read<HybridAuthProvider>();
-      
-      // Check if guest user with expired trial
-      if (authProvider.isGuest && !authProvider.canAccess) {
-        _showTrialExpiredDialog();
-      } else if (authProvider.isGuest && authProvider.remainingTrialDays <= 1) {
-        _showTrialEndingSoonBanner();
-      }
-    });
+    // Simplified - no trial checking for now
+    // This will be added in Phase 2
   }
   
   void _showTrialExpiredDialog() {
@@ -88,14 +75,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               if (!mounted) return;
               
               try {
-                await context.read<HybridAuthProvider>().logout();
-                if (mounted) {
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(builder: (_) => const LoginScreen()),
-                    (route) => false,
-                  );
-                }
+                await context.read<SimplifiedAuthProvider>().logout();
+                // AuthWrapper will automatically navigate to LoginScreen when isAuthenticated becomes false
               } catch (e) {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -124,7 +105,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
   
   void _showTrialEndingSoonBanner() {
-    final authProvider = context.read<HybridAuthProvider>();
+    final authProvider = context.read<SimplifiedAuthProvider>();
     ScaffoldMessenger.of(context).showMaterialBanner(
       MaterialBanner(
         backgroundColor: Colors.orange.shade50,
@@ -136,7 +117,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             Text(
-              'You have ${authProvider.remainingTrialDays} day(s) left in your trial.',
+              'Welcome to ParkEase!',
               style: const TextStyle(fontSize: 14),
             ),
           ],
@@ -495,7 +476,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 _showBackupDialog(context);
               },
             ),
-            if (context.read<HybridAuthProvider>().isAdmin)
+            if (context.read<SimplifiedAuthProvider>().isAdmin)
               ListTile(
                 leading: const Icon(Icons.people),
                 title: const Text('User Management'),
@@ -505,27 +486,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _navigateToScreen(context, const UserManagementScreen());
                 },
               ),
-            if (context.read<HybridAuthProvider>().isGuest)
+            if (context.read<SimplifiedAuthProvider>().isSuperAdmin)
               ListTile(
-                leading: const Icon(Icons.credit_card, color: AppColors.primary),
-                title: const Text('Subscription', style: TextStyle(color: AppColors.primary)),
-                subtitle: Text(
-                  context.read<HybridAuthProvider>().canAccess
-                      ? 'Trial: ${context.read<HybridAuthProvider>().remainingTrialDays} days left'
-                      : 'Subscribe to continue',
-                  style: const TextStyle(fontSize: 12),
-                ),
+                leading: const Icon(Icons.admin_panel_settings),
+                title: const Text('Admin Management'),
+                subtitle: const Text('Deletion codes, audit log, device limits'),
                 onTap: () {
                   Navigator.pop(context);
-                  _navigateToScreen(context, const SubscriptionScreen());
+                  _navigateToScreen(context, const AdminManagementScreen());
                 },
               ),
+            // Subscription tile removed - will be added in Phase 2
             const Divider(),
             ListTile(
               leading: const Icon(Icons.logout, color: Colors.red),
               title: const Text('Logout', style: TextStyle(color: Colors.red)),
               subtitle: Text(
-                'Logged in as: ${context.read<HybridAuthProvider>().currentUser?.fullName ?? "User"}',
+                'Logged in as: ${context.read<SimplifiedAuthProvider>().userEmail ?? "User"}',
                 style: const TextStyle(fontSize: 12),
               ),
               onTap: () async {
@@ -570,18 +547,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   );
                   
                   try {
-                    await context.read<HybridAuthProvider>().logout();
-                    
+                    await context.read<SimplifiedAuthProvider>().logout();
+
                     if (context.mounted) {
                       // Close loading indicator
                       Navigator.pop(context);
-                      
-                      // Navigate to login screen
-                      Navigator.pushAndRemoveUntil(
-                        context,
-                        MaterialPageRoute(builder: (_) => const LoginScreen()),
-                        (route) => false,
-                      );
+                      // AuthWrapper will automatically navigate to LoginScreen when isAuthenticated becomes false
                     }
                   } catch (e) {
                     if (context.mounted) {

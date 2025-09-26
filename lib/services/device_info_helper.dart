@@ -232,4 +232,30 @@ class DeviceInfoHelper {
       return null;
     }
   }
+
+  /// Get current platform name
+  static String getCurrentPlatform() {
+    if (Platform.isAndroid) {
+      return 'Android';
+    } else if (Platform.isIOS) {
+      return 'iOS';
+    } else if (Platform.isWindows) {
+      return 'Windows';
+    } else if (Platform.isMacOS) {
+      return 'macOS';
+    } else if (Platform.isLinux) {
+      return 'Linux';
+    } else {
+      return 'Unknown';
+    }
+  }
+
+  /// Get device name for display
+  static Future<String> getDeviceName() async {
+    try {
+      return await getDeviceDisplayName();
+    } catch (e) {
+      return '${getCurrentPlatform()} Device';
+    }
+  }
 }

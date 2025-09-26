@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/vehicle_provider.dart';
 import '../providers/settings_provider.dart';
-import '../providers/bluetooth_provider.dart';
+import '../providers/simplified_bluetooth_provider.dart';
 import '../models/vehicle.dart';
 import '../utils/constants.dart';
 import '../utils/helpers.dart';
+import '../utils/qr_generator.dart';
 
 class VehicleExitScreen extends StatefulWidget {
   final Vehicle? vehicle;
@@ -69,16 +70,15 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
         ],
       ),
       body: SafeArea(
-        bottom: false,
         child: Column(
           children: [
             Expanded(
               child: SingleChildScrollView(
-                padding: EdgeInsets.only(
+                padding: const EdgeInsets.only(
                   left: AppSpacing.md,
                   right: AppSpacing.md,
                   top: AppSpacing.md,
-                  bottom: MediaQuery.of(context).padding.bottom + 120,
+                  bottom: AppSpacing.lg,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -216,7 +216,7 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
                       '${vehicle.vehicleType.name} • ${Helpers.formatDuration(vehicle.parkingDuration)}',
                     ),
                     trailing: Text(
-                      Helpers.formatCurrency(vehicle.calculateAmount()),
+                      Helpers.formatCurrency(vehicle.calculateAmount(settings: context.read<SettingsProvider>().settings)),
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         color: AppColors.success,
@@ -336,8 +336,18 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
   }
 
   Widget _buildAmountCalculation() {
-    final totalAmount = _selectedVehicle!.calculateAmount();
-    final finalAmount = totalAmount - _discountAmount;
+    final settingsProvider = context.read<SettingsProvider>();
+    final settings = settingsProvider.settings;
+    final baseAmount = _selectedVehicle!.calculateAmount(settings: settings);
+    final discountedAmount = baseAmount - _discountAmount;
+
+    // Calculate GST if enabled
+    double gstAmount = 0;
+    if (settings.enableGST) {
+      gstAmount = discountedAmount * settings.gstPercentage / 100;
+    }
+
+    final finalAmount = discountedAmount + gstAmount;
 
     return Card(
       child: Padding(
@@ -377,7 +387,7 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
                   style: TextStyle(fontWeight: FontWeight.w500),
                 ),
                 Text(
-                  Helpers.formatCurrency(totalAmount),
+                  Helpers.formatCurrency(baseAmount),
                   style: const TextStyle(fontWeight: FontWeight.w500),
                 ),
               ],
@@ -393,6 +403,22 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
                   Text(
                     '- ${Helpers.formatCurrency(_discountAmount)}',
                     style: const TextStyle(color: AppColors.error),
+                  ),
+                ],
+              ),
+            ],
+            if (settings.enableGST && gstAmount > 0) ...[
+              const SizedBox(height: AppSpacing.xs),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'GST (${settings.gstPercentage}%):',
+                    style: const TextStyle(fontWeight: FontWeight.w500),
+                  ),
+                  Text(
+                    '+ ${Helpers.formatCurrency(gstAmount)}',
+                    style: const TextStyle(fontWeight: FontWeight.w500),
                   ),
                 ],
               ),
@@ -446,7 +472,7 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
                     controller: _discountController,
                     decoration: const InputDecoration(
                       labelText: 'Discount Amount',
-                      prefixText: '₹ ',
+                      prefixText: 'Rs ',
                       border: OutlineInputBorder(),
                     ),
                     keyboardType: TextInputType.number,
@@ -460,7 +486,7 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
                 const SizedBox(width: AppSpacing.sm),
                 TextButton(
                   onPressed: () {
-                    final totalAmount = _selectedVehicle!.calculateAmount();
+                    final totalAmount = _selectedVehicle!.calculateAmount(settings: context.read<SettingsProvider>().settings);
                     _discountController.text = totalAmount.toString();
                     setState(() {
                       _discountAmount = totalAmount;
@@ -486,7 +512,18 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
   }
 
   Widget _buildBottomActions() {
-    final finalAmount = _selectedVehicle!.calculateAmount() - _discountAmount;
+    final settingsProvider = context.read<SettingsProvider>();
+    final settings = settingsProvider.settings;
+    final baseAmount = _selectedVehicle!.calculateAmount(settings: settings);
+    final discountedAmount = baseAmount - _discountAmount;
+
+    // Calculate GST if enabled
+    double gstAmount = 0;
+    if (settings.enableGST) {
+      gstAmount = discountedAmount * settings.gstPercentage / 100;
+    }
+
+    final finalAmount = discountedAmount + gstAmount;
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
@@ -616,22 +653,34 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
     try {
       final vehicleProvider = context.read<VehicleProvider>();
       final settingsProvider = context.read<SettingsProvider>();
-      final bluetoothProvider = context.read<BluetoothProvider>();
+      final bluetoothProvider = context.read<SimplifiedBluetoothProvider>();
 
-      final finalAmount = _selectedVehicle!.calculateAmount() - _discountAmount;
+      // Calculate final amount with GST
+      final settings = settingsProvider.settings;
+      final baseAmount = _selectedVehicle!.calculateAmount(settings: settings);
+      final discountedAmount = baseAmount - _discountAmount;
+
+      // Calculate GST if enabled
+      double gstAmount = 0;
+      if (settings.enableGST) {
+        gstAmount = discountedAmount * settings.gstPercentage / 100;
+      }
+
+      final finalAmount = discountedAmount + gstAmount;
 
       // Update vehicle with exit details
       await vehicleProvider.exitVehicle(_selectedVehicle!.id, finalAmount);
 
-      // Auto-print receipt - MANDATORY for exit
+      // Auto-print receipt if enabled in settings
       bool printSuccess = false;
-      setState(() {
-        _isPrintingReceipt = true;
-      });
+      if (settingsProvider.settings.autoPrint) {
+        setState(() {
+          _isPrintingReceipt = true;
+        });
 
-      try {
-        // Always attempt to print receipt for exit
-        final printerReady = await bluetoothProvider.ensurePrinterReady();
+        try {
+          // Attempt to print receipt for exit
+          final printerReady = await bluetoothProvider.ensurePrinterReady();
 
         if (printerReady) {
           printSuccess = await _printReceipt(_selectedVehicle!, finalAmount);
@@ -673,16 +722,22 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
             }
           }
         }
-      } catch (e) {
-        debugPrint('Print error: $e');
-        if (mounted) {
-          Helpers.showSnackBar(context, 'Failed to print receipt: $e', isError: true);
+        } catch (e) {
+          print('Print error: $e');
+          if (mounted) {
+            Helpers.showSnackBar(context, 'Failed to print receipt: $e', isError: true);
+          }
+        } finally {
+          if (mounted) {
+            setState(() {
+              _isPrintingReceipt = false;
+            });
+          }
         }
-      } finally {
+      } else {
+        // Auto-print disabled, just show a notification
         if (mounted) {
-          setState(() {
-            _isPrintingReceipt = false;
-          });
+          Helpers.showSnackBar(context, 'Vehicle checked out successfully (auto-print disabled)');
         }
       }
 
@@ -709,7 +764,7 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
   }
 
   Future<bool> _connectToPrinter() async {
-    final bluetoothProvider = context.read<BluetoothProvider>();
+    final bluetoothProvider = context.read<SimplifiedBluetoothProvider>();
 
     try {
       setState(() {
@@ -722,8 +777,8 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
       if (!ready && mounted) {
         Helpers.showSnackBar(
           context,
-          bluetoothProvider.lastError.isNotEmpty
-              ? bluetoothProvider.lastError
+          bluetoothProvider.lastError?.isNotEmpty == true
+              ? bluetoothProvider.lastError!
               : 'Failed to connect to printer',
           isError: true,
         );
@@ -731,7 +786,7 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
 
       return ready;
     } catch (e) {
-      debugPrint('Failed to connect to printer: $e');
+      print('Failed to connect to printer: $e');
       if (mounted) {
         Helpers.showSnackBar(context, 'Printer connection failed: $e', isError: true);
       }
@@ -746,21 +801,79 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
   }
 
   Future<bool> _printReceipt(Vehicle vehicle, double finalAmount) async {
-    final bluetoothProvider = context.read<BluetoothProvider>();
+    final bluetoothProvider = context.read<SimplifiedBluetoothProvider>();
     final settingsProvider = context.read<SettingsProvider>();
+    final settings = settingsProvider.settings;
+
+    // Recalculate to get GST breakdown
+    final baseAmount = vehicle.calculateAmount(settings: settings);
+    final discountedAmount = baseAmount - _discountAmount;
+    double gstAmount = 0;
+    if (settings.enableGST) {
+      gstAmount = discountedAmount * settings.gstPercentage / 100;
+    }
 
     final receiptData = {
+      'ticketId': vehicle.ticketId,
       'vehicleNumber': vehicle.vehicleNumber,
       'vehicleType': vehicle.vehicleType.name,
+      'ownerName': vehicle.ownerName ?? '',
+      'ownerPhone': vehicle.ownerPhone ?? '',
       'entryTime': Helpers.formatDateTime(vehicle.entryTime),
       'exitTime': Helpers.formatDateTime(DateTime.now()),
       'duration': Helpers.formatDuration(vehicle.parkingDuration),
-      'amount': finalAmount.toStringAsFixed(2),
+      'baseAmount': discountedAmount.toStringAsFixed(2),
+      'gstAmount': gstAmount.toStringAsFixed(2),
+      'totalAmount': finalAmount.toStringAsFixed(2),
     };
 
-    // Use proper receipt printing method
-    final success = await bluetoothProvider.printReceipt(receiptData);
-    return success;
+    // Generate QR code data if enabled
+    String qrSection = '';
+    if (settingsProvider.showQRCode) {
+      final qrData = QRGenerator.generateReceiptQRData(
+        ticketId: vehicle.ticketId,
+        vehicleNumber: vehicle.vehicleNumber,
+        entryTime: vehicle.entryTime,
+        exitTime: DateTime.now(),
+        amount: finalAmount,
+        transactionId: 'TXN${DateTime.now().millisecondsSinceEpoch}',
+      );
+      // For now, use fallback text info instead of broken QR code
+      // TODO: Implement proper QR code with ESC/POS commands when printer supports it
+      qrSection = '\n${QRGenerator.generateFallbackTicketInfo(qrData)}\n';
+    }
+
+    // Convert receipt data to string format with complete business and customer info
+    final receipt = '''
+================================
+${settingsProvider.settings.businessName.toUpperCase()}
+================================
+${settingsProvider.settings.businessAddress}
+Ph: ${settingsProvider.settings.businessPhone}
+${settingsProvider.settings.enableGST ? 'GST: ${settingsProvider.settings.gstNumber}' : ''}
+--------------------------------
+       PARKING RECEIPT
+--------------------------------
+Ticket ID: ${receiptData['ticketId']}
+Vehicle: ${receiptData['vehicleNumber']}
+Type: ${receiptData['vehicleType']}
+${vehicle.ownerName != null ? 'Owner: ${receiptData['ownerName']}' : ''}
+${vehicle.ownerPhone != null ? 'Phone: ${receiptData['ownerPhone']}' : ''}
+--------------------------------
+Entry: ${receiptData['entryTime']}
+Exit: ${receiptData['exitTime']}
+Duration: ${receiptData['duration']}
+--------------------------------
+Subtotal: ${settingsProvider.formatCurrency(double.tryParse(receiptData['baseAmount'] ?? '0') ?? 0)}${_discountAmount > 0 ? '\nDiscount: -${settingsProvider.formatCurrency(_discountAmount)}' : ''}${settings.enableGST ? '\nGST(${settings.gstPercentage}%): ${settingsProvider.formatCurrency(double.tryParse(receiptData['gstAmount'] ?? '0') ?? 0)}' : ''}
+--------------------------------
+Total: ${settingsProvider.formatCurrency(double.tryParse(receiptData['totalAmount'] ?? '0') ?? 0)}$qrSection
+================================
+${settingsProvider.receiptFooterText}
+================================
+''';
+
+    bluetoothProvider.printReceipt(receipt);
+    return true;
   }
 
 }

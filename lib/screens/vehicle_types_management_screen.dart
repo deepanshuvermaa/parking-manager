@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/vehicle_provider.dart';
+import '../providers/simplified_auth_provider.dart';
 import '../models/vehicle_type.dart';
+import '../models/rate_tier.dart';
+import '../widgets/admin_deletion_dialog.dart';
+import '../services/admin_service.dart';
 import '../utils/constants.dart';
 import '../utils/helpers.dart';
 
@@ -102,9 +106,18 @@ class _VehicleTypesManagementScreenState extends State<VehicleTypesManagementScr
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Hourly: ${Helpers.formatCurrency(vehicleType.hourlyRate)}',
-                        ),
+                        if (vehicleType.usesTieredPricing)
+                          Text(
+                            vehicleType.pricingSummary,
+                            style: const TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          )
+                        else
+                          Text(
+                            'Hourly: ${Helpers.formatCurrency(vehicleType.hourlyRate)}',
+                          ),
                         if (vehicleType.flatRate != null)
                           Text(
                             'Flat: ${Helpers.formatCurrency(vehicleType.flatRate!)}',
@@ -145,6 +158,11 @@ class _VehicleTypesManagementScreenState extends State<VehicleTypesManagementScr
       text: vehicleType?.flatRate?.toString() ?? '',
     );
 
+    bool useTieredPricing = vehicleType?.usesTieredPricing ?? false;
+    List<RateTier> rateTiers = vehicleType?.rateTiers != null
+        ? List<RateTier>.from(vehicleType!.rateTiers!)
+        : [];
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -175,7 +193,7 @@ class _VehicleTypesManagementScreenState extends State<VehicleTypesManagementScr
                 controller: hourlyRateController,
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
-                  labelText: 'Hourly Rate (₹)',
+                  labelText: 'Hourly Rate (Rs)',
                   hintText: 'e.g., 20',
                   border: OutlineInputBorder(),
                 ),
@@ -185,7 +203,7 @@ class _VehicleTypesManagementScreenState extends State<VehicleTypesManagementScr
                 controller: flatRateController,
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
-                  labelText: 'Flat Rate (Optional) (₹)',
+                  labelText: 'Flat Rate (Optional) (Rs)',
                   hintText: 'e.g., 100',
                   border: OutlineInputBorder(),
                 ),
@@ -249,32 +267,53 @@ class _VehicleTypesManagementScreenState extends State<VehicleTypesManagementScr
     );
   }
 
-  void _showDeleteConfirmation(VehicleType vehicleType) {
-    showDialog(
+  void _showDeleteConfirmation(VehicleType vehicleType) async {
+    final authProvider = context.read<SimplifiedAuthProvider>();
+
+    // Check if user has permission to delete
+    if (!AdminService.canDeleteItems(authProvider)) {
+      Helpers.showSnackBar(
+        context,
+        'You do not have permission to delete items',
+        isError: true,
+      );
+      return;
+    }
+
+    // Show admin deletion dialog with protection
+    await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Vehicle Type'),
-        content: Text(
-          'Are you sure you want to delete "${vehicleType.name}"? This action cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final vehicleProvider = context.read<VehicleProvider>();
-              vehicleProvider.deleteVehicleType(vehicleType.id);
-              Navigator.pop(context);
+      barrierDismissible: false,
+      builder: (context) => AdminDeletionDialog(
+        itemType: 'Vehicle Type',
+        itemId: vehicleType.id,
+        itemName: vehicleType.name,
+        onConfirmed: () async {
+          try {
+            final vehicleProvider = context.read<VehicleProvider>();
+            vehicleProvider.deleteVehicleType(vehicleType.id);
+
+            // Log the admin action
+            await AdminService.logAdminAction(
+              'DELETE',
+              'Vehicle Type',
+              vehicleType.id,
+              authProvider.userId ?? 'unknown',
+            );
+
+            if (mounted) {
               Helpers.showSnackBar(context, 'Vehicle type deleted successfully');
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
+            }
+          } catch (e) {
+            if (mounted) {
+              Helpers.showSnackBar(
+                context,
+                'Failed to delete vehicle type: $e',
+                isError: true,
+              );
+            }
+          }
+        },
       ),
     );
   }

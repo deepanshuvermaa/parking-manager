@@ -990,6 +990,21 @@ app.use((error, req, res, next) => {
   res.status(500).json({ success: false, error: 'Internal server error' });
 });
 
+// ================================
+// OPTIONAL: User Management Features
+// ================================
+// This is a safe addon that doesn't modify existing functionality
+// Comment out the next line to disable user management features
+try {
+  const enableUserManagement = process.env.ENABLE_USER_MANAGEMENT !== 'false';
+  if (enableUserManagement) {
+    require('./user-management-addon')(app, pool, verifyToken);
+    console.log('📥 User Management features loaded');
+  }
+} catch (error) {
+  console.log('⚠️ User Management addon not found or disabled');
+}
+
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 ParkEase Backend Server running on port ${PORT}`);

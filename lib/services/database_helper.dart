@@ -1,5 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../models/user.dart';
 import '../models/vehicle.dart';
 import '../models/vehicle_type.dart';
@@ -12,7 +13,13 @@ class DatabaseHelper {
 
   DatabaseHelper._internal();
 
-  Future<Database> get database async {
+  Future<Database?> get database async {
+    // Skip database initialization on web
+    if (kIsWeb) {
+      print('⚠️ SQLite not available on web platform');
+      return null;
+    }
+
     if (_database != null) return _database!;
     _database = await _initDatabase();
     return _database!;
@@ -22,7 +29,7 @@ class DatabaseHelper {
     final path = join(await getDatabasesPath(), 'parkease.db');
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,  // Increment version to trigger migration
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -32,14 +39,22 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE users(
         id TEXT PRIMARY KEY,
-        email TEXT NOT NULL UNIQUE,
-        name TEXT NOT NULL,
+        username TEXT,
+        email TEXT,
+        name TEXT,
+        fullName TEXT,
+        password TEXT,
         role TEXT NOT NULL,
         businessId TEXT,
         deviceId TEXT,
+        currentDeviceId TEXT,
+        isGuest INTEGER DEFAULT 0,
         createdAt TEXT NOT NULL,
         lastLogin TEXT,
-        metadata TEXT
+        metadata TEXT,
+        trialEndDate TEXT,
+        subscriptionType TEXT,
+        features TEXT
       )
     ''');
 
@@ -90,6 +105,33 @@ class DatabaseHelper {
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 3) {
+      // Add missing columns to existing users table
+      try {
+        await db.execute('ALTER TABLE users ADD COLUMN username TEXT');
+      } catch (e) { /* Column might already exist */ }
+      try {
+        await db.execute('ALTER TABLE users ADD COLUMN fullName TEXT');
+      } catch (e) { /* Column might already exist */ }
+      try {
+        await db.execute('ALTER TABLE users ADD COLUMN password TEXT');
+      } catch (e) { /* Column might already exist */ }
+      try {
+        await db.execute('ALTER TABLE users ADD COLUMN currentDeviceId TEXT');
+      } catch (e) { /* Column might already exist */ }
+      try {
+        await db.execute('ALTER TABLE users ADD COLUMN isGuest INTEGER DEFAULT 0');
+      } catch (e) { /* Column might already exist */ }
+      try {
+        await db.execute('ALTER TABLE users ADD COLUMN trialEndDate TEXT');
+      } catch (e) { /* Column might already exist */ }
+      try {
+        await db.execute('ALTER TABLE users ADD COLUMN subscriptionType TEXT');
+      } catch (e) { /* Column might already exist */ }
+      try {
+        await db.execute('ALTER TABLE users ADD COLUMN features TEXT');
+      } catch (e) { /* Column might already exist */ }
+    }
     if (oldVersion < 2) {
       await db.execute('ALTER TABLE vehicles ADD COLUMN metadata TEXT');
       await db.execute('ALTER TABLE users ADD COLUMN metadata TEXT');
@@ -112,6 +154,7 @@ class DatabaseHelper {
 
   Future<User?> getUser(String email) async {
     final db = await database;
+    if (db == null) return null;
     final maps = await db.query(
       'users',
       where: 'email = ?',
@@ -126,11 +169,13 @@ class DatabaseHelper {
 
   Future<int> insertUser(User user) async {
     final db = await database;
+    if (db == null) return 0;
     return await db.insert('users', user.toJson());
   }
 
   Future<int> updateUser(User user) async {
     final db = await database;
+    if (db == null) return 0;
     return await db.update(
       'users',
       user.toJson(),
@@ -141,6 +186,7 @@ class DatabaseHelper {
 
   Future<int> deleteUser(String id) async {
     final db = await database;
+    if (db == null) return 0;
     return await db.delete(
       'users',
       where: 'id = ?',
@@ -150,6 +196,7 @@ class DatabaseHelper {
 
   Future<List<Vehicle>> getVehicles({String? status}) async {
     final db = await database;
+    if (db == null) return [];
     final List<Map<String, dynamic>> maps = status != null
         ? await db.query('vehicles', where: 'status = ?', whereArgs: [status])
         : await db.query('vehicles');
@@ -161,11 +208,13 @@ class DatabaseHelper {
 
   Future<int> insertVehicle(Vehicle vehicle) async {
     final db = await database;
+    if (db == null) return 0;
     return await db.insert('vehicles', vehicle.toJson());
   }
 
   Future<int> updateVehicle(Vehicle vehicle) async {
     final db = await database;
+    if (db == null) return 0;
     return await db.update(
       'vehicles',
       vehicle.toJson(),
@@ -176,6 +225,7 @@ class DatabaseHelper {
 
   Future<List<VehicleType>> getVehicleTypes() async {
     final db = await database;
+    if (db == null) return [];
     final List<Map<String, dynamic>> maps = await db.query('vehicle_types');
 
     return List.generate(maps.length, (i) {
@@ -185,11 +235,13 @@ class DatabaseHelper {
 
   Future<int> insertVehicleType(VehicleType type) async {
     final db = await database;
+    if (db == null) return 0;
     return await db.insert('vehicle_types', type.toJson());
   }
 
   Future<int> updateVehicleType(VehicleType type) async {
     final db = await database;
+    if (db == null) return 0;
     return await db.update(
       'vehicle_types',
       type.toJson(),
@@ -200,6 +252,7 @@ class DatabaseHelper {
 
   Future<int> deleteVehicleType(String id) async {
     final db = await database;
+    if (db == null) return 0;
     return await db.delete(
       'vehicle_types',
       where: 'id = ?',
@@ -209,6 +262,7 @@ class DatabaseHelper {
 
   Future<Map<String, dynamic>> getSettings() async {
     final db = await database;
+    if (db == null) return {};
     final List<Map<String, dynamic>> maps = await db.query('settings');
 
     final settings = <String, dynamic>{};
@@ -221,6 +275,7 @@ class DatabaseHelper {
 
   Future<void> saveSetting(String key, dynamic value) async {
     final db = await database;
+    if (db == null) return;
     await db.insert(
       'settings',
       {'key': key, 'value': value.toString()},
@@ -230,6 +285,7 @@ class DatabaseHelper {
 
   Future<void> clearDatabase() async {
     final db = await database;
+    if (db == null) return;
     await db.delete('vehicles');
     await db.delete('users');
     await db.delete('settings');
@@ -237,15 +293,23 @@ class DatabaseHelper {
 
   Future<void> close() async {
     final db = await database;
+    if (db == null) return;
     await db.close();
   }
 
   Future<User?> authenticateUser(String username, String password) async {
     final db = await database;
+    // Return null if database is not available (web platform)
+    if (db == null) {
+      print('⚠️ Local authentication not available on web platform');
+      return null;
+    }
+
+    // Try to authenticate with username OR email
     final maps = await db.query(
       'users',
-      where: 'username = ? AND password = ?',
-      whereArgs: [username, password],
+      where: '(username = ? OR email = ?) AND password = ?',
+      whereArgs: [username, username, password],
     );
 
     if (maps.isNotEmpty) {
@@ -256,6 +320,7 @@ class DatabaseHelper {
 
   Future<bool> isDeviceInUse(String deviceId) async {
     final db = await database;
+    if (db == null) return false;
     final maps = await db.query(
       'users',
       where: 'deviceId = ? AND isGuest = ?',
@@ -282,6 +347,7 @@ class DatabaseHelper {
 
   Future<void> updateUserSubscription(String userId, String subscriptionType) async {
     final db = await database;
+    if (db == null) return;
     await db.update(
       'users',
       {'subscriptionType': subscriptionType},
@@ -292,12 +358,14 @@ class DatabaseHelper {
 
   Future<List<User>> getAllUsers() async {
     final db = await database;
+    if (db == null) return [];
     final List<Map<String, dynamic>> maps = await db.query('users');
     return List.generate(maps.length, (i) => User.fromJson(maps[i]));
   }
 
   Future<bool> changePassword(String userId, String oldPassword, String newPassword) async {
     final db = await database;
+    if (db == null) return false;
     final result = await db.update(
       'users',
       {'password': newPassword},
@@ -314,6 +382,12 @@ class DatabaseHelper {
 
   Future<void> createUser(dynamic userOrData) async {
     final db = await database;
+    // Skip if database is not available (web platform)
+    if (db == null) {
+      print('⚠️ Skipping local user storage on web platform');
+      return;
+    }
+
     Map<String, dynamic> userData;
 
     if (userOrData is User) {
@@ -329,5 +403,26 @@ class DatabaseHelper {
 
   Future<List<Vehicle>> getActiveVehicles() async {
     return getVehicles(status: 'active');
+  }
+
+  Future<void> resetDatabase() async {
+    if (kIsWeb) return;
+
+    try {
+      // Close existing connection
+      if (_database != null) {
+        await _database!.close();
+        _database = null;
+      }
+
+      // Delete the database file
+      final path = join(await getDatabasesPath(), 'parkease.db');
+      await deleteDatabase(path);
+
+      // Reinitialize will happen on next access
+      print('✅ Database reset successfully');
+    } catch (e) {
+      print('❌ Database reset failed: $e');
+    }
   }
 }

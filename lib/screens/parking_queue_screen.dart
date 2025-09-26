@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/vehicle_provider.dart';
+import '../providers/settings_provider.dart';
 import '../models/vehicle.dart';
 import '../utils/constants.dart';
 import '../utils/helpers.dart';
@@ -115,7 +116,7 @@ class _ParkingQueueScreenState extends State<ParkingQueueScreen> {
       builder: (context, vehicleProvider, _) {
         final filteredVehicles = _getFilteredVehicles(vehicleProvider);
         final totalAmount = filteredVehicles.fold(0.0, (sum, vehicle) {
-          return sum + vehicle.calculateAmount();
+          return sum + vehicle.calculateAmount(settings: context.read<SettingsProvider>().settings);
         });
 
         return Container(
@@ -233,7 +234,7 @@ class _ParkingQueueScreenState extends State<ParkingQueueScreen> {
 
   Widget _buildVehicleCard(Vehicle vehicle) {
     final parkingDuration = vehicle.parkingDuration;
-    final currentAmount = vehicle.calculateAmount();
+    final currentAmount = vehicle.calculateAmount(settings: context.read<SettingsProvider>().settings);
 
     return Card(
       margin: const EdgeInsets.only(bottom: AppSpacing.md),
@@ -436,7 +437,7 @@ class _ParkingQueueScreenState extends State<ParkingQueueScreen> {
               _buildDetailRow('Vehicle Type', vehicle.vehicleType.name),
               _buildDetailRow('Entry Time', Helpers.formatDateTime(vehicle.entryTime)),
               _buildDetailRow('Parking Duration', Helpers.formatDuration(vehicle.parkingDuration)),
-              _buildDetailRow('Current Amount', Helpers.formatCurrency(vehicle.calculateAmount())),
+              _buildDetailRow('Current Amount', Helpers.formatCurrency(vehicle.calculateAmount(settings: context.read<SettingsProvider>().settings))),
               if (vehicle.ownerName != null)
                 _buildDetailRow('Owner Name', vehicle.ownerName!),
               if (vehicle.ownerPhone != null)

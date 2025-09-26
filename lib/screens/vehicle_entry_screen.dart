@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/vehicle_provider.dart';
 import '../providers/settings_provider.dart';
-import '../providers/bluetooth_provider.dart';
+import '../providers/simplified_bluetooth_provider.dart';
 import '../models/vehicle.dart';
 import '../models/vehicle_type.dart';
 import '../utils/constants.dart';
 import '../utils/helpers.dart';
+import '../utils/qr_generator.dart';
 
 class VehicleEntryScreen extends StatefulWidget {
   const VehicleEntryScreen({super.key});
@@ -46,16 +47,15 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
         foregroundColor: Colors.white,
       ),
       body: SafeArea(
-        bottom: false,
         child: Column(
           children: [
             Expanded(
               child: SingleChildScrollView(
-                padding: EdgeInsets.only(
+                padding: const EdgeInsets.only(
                   left: AppSpacing.md,
                   right: AppSpacing.md,
                   top: AppSpacing.md,
-                  bottom: MediaQuery.of(context).padding.bottom + 100,
+                  bottom: AppSpacing.lg,
                 ),
                 child: Form(
                   key: _formKey,
@@ -416,8 +416,8 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
         return;
       }
 
-      // Generate ticket ID
-      final ticketId = '${settingsProvider.settings.ticketIdPrefix}${settingsProvider.settings.nextTicketNumber.toString().padLeft(4, '0')}';
+      // Generate ticket ID using the proper method that increments the counter
+      final ticketId = await settingsProvider.generateNextTicketId();
 
       final vehicle = Vehicle(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -439,7 +439,7 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
           _isPrintingReceipt = true;
         });
 
-        final bluetoothProvider = context.read<BluetoothProvider>();
+        final bluetoothProvider = context.read<SimplifiedBluetoothProvider>();
 
         try {
           // Ensure printer is ready
@@ -481,7 +481,7 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
             }
           }
         } catch (e) {
-          debugPrint('Print error: $e');
+          print('Print error: $e');
         } finally {
           if (mounted) {
             setState(() {
@@ -512,7 +512,7 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
   }
 
   Future<bool> _connectToPrinter() async {
-    final bluetoothProvider = context.read<BluetoothProvider>();
+    final bluetoothProvider = context.read<SimplifiedBluetoothProvider>();
 
     try {
       setState(() {
@@ -526,8 +526,8 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
         // Show error with retry option
         Helpers.showSnackBar(
           context,
-          bluetoothProvider.lastError.isNotEmpty
-              ? bluetoothProvider.lastError
+          bluetoothProvider.lastError?.isNotEmpty == true
+              ? bluetoothProvider.lastError!
               : 'Failed to connect to printer',
           isError: true,
         );
@@ -535,7 +535,7 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
 
       return ready;
     } catch (e) {
-      debugPrint('Failed to connect to printer: $e');
+      print('Failed to connect to printer: $e');
       if (mounted) {
         Helpers.showSnackBar(context, 'Printer connection failed: $e', isError: true);
       }
@@ -550,25 +550,61 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
   }
 
   Future<bool> _printTicket(Vehicle vehicle) async {
-    final bluetoothProvider = context.read<BluetoothProvider>();
+    final bluetoothProvider = context.read<SimplifiedBluetoothProvider>();
     final settingsProvider = context.read<SettingsProvider>();
 
     final receiptData = {
+      'ticketId': vehicle.ticketId,
+      'date': Helpers.formatDateTime(DateTime.now()),
       'vehicleNumber': vehicle.vehicleNumber,
       'vehicleType': vehicle.vehicleType.name,
       'entryTime': Helpers.formatDateTime(vehicle.entryTime),
-      'exitTime': '',
-      'duration': '',
-      'amount': '0.00',
+      'rate': settingsProvider.formatCurrency(vehicle.vehicleType.hourlyRate) + '/hr',
     };
 
-    // Use proper receipt printing method
-    final success = await bluetoothProvider.printReceipt(receiptData);
-    return success;
+    // Generate QR code data if enabled
+    String qrSection = '';
+    if (settingsProvider.showQRCode) {
+      final qrData = QRGenerator.generateTicketQRData(
+        ticketId: vehicle.ticketId,
+        vehicleNumber: vehicle.vehicleNumber,
+        entryTime: vehicle.entryTime,
+        vehicleType: vehicle.vehicleType.name,
+        ownerPhone: vehicle.ownerPhone,
+      );
+      // For now, use fallback text info instead of broken QR code
+      // TODO: Implement proper QR code with ESC/POS commands when printer supports it
+      qrSection = '\n${QRGenerator.generateFallbackTicketInfo(qrData)}\n';
+    }
+
+    // Convert receipt data to string format with business info from settings
+    final receipt = '''
+================================
+${settingsProvider.settings.businessName.toUpperCase()}
+================================
+${settingsProvider.settings.businessAddress}
+Ph: ${settingsProvider.settings.businessPhone}
+--------------------------------
+       PARKING TICKET
+--------------------------------
+Ticket ID: ${receiptData['ticketId']}
+Date: ${receiptData['date']}
+Vehicle: ${receiptData['vehicleNumber']}
+Type: ${receiptData['vehicleType']}
+Entry: ${receiptData['entryTime']}
+Rate: ${receiptData['rate']}
+--------------------------------
+Grace Period: ${settingsProvider.settings.gracePeriodMinutes} minutes$qrSection
+${settingsProvider.receiptFooterText}
+================================
+''';
+
+    bluetoothProvider.printReceipt(receipt);
+    return true;
   }
 
   Future<void> _printTicketOld(Vehicle vehicle) async {
-    final bluetoothProvider = context.read<BluetoothProvider>();
+    final bluetoothProvider = context.read<SimplifiedBluetoothProvider>();
     final settingsProvider = context.read<SettingsProvider>();
 
     final ticket = '''
@@ -589,6 +625,6 @@ Please keep this ticket safe
 ==============================
 ''';
 
-    await bluetoothProvider.printText(ticket);
+    bluetoothProvider.printText(ticket);
   }
 }

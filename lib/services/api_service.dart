@@ -67,7 +67,7 @@ class ApiService {
   }
 
   // Clear tokens
-  static Future<void> _clearTokens() async {
+  static Future<void> clearTokens() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
     await prefs.remove('refresh_token');
@@ -174,7 +174,8 @@ class ApiService {
   static Future<Map<String, dynamic>?> login(String username, String password) async {
     try {
       final deviceId = await DeviceInfoHelper.getDeviceId();
-      
+
+      print('🔐 Attempting login for: $username');
       final response = await http.post(
         Uri.parse('$apiUrl/auth/login'),
         headers: {'Content-Type': 'application/json'},
@@ -183,22 +184,30 @@ class ApiService {
           'password': password,
           'deviceId': deviceId,
         }),
-      );
+      ).timeout(const Duration(seconds: 15));
+
+      print('📨 Login response: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['success'] == true && data['data'] != null) {
           await _storeTokens(data['data']['token'], data['data']['refreshToken'], userId: data['data']['user']['id'].toString());
+          print('✅ Login successful, tokens stored');
           return data['data'];
         }
-        return null;
+        throw Exception(data['message'] ?? 'Login failed - invalid response');
       } else {
         final error = jsonDecode(response.body);
-        throw Exception(error['message'] ?? 'Login failed');
+        final errorMessage = error['error'] ?? error['message'] ?? 'Login failed';
+        print('❌ Login failed: $errorMessage');
+        throw Exception(errorMessage);
       }
     } catch (e) {
-      print('Login error: $e');
-      return null;
+      print('❌ Login exception: $e');
+      if (e is Exception) {
+        rethrow;
+      }
+      throw Exception('Network error: Please check your connection');
     }
   }
 
@@ -249,13 +258,7 @@ class ApiService {
     try {
       final deviceId = await DeviceInfoHelper.getDeviceId();
 
-      print('=== API SERVICE SIGNUP DEBUG ===');
-      print('API URL: $apiUrl/auth/signup');
-      print('Email: $email');
-      print('Password: ${password.replaceAll(RegExp(r'.'), '*')}');
-      print('Full Name: $fullName');
-      print('Device ID: $deviceId');
-      print('Base URL: $baseUrl');
+      print('🔐 Attempting signup for: $email');
 
       final requestBody = {
         'email': email,
@@ -265,38 +268,34 @@ class ApiService {
         'isTrialUser': true,
       };
 
-      print('Request body: ${jsonEncode(requestBody)}');
-      print('Headers: {Content-Type: application/json}');
-      print('Starting HTTP request...');
-
       final response = await http.post(
         Uri.parse('$apiUrl/auth/signup'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(requestBody),
       ).timeout(const Duration(seconds: 15));
 
-      print('✅ HTTP request completed');
-      print('Response status: ${response.statusCode}');
-      print('Response headers: ${response.headers}');
-      print('Response body: ${response.body}');
+      print('📨 Signup response: ${response.statusCode}');
 
       if (response.statusCode == 201 || response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['success'] == true && data['data'] != null) {
           await _storeTokens(data['data']['token'], data['data']['refreshToken'], userId: data['data']['user']['id'].toString());
+          print('✅ Signup successful, tokens stored');
           return data['data'];
         }
-        print('Signup failed: success is false or data is null');
-        return null;
+        throw Exception(data['message'] ?? 'Signup failed - invalid response');
       } else {
         final error = jsonDecode(response.body);
-        print('Signup error response: ${error['error'] ?? error['message'] ?? 'Unknown error'}');
-        throw Exception(error['error'] ?? error['message'] ?? 'Signup failed');
+        final errorMessage = error['error'] ?? error['message'] ?? 'Signup failed';
+        print('❌ Signup failed: $errorMessage');
+        throw Exception(errorMessage);
       }
     } catch (e) {
-      print('Signup exception: $e');
-      print('Stack trace: ${StackTrace.current}');
-      rethrow;
+      print('❌ Signup exception: $e');
+      if (e is Exception) {
+        rethrow;
+      }
+      throw Exception('Network error: Please check your connection');
     }
   }
 
@@ -312,7 +311,7 @@ class ApiService {
     }
 
     // Always clear tokens
-    await _clearTokens();
+    await clearTokens();
     return true;
   }
 
@@ -521,6 +520,118 @@ class ApiService {
     } catch (e) {
       print('Mark notifications read error: $e');
       return false;
+    }
+  }
+
+  // Device Management Methods
+  static Future<Map<String, dynamic>?> registerDevice(Map<String, dynamic> deviceInfo) async {
+    try {
+      final response = await _makeRequest('POST', '/devices/register', body: deviceInfo);
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return jsonDecode(response.body);
+      }
+      return null;
+    } catch (e) {
+      print('Register device error: $e');
+      return null;
+    }
+  }
+
+  static Future<Map<String, dynamic>?> checkDevicePermission(String userId, String deviceId) async {
+    try {
+      final response = await _makeRequest('GET', '/devices/check-permission?userId=$userId&deviceId=$deviceId');
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return null;
+    } catch (e) {
+      print('Check device permission error: $e');
+      return null;
+    }
+  }
+
+  static Future<Map<String, dynamic>?> syncDeviceData(Map<String, dynamic> data) async {
+    try {
+      final response = await _makeRequest('POST', '/devices/sync', body: data);
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return null;
+    } catch (e) {
+      print('Sync device data error: $e');
+      return null;
+    }
+  }
+
+  static Future<Map<String, dynamic>?> logoutOtherDevices(String currentDeviceId) async {
+    try {
+      final response = await _makeRequest('POST', '/devices/logout-others', body: {'deviceId': currentDeviceId});
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return null;
+    } catch (e) {
+      print('Logout other devices error: $e');
+      return null;
+    }
+  }
+
+  static Future<Map<String, dynamic>?> getDeviceStatus() async {
+    try {
+      final response = await _makeRequest('GET', '/devices/status');
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return null;
+    } catch (e) {
+      print('Get device status error: $e');
+      return null;
+    }
+  }
+
+  static Future<Map<String, dynamic>?> checkAdminStatus(String userId) async {
+    try {
+      final response = await _makeRequest('GET', '/admin/check-status?userId=$userId');
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return null;
+    } catch (e) {
+      print('Check admin status error: $e');
+      return null;
+    }
+  }
+
+  // Admin deletion protection methods
+  static Future<Map<String, dynamic>?> validateDeletionCode(String code, String itemType, String itemId) async {
+    try {
+      final response = await _makeRequest('POST', '/admin/validate-deletion', body: {
+        'code': code,
+        'itemType': itemType,
+        'itemId': itemId,
+      });
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return null;
+    } catch (e) {
+      print('Validate deletion code error: $e');
+      return null;
+    }
+  }
+
+  static Future<Map<String, dynamic>?> validateAdminPassword(String password) async {
+    try {
+      final response = await _makeRequest('POST', '/admin/validate-password', body: {
+        'password': password,
+      });
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return null;
+    } catch (e) {
+      print('Validate admin password error: $e');
+      return null;
     }
   }
 }
