@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// This allows enabling/disabling features without code changes
 class AppConfig {
   // Feature flags
-  static bool _enableUserManagement = false;
+  static bool _enableUserManagement = true; // Enable by default
   static bool _enableAdvancedReports = false;
   static bool _debugMode = false;
 

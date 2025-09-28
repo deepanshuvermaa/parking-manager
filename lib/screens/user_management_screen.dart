@@ -320,6 +320,14 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
         ],
       ),
       body: _buildBody(),
+      floatingActionButton: (_userRole == 'owner' || _userRole == 'manager')
+          ? FloatingActionButton.extended(
+              onPressed: _showInviteDialog,
+              label: const Text('Add Staff'),
+              icon: const Icon(Icons.person_add),
+              backgroundColor: AppColors.primary,
+            )
+          : null,
     );
   }
 

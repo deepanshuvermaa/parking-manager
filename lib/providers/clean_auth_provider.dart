@@ -126,6 +126,7 @@ class CleanAuthProvider extends ChangeNotifier {
 
   /// Simple logout - clear everything
   Future<void> logout() async {
+    print('🚪 Logout started');
     _isLoading = true;
     notifyListeners();
 
@@ -140,14 +141,20 @@ class CleanAuthProvider extends ChangeNotifier {
           },
         ).timeout(const Duration(seconds: 3));
       } catch (e) {
-        // Ignore backend errors
+        print('Backend logout error (ignoring): $e');
       }
     }
 
     // Clear everything
     await _clearAll();
 
+    // Set authenticated to false BEFORE notifying
+    _isAuthenticated = false;
     _isLoading = false;
+
+    print('✅ Logout complete - isAuthenticated: $_isAuthenticated');
+
+    // Notify listeners to trigger UI update
     notifyListeners();
   }
 

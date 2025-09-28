@@ -49,7 +49,8 @@ class SettingsProvider with ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
 
       // Save main settings
-      await prefs.setString('settings', jsonEncode(_settings.toJson()));
+      final settingsJson = jsonEncode(_settings.toJson());
+      await prefs.setString('settings', settingsJson);
 
       // Save additional settings
       await prefs.setString('printerFormat', _printerFormat);
@@ -59,7 +60,11 @@ class SettingsProvider with ChangeNotifier {
       await prefs.setBool('showQRCode', _showQRCode);
       await prefs.setString('receiptFooterText', _receiptFooterText);
 
-      debugPrint('✅ Settings persisted to SharedPreferences');
+      debugPrint('✅ Settings persisted to SharedPreferences:');
+      debugPrint('   Business Name: ${_settings.businessName}');
+      debugPrint('   Business Address: ${_settings.businessAddress}');
+      debugPrint('   Business Phone: ${_settings.businessPhone}');
+      debugPrint('   JSON: $settingsJson');
     } catch (e) {
       debugPrint('❌ Error persisting settings: $e');
     }
@@ -67,17 +72,27 @@ class SettingsProvider with ChangeNotifier {
 
   /// Load all settings from SharedPreferences or backend
   Future<void> loadSettings() async {
+    debugPrint('🔄 Loading settings...');
     final prefs = await SharedPreferences.getInstance();
 
     // First, load from local storage
     final settingsJson = prefs.getString('settings');
-    if (settingsJson != null) {
+    debugPrint('📦 Stored settings JSON: $settingsJson');
+
+    if (settingsJson != null && settingsJson.isNotEmpty) {
       try {
-        _settings = Settings.fromJson(jsonDecode(settingsJson));
-        debugPrint('✅ Settings loaded from SharedPreferences');
+        final decodedJson = jsonDecode(settingsJson);
+        _settings = Settings.fromJson(decodedJson);
+        debugPrint('✅ Settings loaded from SharedPreferences:');
+        debugPrint('   Business Name: ${_settings.businessName}');
+        debugPrint('   Business Address: ${_settings.businessAddress}');
+        debugPrint('   Business Phone: ${_settings.businessPhone}');
       } catch (e) {
         debugPrint('❌ Error parsing local settings: $e');
+        debugPrint('   JSON was: $settingsJson');
       }
+    } else {
+      debugPrint('⚠️ No stored settings found, using defaults');
     }
 
     // Load additional settings

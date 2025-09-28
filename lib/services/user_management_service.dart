@@ -158,6 +158,7 @@ class UserManagementService {
           'totalVehicles': 0,
           'activeSubscriptions': 0,
           'owner': user['fullName'] ?? 'Business Owner',
+          'userRole': user['role'] ?? 'owner', // Add user role
           'createdAt': DateTime.now().toIso8601String(),
         };
       }
@@ -168,6 +169,7 @@ class UserManagementService {
         'totalVehicles': 0,
         'activeSubscriptions': 0,
         'owner': 'Business Owner',
+        'userRole': 'owner', // Default to owner
         'createdAt': DateTime.now().toIso8601String(),
       };
     } catch (e) {
@@ -179,6 +181,7 @@ class UserManagementService {
         'totalVehicles': 0,
         'activeSubscriptions': 0,
         'owner': 'Business Owner',
+        'userRole': 'owner', // Add user role
         'createdAt': DateTime.now().toIso8601String(),
       };
     }
