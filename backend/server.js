@@ -192,6 +192,7 @@ app.post('/api/auth/guest-signup-old', async (req, res) => {
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 });
+*/
 
 // Signup endpoint removed - using authController
 
