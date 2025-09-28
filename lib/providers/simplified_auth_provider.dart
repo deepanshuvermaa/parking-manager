@@ -41,7 +41,7 @@ class SimplifiedAuthProvider extends ChangeNotifier {
 
   Future<void> _initialize() async {
     _deviceId = await DeviceInfoHelper.getDeviceId();
-    await ApiService.initialize();
+    // DO NOT call ApiService.initialize() here - it was loading tokens
     await _checkBackendConnectivity();
     await _checkStoredAuth();
     _startSessionCheck();
@@ -95,6 +95,11 @@ class SimplifiedAuthProvider extends ChangeNotifier {
             _authToken = token;
             _userData = Map<String, dynamic>.from(userData);
             _isAuthenticated = true;
+
+            // Set tokens in ApiService (single source of truth)
+            final refreshToken = prefs.getString('refresh_token');
+            final userId = userData['id']?.toString();
+            ApiService.setTokensFromAuthProvider(token, refreshToken, userId: userId);
 
             // Restore User model
             _currentUserModel = User(
@@ -165,6 +170,7 @@ class SimplifiedAuthProvider extends ChangeNotifier {
           // Save to SharedPreferences - exactly like SimpleAuthTest
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('auth_token', data['data']['token']);
+          await prefs.setString('refresh_token', data['data']['refreshToken'] ?? '');
           await prefs.setString('user_id', data['data']['user']['id'].toString());
           await prefs.setString('user_email', data['data']['user']['username'] ?? email);
           await prefs.setBool('is_logged_in', true);
@@ -177,6 +183,13 @@ class SimplifiedAuthProvider extends ChangeNotifier {
           _authToken = data['data']['token'];
           _userData = data['data']['user'];
           _isAuthenticated = true;
+
+          // Set tokens in ApiService (single source of truth)
+          ApiService.setTokensFromAuthProvider(
+            data['data']['token'],
+            data['data']['refreshToken'],
+            userId: data['data']['user']['id'].toString(),
+          );
 
           // Create User model for subscription tracking
           _currentUserModel = User(
@@ -248,6 +261,7 @@ class SimplifiedAuthProvider extends ChangeNotifier {
           // Auto-login after signup
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('auth_token', data['data']['token']);
+          await prefs.setString('refresh_token', data['data']['refreshToken'] ?? '');
           await prefs.setString('user_id', data['data']['user']['id'].toString());
           await prefs.setString('user_email', email);
           await prefs.setBool('is_logged_in', true);
@@ -256,6 +270,13 @@ class SimplifiedAuthProvider extends ChangeNotifier {
           _authToken = data['data']['token'];
           _userData = data['data']['user'];
           _isAuthenticated = true;
+
+          // Set tokens in ApiService (single source of truth)
+          ApiService.setTokensFromAuthProvider(
+            data['data']['token'],
+            data['data']['refreshToken'],
+            userId: data['data']['user']['id'].toString(),
+          );
 
           // Create User model for subscription tracking
           _currentUserModel = User(
@@ -365,13 +386,15 @@ class SimplifiedAuthProvider extends ChangeNotifier {
       await prefs.remove('device_id');
       await prefs.remove('device_permissions');
 
-      // Clear any cached data
+      // Clear any cached data (but NOT app settings!)
       await prefs.remove('cached_vehicles');
-      await prefs.remove('settings_json');
-      await prefs.remove('settings'); // Clear settings as well
+      // DO NOT remove settings_json or settings - they are app settings, not auth data!
+      // await prefs.remove('settings_json'); // REMOVED - this was deleting app settings
+      // await prefs.remove('settings'); // REMOVED - this was deleting app settings
 
-      // Also clear tokens from ApiService to ensure complete logout
+      // Clear tokens from ApiService AND set them to null
       await ApiService.clearTokens();
+      ApiService.setTokensFromAuthProvider(null, null, userId: null);
 
       // Clear state variables BEFORE notifying listeners
       _authToken = null;

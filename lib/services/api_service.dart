@@ -19,15 +19,24 @@ class ApiService {
   static Timer? _tokenRefreshTimer;
   static String? _userId;
 
-  // Initialize with stored tokens
+  // Initialize without auto-loading tokens
+  // Tokens should only be loaded through auth provider
   static Future<void> initialize() async {
-    final prefs = await SharedPreferences.getInstance();
-    _authToken = prefs.getString('auth_token');
-    _refreshToken = prefs.getString('refresh_token');
-    _userId = prefs.getString('user_id');
+    // Do NOT auto-load tokens here
+    // This was causing auto-login issues
+    print('ApiService initialized (tokens not auto-loaded)');
+  }
+
+  // Set tokens from auth provider (single source of truth)
+  static void setTokensFromAuthProvider(String? authToken, String? refreshToken, {String? userId}) {
+    _authToken = authToken;
+    _refreshToken = refreshToken;
+    _userId = userId;
 
     if (_authToken != null) {
       _scheduleTokenRefresh();
+    } else {
+      _tokenRefreshTimer?.cancel();
     }
   }
 

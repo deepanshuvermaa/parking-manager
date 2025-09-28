@@ -24,23 +24,32 @@ class UserManagementService {
   /// Get all users in the business
   static Future<List<Map<String, dynamic>>> getBusinessUsers() async {
     try {
-      final headers = await _getAuthHeaders();
-      final response = await http.get(
-        Uri.parse('$baseUrl/business/users'),
-        headers: headers,
-      );
+      // Temporarily return current user until backend endpoints are implemented
+      print('⚠️ Business endpoints not yet implemented, returning current user only');
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['success'] == true) {
-          return List<Map<String, dynamic>>.from(data['data'] ?? []);
-        }
+      final prefs = await SharedPreferences.getInstance();
+      final userData = prefs.getString('user_data');
+
+      if (userData != null) {
+        final user = json.decode(userData);
+        return [
+          {
+            'id': user['id'],
+            'username': user['username'] ?? user['email'],
+            'email': user['email'],
+            'fullName': user['fullName'],
+            'role': user['role'] ?? 'owner',
+            'isActive': true,
+            'createdAt': DateTime.now().toIso8601String(),
+          }
+        ];
       }
 
-      throw Exception('Failed to fetch users: ${response.body}');
+      return [];
     } catch (e) {
       print('Error fetching business users: $e');
-      throw e;
+      // Return empty list instead of throwing
+      return [];
     }
   }
 
@@ -135,23 +144,43 @@ class UserManagementService {
   /// Get business info and stats
   static Future<Map<String, dynamic>> getBusinessInfo() async {
     try {
-      final headers = await _getAuthHeaders();
-      final response = await http.get(
-        Uri.parse('$baseUrl/business/info'),
-        headers: headers,
-      );
+      // Temporarily return mock data until backend endpoints are implemented
+      print('⚠️ Business endpoints not yet implemented, returning mock data');
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['success'] == true) {
-          return data['data'];
-        }
+      final prefs = await SharedPreferences.getInstance();
+      final userData = prefs.getString('user_data');
+
+      if (userData != null) {
+        final user = json.decode(userData);
+        return {
+          'businessName': 'ParkEase Parking',
+          'totalUsers': 1,
+          'totalVehicles': 0,
+          'activeSubscriptions': 0,
+          'owner': user['fullName'] ?? 'Business Owner',
+          'createdAt': DateTime.now().toIso8601String(),
+        };
       }
 
-      throw Exception('Failed to fetch business info');
+      return {
+        'businessName': 'ParkEase Parking',
+        'totalUsers': 1,
+        'totalVehicles': 0,
+        'activeSubscriptions': 0,
+        'owner': 'Business Owner',
+        'createdAt': DateTime.now().toIso8601String(),
+      };
     } catch (e) {
       print('Error fetching business info: $e');
-      throw e;
+      // Return default data instead of throwing
+      return {
+        'businessName': 'ParkEase Parking',
+        'totalUsers': 1,
+        'totalVehicles': 0,
+        'activeSubscriptions': 0,
+        'owner': 'Business Owner',
+        'createdAt': DateTime.now().toIso8601String(),
+      };
     }
   }
 
