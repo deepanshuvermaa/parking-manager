@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/simplified_auth_provider.dart';
+import '../providers/clean_auth_provider.dart';
 import '../services/admin_service.dart';
 import '../utils/constants.dart';
 import '../utils/helpers.dart';
@@ -49,7 +49,7 @@ class _AdminManagementScreenState extends State<AdminManagementScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = context.watch<SimplifiedAuthProvider>();
+    final authProvider = context.watch<CleanAuthProvider>();
 
     // Only super admin can access this screen
     if (!authProvider.isSuperAdmin) {

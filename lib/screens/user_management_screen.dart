@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/simplified_auth_provider.dart';
+import '../providers/clean_auth_provider.dart';
 import '../services/user_management_service.dart';
 import '../config/app_config.dart';
 import '../utils/constants.dart';
@@ -260,7 +260,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = Provider.of<SimplifiedAuthProvider>(context, listen: false);
+    final authProvider = Provider.of<CleanAuthProvider>(context, listen: false);
 
     if (!AppConfig.enableUserManagement) {
       return Scaffold(
@@ -435,7 +435,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
               final user = _users[index];
               final isActive = user['is_active'] ?? true;
               final role = user['role'] ?? 'operator';
-              final isCurrentUser = user['id'] == Provider.of<SimplifiedAuthProvider>(context, listen: false).userId;
+              final isCurrentUser = user['id'] == Provider.of<CleanAuthProvider>(context, listen: false).userId;
 
               return Card(
                 margin: const EdgeInsets.only(bottom: 12),

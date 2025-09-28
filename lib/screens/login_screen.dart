@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/simplified_auth_provider.dart';
+import '../providers/clean_auth_provider.dart';
 import '../utils/constants.dart';
 import '../widgets/loading_button.dart';
 import 'guest_signup_screen.dart';
@@ -16,9 +16,9 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _rememberMe = false;
   bool _obscurePassword = true;
   bool _isLoading = false;
+  bool _rememberMe = false;
 
   @override
   void dispose() {
@@ -34,10 +34,11 @@ class _LoginScreenState extends State<LoginScreen> {
       _isLoading = true;
     });
 
-    final authProvider = context.read<SimplifiedAuthProvider>();
+    final authProvider = context.read<CleanAuthProvider>();
     final success = await authProvider.login(
       _usernameController.text.trim(),
       _passwordController.text,
+      rememberMe: _rememberMe,
     );
 
     if (mounted) {
@@ -47,7 +48,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (success) {
         // Don't navigate manually - AuthWrapper will handle it automatically
-        // when SimplifiedAuthProvider's isAuthenticated becomes true
+        // when CleanAuthProvider's isAuthenticated becomes true
         print('✅ Login successful - AuthWrapper will navigate automatically');
       } else {
         // Show actual error message from provider

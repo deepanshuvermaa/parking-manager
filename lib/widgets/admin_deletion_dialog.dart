@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/simplified_auth_provider.dart';
+import '../providers/clean_auth_provider.dart';
 import '../services/api_service.dart';
 import '../utils/constants.dart';
 
@@ -38,7 +38,7 @@ class _AdminDeletionDialogState extends State<AdminDeletionDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = context.watch<SimplifiedAuthProvider>();
+    final authProvider = context.watch<CleanAuthProvider>();
 
     return AlertDialog(
       title: Row(

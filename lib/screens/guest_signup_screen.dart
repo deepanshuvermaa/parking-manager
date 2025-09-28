@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/simplified_auth_provider.dart';
+import '../providers/clean_auth_provider.dart';
 import '../utils/constants.dart';
 import '../widgets/loading_button.dart';
 
@@ -50,7 +50,7 @@ class _GuestSignupScreenState extends State<GuestSignupScreen> {
       _isLoading = true;
     });
 
-    final authProvider = context.read<SimplifiedAuthProvider>();
+    final authProvider = context.read<CleanAuthProvider>();
     // Use the regular signup method
     final result = await authProvider.signup(
       _emailController.text.trim(),
@@ -138,7 +138,7 @@ class _GuestSignupScreenState extends State<GuestSignupScreen> {
                 onPressed: () {
                   Navigator.pop(context);
                   // AuthWrapper will automatically navigate to DashboardScreen
-                  // when SimplifiedAuthProvider's isAuthenticated becomes true
+                  // when CleanAuthProvider's isAuthenticated becomes true
                 },
                 child: const Text('Get Started'),
               ),

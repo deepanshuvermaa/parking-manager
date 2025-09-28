@@ -5,7 +5,7 @@ import 'config/app_config.dart';
 import 'providers/vehicle_provider.dart';
 import 'providers/simplified_bluetooth_provider.dart';
 import 'providers/settings_provider.dart';
-import 'providers/simplified_auth_provider.dart';
+import 'providers/clean_auth_provider.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/login_screen.dart';
 import 'utils/constants.dart';
@@ -26,7 +26,7 @@ class ParkEaseApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => SimplifiedAuthProvider()),
+        ChangeNotifierProvider(create: (_) => CleanAuthProvider()),
         ChangeNotifierProvider(create: (_) => VehicleProvider()),
         ChangeNotifierProvider(create: (_) => SimplifiedBluetoothProvider()),
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
@@ -94,7 +94,7 @@ class AuthWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<SimplifiedAuthProvider>(
+    return Consumer<CleanAuthProvider>(
       builder: (context, authProvider, _) {
         if (authProvider.isLoading) {
           return const Scaffold(

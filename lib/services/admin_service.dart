@@ -1,5 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
-import '../providers/simplified_auth_provider.dart';
+import '../providers/clean_auth_provider.dart';
 
 class AdminService {
   static const String _deletionCodeKey = 'deletion_code';
@@ -62,12 +62,12 @@ class AdminService {
   }
 
   /// Check if user can delete items (admin or super admin)
-  static bool canDeleteItems(SimplifiedAuthProvider authProvider) {
+  static bool canDeleteItems(CleanAuthProvider authProvider) {
     return authProvider.isAdmin || authProvider.isSuperAdmin;
   }
 
   /// Get admin permissions
-  static Map<String, bool> getAdminPermissions(SimplifiedAuthProvider authProvider) {
+  static Map<String, bool> getAdminPermissions(CleanAuthProvider authProvider) {
     final isAdmin = authProvider.isAdmin;
     final isSuperAdmin = authProvider.isSuperAdmin;
 
