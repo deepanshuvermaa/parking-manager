@@ -30,19 +30,19 @@ class AuthService {
       final deviceId = await DeviceInfoHelper.getDeviceId();
       final deviceName = await DeviceInfoHelper.getDeviceName();
 
-      // Make login request
+      // Make login request - API expects 'username' field
       final response = await http.post(
         Uri.parse('${ApiConfig.baseUrl}/auth/login'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'email': email,  // Changed from 'username' to 'email'
+          'username': email,  // API expects 'username' even for email
           'password': password,
-          'device_id': deviceId,  // Changed to snake_case
-          'device_name': deviceName,  // Changed to snake_case
+          // Note: deviceId and deviceName are optional for login
         }),
       ).timeout(const Duration(seconds: 15));
 
       print('📨 Login response: ${response.statusCode}');
+      print('📋 Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -52,18 +52,18 @@ class AuthService {
           final token = data['data']['token'];
           final refreshToken = data['data']['refreshToken'];
 
-          // Create auth session
+          // Create auth session from API response
           final session = AuthSession(
             userId: userData['id'].toString(),
             email: userData['email'] ?? userData['username'] ?? email,
-            fullName: userData['fullName'] ?? userData['full_name'] ?? '',
-            role: userData['role'] ?? 'user',
+            fullName: userData['fullName'] ?? '',
+            role: userData['role'] ?? 'owner',  // Default to 'owner' as per API
             isGuest: false,
             token: token,
             refreshToken: refreshToken,
             deviceId: deviceId,
             loginTime: DateTime.now(),
-            expiryTime: DateTime.now().add(const Duration(hours: 1)),
+            expiryTime: DateTime.now().add(const Duration(days: 7)),  // Token valid for 7 days
             metadata: userData,
           );
 
@@ -117,43 +117,28 @@ class AuthService {
     }
   }
 
-  /// Signup new user
+  /// Regular signup is not available - users should use guest signup
+  /// and then upgrade their account via the backend
   Future<Map<String, dynamic>?> signup({
     required String email,
     required String password,
     required String fullName,
     String? phoneNumber,
   }) async {
-    try {
-      final deviceId = await DeviceInfoHelper.getDeviceId();
-      final deviceInfo = await DeviceInfoHelper.getDeviceInfo();
-
-      final response = await http.post(
-        Uri.parse('${ApiConfig.baseUrl}/auth/signup'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'email': email,
-          'password': password,
-          'full_name': fullName,
-          'phone': phoneNumber ?? '',
-          'device_id': deviceId,
-          'device_info': deviceInfo,
-        }),
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 201 || response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        print('✅ Signup successful');
-        return data;
-      }
-
-      throw Exception('Signup failed: ${response.body}');
-    } catch (e) {
-      print('❌ Signup error: $e');
-      return null;
+    print('⚠️ Regular signup not available - use guest signup instead');
+    // For now, we'll use guest signup with the user's name
+    // They can upgrade their account later
+    final session = await guestLogin(guestName: fullName);
+    if (session != null) {
+      return {
+        'success': true,
+        'data': {
+          'user': session.metadata,
+          'token': session.token,
+        }
+      };
     }
+    return null;
   }
 
   /// Guest login
@@ -166,16 +151,20 @@ class AuthService {
       // Get device info
       final deviceId = await DeviceInfoHelper.getDeviceId();
 
-      // Make guest signup request
+      // Make guest signup request - API generates its own username
       final response = await http.post(
         Uri.parse('${ApiConfig.baseUrl}/auth/guest-signup'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'username': 'guest_${DateTime.now().millisecondsSinceEpoch}',
-          'full_name': guestName,  // Changed to snake_case
-          'device_id': deviceId,  // Changed to snake_case
+          // API ignores these but we send them for consistency
+          'username': 'guest',
+          'full_name': guestName,
+          'device_id': deviceId,
         }),
       ).timeout(const Duration(seconds: 10));
+
+      print('📨 Guest signup response: ${response.statusCode}');
+      print('📋 Response body: ${response.body}');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = jsonDecode(response.body);
@@ -184,18 +173,18 @@ class AuthService {
           final userData = data['data']['user'];
           final token = data['data']['token'];
 
-          // Create guest session
+          // Create guest session - Use the guest name we provided, not what API returns
           final session = AuthSession(
             userId: userData['id'].toString(),
-            email: userData['email'] ?? '',
-            fullName: guestName, // Use the provided guest name
-            role: 'guest',
+            email: userData['username'] ?? '',  // Store the generated username
+            fullName: guestName,  // Use the name the user entered, not "Guest User"
+            role: userData['role'] ?? 'owner',  // API returns 'owner' for guests too
             isGuest: true,
             token: token,
             refreshToken: data['data']['refreshToken'],
             deviceId: deviceId,
             loginTime: DateTime.now(),
-            expiryTime: DateTime.now().add(const Duration(hours: 24)),
+            expiryTime: DateTime.now().add(const Duration(days: 3)),  // 3-day trial
             metadata: userData,
           );
 

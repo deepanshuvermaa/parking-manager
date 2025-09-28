@@ -94,6 +94,7 @@ class AuthStateProvider extends ChangeNotifier {
       }
     } catch (e) {
       print('❌ Initialization error: $e');
+      print('Stack trace: ${StackTrace.current}');
       _lastError = e.toString();
       _session = null;
     } finally {
@@ -138,10 +139,21 @@ class AuthStateProvider extends ChangeNotifier {
         return true;
       }
 
-      throw Exception('Login failed');
+      throw Exception('Login failed - please check your credentials');
     } catch (e) {
       print('❌ Login error: $e');
-      _lastError = e.toString();
+
+      // Parse error message for better user feedback
+      String errorMessage = e.toString();
+      if (errorMessage.contains('SocketException')) {
+        _lastError = 'No internet connection. Please check your network.';
+      } else if (errorMessage.contains('TimeoutException')) {
+        _lastError = 'Connection timeout. Please try again.';
+      } else if (errorMessage.contains('Invalid credentials')) {
+        _lastError = 'Invalid email or password.';
+      } else {
+        _lastError = errorMessage.replaceAll('Exception: ', '');
+      }
       _session = null;
 
       _isLoading = false;
@@ -180,10 +192,19 @@ class AuthStateProvider extends ChangeNotifier {
         return true;
       }
 
-      throw Exception('Guest login failed');
+      throw Exception('Guest login failed - please try again');
     } catch (e) {
       print('❌ Guest login error: $e');
-      _lastError = e.toString();
+
+      // Parse error message for better user feedback
+      String errorMessage = e.toString();
+      if (errorMessage.contains('SocketException')) {
+        _lastError = 'No internet connection. Please check your network.';
+      } else if (errorMessage.contains('TimeoutException')) {
+        _lastError = 'Connection timeout. Please try again.';
+      } else {
+        _lastError = errorMessage.replaceAll('Exception: ', '');
+      }
       _session = null;
 
       _isLoading = false;
