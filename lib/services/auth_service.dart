@@ -35,10 +35,10 @@ class AuthService {
         Uri.parse('${ApiConfig.baseUrl}/auth/login'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'username': email,
+          'email': email,  // Changed from 'username' to 'email'
           'password': password,
-          'deviceId': deviceId,
-          'deviceName': deviceName,
+          'device_id': deviceId,  // Changed to snake_case
+          'device_name': deviceName,  // Changed to snake_case
         }),
       ).timeout(const Duration(seconds: 15));
 
@@ -117,6 +117,45 @@ class AuthService {
     }
   }
 
+  /// Signup new user
+  Future<Map<String, dynamic>?> signup({
+    required String email,
+    required String password,
+    required String fullName,
+    String? phoneNumber,
+  }) async {
+    try {
+      final deviceId = await DeviceInfoHelper.getDeviceId();
+      final deviceInfo = await DeviceInfoHelper.getDeviceInfo();
+
+      final response = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/auth/signup'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'email': email,
+          'password': password,
+          'full_name': fullName,
+          'phone': phoneNumber ?? '',
+          'device_id': deviceId,
+          'device_info': deviceInfo,
+        }),
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        print('✅ Signup successful');
+        return data;
+      }
+
+      throw Exception('Signup failed: ${response.body}');
+    } catch (e) {
+      print('❌ Signup error: $e');
+      return null;
+    }
+  }
+
   /// Guest login
   Future<AuthSession?> guestLogin({
     required String guestName,
@@ -133,8 +172,8 @@ class AuthService {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'username': 'guest_${DateTime.now().millisecondsSinceEpoch}',
-          'fullName': guestName,
-          'deviceId': deviceId,
+          'full_name': guestName,  // Changed to snake_case
+          'device_id': deviceId,  // Changed to snake_case
         }),
       ).timeout(const Duration(seconds: 10));
 

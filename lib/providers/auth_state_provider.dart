@@ -268,6 +268,61 @@ class AuthStateProvider extends ChangeNotifier {
     return true;
   }
 
+  /// Signup with credentials
+  Future<bool> signup(
+    String email,
+    String password,
+    String fullName, {
+    String? phoneNumber,
+  }) async {
+    print('📝 Signup attempt for: $email');
+
+    _isLoading = true;
+    _lastError = null;
+    notifyListeners();
+
+    try {
+      // Call signup API
+      final response = await _authService.signup(
+        email: email,
+        password: password,
+        fullName: fullName,
+        phoneNumber: phoneNumber,
+      );
+
+      if (response != null) {
+        // Auto-login after successful signup
+        final session = await _authService.login(
+          email: email,
+          password: password,
+          rememberMe: true,
+        );
+
+        if (session != null) {
+          _session = session;
+          _syncService.startPeriodicSync();
+          await _syncService.syncAll(authToken: session.token);
+
+          print('✅ Signup and login successful: ${session.displayName}');
+
+          _isLoading = false;
+          notifyListeners();
+          return true;
+        }
+      }
+
+      throw Exception('Signup failed');
+    } catch (e) {
+      print('❌ Signup error: $e');
+      _lastError = e.toString();
+      _session = null;
+
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
   /// Clear error
   void clearError() {
     _lastError = null;
