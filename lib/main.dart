@@ -184,14 +184,34 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
         // Show loading while initializing
         if (!appProvider.isInitialized) {
           print('[AppRoot] Showing loading screen');
-          return const Scaffold(
+          return Scaffold(
             body: Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text('Initializing...'),
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 16),
+                  const Text('Initializing...'),
+                  const SizedBox(height: 8),
+                  Text(
+                    'v2.0.1 - ${DateTime.now().toString().substring(0, 19)}',
+                    style: const TextStyle(fontSize: 10, color: Colors.grey),
+                  ),
+                  Text(
+                    'Debug: isInit=${appProvider.isInitialized}',
+                    style: const TextStyle(fontSize: 10, color: Colors.grey),
+                  ),
+                  if (appProvider.authProvider.lastError != null) ...[
+                    const SizedBox(height: 8),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 32),
+                      child: Text(
+                        'Error: ${appProvider.authProvider.lastError}',
+                        style: const TextStyle(color: Colors.red, fontSize: 12),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
