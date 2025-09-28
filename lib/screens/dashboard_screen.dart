@@ -18,8 +18,8 @@ import 'business_settings_screen.dart';
 import 'vehicle_types_management_screen.dart';
 import 'advanced_settings_screen.dart';
 import 'user_management_screen.dart';
-import 'admin_management_screen.dart';
 import 'login_screen.dart';
+import 'admin_management_screen.dart';
 import 'subscription_screen.dart';
 import 'receipt_settings_screen.dart';
 
@@ -552,7 +552,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     if (context.mounted) {
                       // Close loading indicator
                       Navigator.pop(context);
-                      // AuthWrapper will automatically navigate to LoginScreen when isAuthenticated becomes false
+                      // Force navigate to login screen
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(builder: (context) => const LoginScreen()),
+                        (route) => false,
+                      );
                     }
                   } catch (e) {
                     if (context.mounted) {

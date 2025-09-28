@@ -57,8 +57,8 @@ class SimplifiedAuthProvider extends ChangeNotifier {
       // First check if we explicitly logged out
       final hasLoggedOut = prefs.getBool('has_logged_out') ?? false;
       if (hasLoggedOut) {
-        // Clear the flag and don't auto-login
-        await prefs.remove('has_logged_out');
+        // Don't auto-login if user explicitly logged out
+        print('📝 User explicitly logged out, not auto-logging in');
         _authToken = null;
         _userData = null;
         _isAuthenticated = false;
@@ -154,6 +154,9 @@ class SimplifiedAuthProvider extends ChangeNotifier {
           await prefs.setString('user_email', data['data']['user']['username'] ?? email);
           await prefs.setBool('is_logged_in', true);
           await prefs.setString('user_data', jsonEncode(data['data']['user']));
+
+          // Clear the has_logged_out flag on successful login
+          await prefs.remove('has_logged_out');
 
           // Update state
           _authToken = data['data']['token'];
@@ -332,6 +335,7 @@ class SimplifiedAuthProvider extends ChangeNotifier {
       // Clear any cached data
       await prefs.remove('cached_vehicles');
       await prefs.remove('settings_json');
+      await prefs.remove('settings'); // Clear settings as well
 
       // Also clear tokens from ApiService to ensure complete logout
       await ApiService.clearTokens();
