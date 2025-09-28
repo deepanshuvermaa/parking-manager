@@ -61,25 +61,32 @@ class AuthStateProvider extends ChangeNotifier {
 
   /// Constructor - NO auto-loading
   AuthStateProvider() {
-    print('🔨 AuthStateProvider initialized');
+    print('===== AuthStateProvider Constructor =====');
+    print('[AuthStateProvider] Constructor called - NO auto-loading');
+    print('[AuthStateProvider] Creating AuthService and SyncService instances...');
   }
 
   /// Initialize provider (called once from main)
   Future<void> initialize() async {
-    print('🚀 Initializing AuthStateProvider...');
+    print('===== AuthStateProvider.initialize() =====');
+    print('[AuthStateProvider] Starting initialization...');
 
     _isLoading = true;
+    print('[AuthStateProvider] Set isLoading = true');
     notifyListeners();
+    print('[AuthStateProvider] Notified listeners');
 
     try {
       // Initialize services with timeout
+      print('[AuthStateProvider] Starting Future.wait for services...');
       await Future.wait([
         _authService.initialize(),
         _syncService.initialize(),
       ]).timeout(const Duration(seconds: 5), onTimeout: () {
-        print('⚠️ Service initialization timeout - continuing anyway');
+        print('[AuthStateProvider] Services initialization TIMEOUT after 5s');
         return <void>[];
       });
+      print('[AuthStateProvider] Services initialized');
 
       // Check for stored session ONLY if user chose to remember
       try {

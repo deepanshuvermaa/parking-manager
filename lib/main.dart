@@ -8,9 +8,19 @@ import 'screens/login_screen.dart';
 import 'utils/constants.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  print('===== APP STARTING =====');
+  print('[MAIN] Starting ParkEase app...');
 
-  runApp(const ParkEaseApp());
+  try {
+    WidgetsFlutterBinding.ensureInitialized();
+    print('[MAIN] Flutter binding initialized');
+
+    runApp(const ParkEaseApp());
+    print('[MAIN] App launched');
+  } catch (e, stack) {
+    print('[MAIN] FATAL ERROR: $e');
+    print('[MAIN] Stack: $stack');
+  }
 }
 
 class ParkEaseApp extends StatelessWidget {
@@ -18,15 +28,22 @@ class ParkEaseApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    print('[ParkEaseApp] Building app...');
     return MultiProvider(
       providers: [
         // Root provider that manages everything
         ChangeNotifierProvider(
-          create: (_) => AppStateProvider(),
+          create: (_) {
+            print('[ParkEaseApp] Creating AppStateProvider...');
+            return AppStateProvider();
+          },
         ),
         // Bluetooth provider (independent)
         ChangeNotifierProvider(
-          create: (_) => SimplifiedBluetoothProvider(),
+          create: (_) {
+            print('[ParkEaseApp] Creating BluetoothProvider...');
+            return SimplifiedBluetoothProvider();
+          },
         ),
       ],
       child: MaterialApp(
@@ -105,12 +122,20 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
+    print('[AppRoot] initState called');
 
-    // Initialize app
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initializeApp();
-    });
+    try {
+      WidgetsBinding.instance.addObserver(this);
+      print('[AppRoot] Added lifecycle observer');
+
+      // Initialize app
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        print('[AppRoot] Post frame callback triggered');
+        _initializeApp();
+      });
+    } catch (e) {
+      print('[AppRoot] initState ERROR: $e');
+    }
   }
 
   @override
@@ -120,8 +145,17 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
   }
 
   Future<void> _initializeApp() async {
-    final appProvider = context.read<AppStateProvider>();
-    await appProvider.initialize();
+    print('[AppRoot] _initializeApp started');
+    try {
+      final appProvider = context.read<AppStateProvider>();
+      print('[AppRoot] Got AppStateProvider instance');
+
+      await appProvider.initialize();
+      print('[AppRoot] AppStateProvider.initialize() completed');
+    } catch (e, stack) {
+      print('[AppRoot] _initializeApp ERROR: $e');
+      print('[AppRoot] Stack: $stack');
+    }
   }
 
   @override
@@ -142,10 +176,14 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    print('[AppRoot] build called');
     return Consumer<AppStateProvider>(
       builder: (context, appProvider, _) {
+        print('[AppRoot] Consumer builder - isInitialized: ${appProvider.isInitialized}');
+
         // Show loading while initializing
         if (!appProvider.isInitialized) {
+          print('[AppRoot] Showing loading screen');
           return const Scaffold(
             body: Center(
               child: Column(
@@ -161,10 +199,13 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
         }
 
         // Show login or dashboard based on auth state
+        print('[AppRoot] Checking authentication: ${appProvider.authProvider.isAuthenticated}');
         if (appProvider.authProvider.isAuthenticated) {
+          print('[AppRoot] User authenticated, showing Dashboard');
           return const DashboardScreen();
         }
 
+        print('[AppRoot] User not authenticated, showing Login');
         return const LoginScreen();
       },
     );

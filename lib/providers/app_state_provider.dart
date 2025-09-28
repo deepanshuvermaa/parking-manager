@@ -28,8 +28,16 @@ class AppStateProvider extends ChangeNotifier {
 
   /// Constructor
   AppStateProvider() {
-    print('🔨 AppStateProvider initialized');
-    _setupListeners();
+    print('===== AppStateProvider Constructor =====');
+    print('[AppStateProvider] Constructor called');
+    print('[AppStateProvider] Creating auth, settings, vehicle providers...');
+
+    try {
+      _setupListeners();
+      print('[AppStateProvider] Listeners setup complete');
+    } catch (e) {
+      print('[AppStateProvider] Constructor ERROR: $e');
+    }
   }
 
   /// Setup listeners for child providers
@@ -46,16 +54,19 @@ class AppStateProvider extends ChangeNotifier {
 
   /// Initialize app
   Future<void> initialize() async {
-    print('🚀 Initializing app...');
+    print('===== AppStateProvider.initialize() =====');
+    print('[AppStateProvider] Starting initialization...');
 
     try {
       // Initialize auth first with timeout
+      print('[AppStateProvider] Calling authProvider.initialize()...');
       await authProvider.initialize().timeout(
         const Duration(seconds: 10),
         onTimeout: () {
-          print('⚠️ Auth initialization timeout - marking as initialized');
+          print('[AppStateProvider] Auth initialization TIMEOUT after 10s');
         },
       );
+      print('[AppStateProvider] authProvider.initialize() completed');
 
       // If authenticated, initialize other providers
       if (authProvider.isAuthenticated) {
