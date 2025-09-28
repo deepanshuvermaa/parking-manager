@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/vehicle_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/simplified_bluetooth_provider.dart';
-import '../providers/clean_auth_provider.dart';
+import '../providers/auth_state_provider.dart';
 import '../utils/constants.dart';
 import '../utils/helpers.dart';
 import '../widgets/stats_card.dart';
@@ -75,7 +75,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               if (!mounted) return;
               
               try {
-                await context.read<CleanAuthProvider>().logout();
+                await context.read<AuthStateProvider>().logout();
                 // AuthWrapper will automatically navigate to LoginScreen when isAuthenticated becomes false
               } catch (e) {
                 if (mounted) {
@@ -105,7 +105,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
   
   void _showTrialEndingSoonBanner() {
-    final authProvider = context.read<CleanAuthProvider>();
+    final authProvider = context.read<AuthStateProvider>();
     ScaffoldMessenger.of(context).showMaterialBanner(
       MaterialBanner(
         backgroundColor: Colors.orange.shade50,
@@ -485,7 +485,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 _showBackupDialog(context);
               },
             ),
-            if (context.read<CleanAuthProvider>().isAdmin)
+            if (context.read<AuthStateProvider>().isAdmin)
               ListTile(
                 leading: const Icon(Icons.people),
                 title: const Text('User Management'),
@@ -495,7 +495,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _navigateToScreen(context, const UserManagementScreen());
                 },
               ),
-            if (context.read<CleanAuthProvider>().isSuperAdmin)
+            if (context.read<AuthStateProvider>().isSuperAdmin)
               ListTile(
                 leading: const Icon(Icons.admin_panel_settings),
                 title: const Text('Admin Management'),
@@ -511,7 +511,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               leading: const Icon(Icons.logout, color: Colors.red),
               title: const Text('Logout', style: TextStyle(color: Colors.red)),
               subtitle: Text(
-                'Logged in as: ${context.read<CleanAuthProvider>().userEmail ?? "User"}',
+                'Logged in as: ${context.read<AuthStateProvider>().userEmail ?? "User"}',
                 style: const TextStyle(fontSize: 12),
               ),
               onTap: () async {
@@ -556,7 +556,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   );
                   
                   try {
-                    await context.read<CleanAuthProvider>().logout();
+                    await context.read<AuthStateProvider>().logout();
 
                     if (context.mounted) {
                       // Close loading indicator

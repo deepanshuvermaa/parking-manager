@@ -298,4 +298,10 @@ class VehicleProvider with ChangeNotifier {
       debugPrint('Error loading vehicle types: $e');
     }
   }
+
+  /// Clear all vehicles (for logout)
+  void clearVehicles() {
+    _vehicles = [];
+    notifyListeners();
+  }
 }

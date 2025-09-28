@@ -41,6 +41,18 @@ class AuthStateProvider extends ChangeNotifier {
   /// Check if can manage staff
   bool get canManageStaff => _session?.canManageStaff ?? false;
 
+  /// Check if super admin
+  bool get isSuperAdmin {
+    if (_session == null) return false;
+    return _session!.email == 'deepanshuverma966@gmail.com';
+  }
+
+  /// Get current user map (for compatibility)
+  Map<String, dynamic>? get currentUser {
+    if (_session == null) return null;
+    return _session!.toJson();
+  }
+
   /// Loading state
   bool get isLoading => _isLoading;
 

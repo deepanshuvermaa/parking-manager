@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/clean_auth_provider.dart';
+import '../providers/auth_state_provider.dart';
 import '../utils/constants.dart';
 import '../widgets/loading_button.dart';
 import 'guest_signup_screen.dart';
@@ -34,7 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _isLoading = true;
     });
 
-    final authProvider = context.read<CleanAuthProvider>();
+    final authProvider = context.read<AuthStateProvider>();
     final success = await authProvider.login(
       _usernameController.text.trim(),
       _passwordController.text,
@@ -48,7 +48,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (success) {
         // Don't navigate manually - AuthWrapper will handle it automatically
-        // when CleanAuthProvider's isAuthenticated becomes true
+        // when AuthStateProvider's isAuthenticated becomes true
         print('✅ Login successful - AuthWrapper will navigate automatically');
       } else {
         // Show actual error message from provider

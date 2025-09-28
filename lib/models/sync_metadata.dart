@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 /// Sync metadata for tracking data synchronization
 class SyncMetadata {
   final String entityType;
@@ -162,6 +164,3 @@ class SyncResult {
     };
   }
 }
-
-/// Import for JSON decode
-import 'dart:convert';

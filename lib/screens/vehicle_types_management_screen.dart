@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/vehicle_provider.dart';
-import '../providers/clean_auth_provider.dart';
+import '../providers/auth_state_provider.dart';
 import '../models/vehicle_type.dart';
 import '../models/rate_tier.dart';
 import '../widgets/admin_deletion_dialog.dart';
@@ -268,7 +268,7 @@ class _VehicleTypesManagementScreenState extends State<VehicleTypesManagementScr
   }
 
   void _showDeleteConfirmation(VehicleType vehicleType) async {
-    final authProvider = context.read<CleanAuthProvider>();
+    final authProvider = context.read<AuthStateProvider>();
 
     // Check if user has permission to delete
     if (!AdminService.canDeleteItems(authProvider)) {

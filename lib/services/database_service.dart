@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/sync_metadata.dart';
@@ -450,6 +451,3 @@ class DatabaseService {
     await db.delete('users');
   }
 }
-
-// Import for JSON operations
-import 'dart:convert';
