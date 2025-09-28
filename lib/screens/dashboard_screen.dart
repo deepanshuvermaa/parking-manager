@@ -280,6 +280,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
+          'This is the change',
+          style: TextStyle(
+            fontSize: AppFontSize.md,
+            fontWeight: FontWeight.w500,
+            color: AppColors.info,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        const Text(
           'Quick Actions',
           style: TextStyle(
             fontSize: AppFontSize.xl,
