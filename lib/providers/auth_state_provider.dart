@@ -72,29 +72,41 @@ class AuthStateProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Initialize services
-      await _authService.initialize();
-      await _syncService.initialize();
+      // Initialize services with timeout
+      await Future.wait([
+        _authService.initialize(),
+        _syncService.initialize(),
+      ]).timeout(const Duration(seconds: 5), onTimeout: () {
+        print('⚠️ Service initialization timeout - continuing anyway');
+        return <void>[];
+      });
 
       // Check for stored session ONLY if user chose to remember
-      final storedSession = await _authService.checkStoredSession();
+      try {
+        final storedSession = await _authService.checkStoredSession()
+            .timeout(const Duration(seconds: 3));
 
-      if (storedSession != null) {
-        print('✅ Restored session for: ${storedSession.displayName}');
-        _session = storedSession;
+        if (storedSession != null) {
+          print('✅ Restored session for: ${storedSession.displayName}');
+          _session = storedSession;
 
-        // Start background sync
-        _syncService.startPeriodicSync();
+          // Start background sync (don't await)
+          _syncService.startPeriodicSync();
 
-        // Do initial sync
-        _syncService.syncAll(authToken: storedSession.token);
-      } else {
-        print('📝 No stored session, starting fresh');
+          // Do initial sync in background (don't await)
+          Future.microtask(() {
+            _syncService.syncAll(authToken: storedSession.token);
+          });
+        } else {
+          print('📝 No stored session, starting fresh');
+          _session = null;
+        }
+      } catch (e) {
+        print('⚠️ Could not check stored session: $e');
         _session = null;
       }
     } catch (e) {
       print('❌ Initialization error: $e');
-      print('Stack trace: ${StackTrace.current}');
       _lastError = e.toString();
       _session = null;
     } finally {

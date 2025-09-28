@@ -14,7 +14,20 @@ class AuthService {
 
   /// Initialize service
   Future<void> initialize() async {
-    await _storage.initialize();
+    print('🔧 Initializing AuthService...');
+    try {
+      await _storage.initialize().timeout(
+        const Duration(seconds: 3),
+        onTimeout: () {
+          print('⚠️ Storage initialization timeout');
+          throw Exception('Storage initialization timeout');
+        },
+      );
+      print('✅ AuthService initialized');
+    } catch (e) {
+      print('❌ AuthService initialization error: $e');
+      rethrow;
+    }
   }
 
   /// Login with credentials
@@ -80,21 +93,27 @@ class AuthService {
           // Save device ID
           await _storage.saveDeviceId(deviceId);
 
-          // Register device in database
-          await _database.registerDevice(
-            session.userId,
-            deviceId,
-            deviceName,
-          );
+          // Register device in database (don't block on this)
+          Future.microtask(() async {
+            try {
+              await _database.registerDevice(
+                session.userId,
+                deviceId,
+                deviceName,
+              );
 
-          // Save user to database
-          await _database.saveUser({
-            'id': session.userId,
-            'email': session.email,
-            'full_name': session.fullName,
-            'role': session.role,
-            'is_guest': 0,
-            'created_at': DateTime.now().toIso8601String(),
+              // Save user to database
+              await _database.saveUser({
+                'id': session.userId,
+                'email': session.email,
+                'full_name': session.fullName,
+                'role': session.role,
+                'is_guest': 0,
+                'created_at': DateTime.now().toIso8601String(),
+              });
+            } catch (e) {
+              print('⚠️ Database save error (non-critical): $e');
+            }
           });
 
           print('✅ Login successful for: ${session.displayName}');

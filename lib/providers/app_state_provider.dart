@@ -49,12 +49,20 @@ class AppStateProvider extends ChangeNotifier {
     print('🚀 Initializing app...');
 
     try {
-      // Initialize auth first
-      await authProvider.initialize();
+      // Initialize auth first with timeout
+      await authProvider.initialize().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          print('⚠️ Auth initialization timeout - marking as initialized');
+        },
+      );
 
       // If authenticated, initialize other providers
       if (authProvider.isAuthenticated) {
-        await _initializeAuthenticatedState();
+        // Don't block on authenticated state init
+        Future.microtask(() async {
+          await _initializeAuthenticatedState();
+        });
       }
 
       _isInitialized = true;
@@ -63,6 +71,7 @@ class AppStateProvider extends ChangeNotifier {
       print('✅ App initialization complete');
     } catch (e) {
       print('❌ App initialization error: $e');
+      // Mark as initialized even on error so app doesn't hang
       _isInitialized = true;
       notifyListeners();
     }
