@@ -54,25 +54,40 @@ class SimplifiedAuthProvider extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
 
-      // First check if we explicitly logged out
+      // Check multiple conditions to prevent unwanted auto-login
       final hasLoggedOut = prefs.getBool('has_logged_out') ?? false;
-      if (hasLoggedOut) {
-        // Don't auto-login if user explicitly logged out
-        print('📝 User explicitly logged out, not auto-logging in');
+      final isLoggedIn = prefs.getBool('is_logged_in') ?? false;
+      final token = prefs.getString('auth_token');
+      final userJson = prefs.getString('user_data');
+
+      print('🔍 Auth check: hasLoggedOut=$hasLoggedOut, isLoggedIn=$isLoggedIn, hasToken=${token != null}, hasUserData=${userJson != null}');
+
+      // Don't auto-login if:
+      // 1. User explicitly logged out
+      // 2. is_logged_in is false
+      // 3. Missing auth data
+      if (hasLoggedOut || !isLoggedIn || token == null || token.isEmpty || userJson == null || userJson.isEmpty) {
+        print('📝 Not auto-logging in - clearing auth state');
+        // Clear ONLY auth state, not app settings
         _authToken = null;
         _userData = null;
         _isAuthenticated = false;
+
+        // If user logged out, keep the flag
+        if (!hasLoggedOut && !isLoggedIn) {
+          // User data is inconsistent, clean it up
+          await prefs.remove('auth_token');
+          await prefs.remove('user_data');
+          await prefs.remove('user_id');
+        }
+
         _isLoading = false;
         notifyListeners();
         return;
       }
 
-      final token = prefs.getString('auth_token');
-      final isLoggedIn = prefs.getBool('is_logged_in') ?? false;
-      final userJson = prefs.getString('user_data');
-
-      // Only restore session if ALL required data is present
-      if (isLoggedIn == true && token != null && token.isNotEmpty && userJson != null && userJson.isNotEmpty) {
+      // Only restore session if ALL conditions are met
+      if (isLoggedIn == true && token.isNotEmpty && userJson.isNotEmpty && !hasLoggedOut) {
         try {
           final userData = jsonDecode(userJson);
           // Validate that user data is properly formatted
@@ -327,6 +342,24 @@ class SimplifiedAuthProvider extends ChangeNotifier {
       await prefs.setBool('is_logged_in', false);
       await prefs.setBool('isAuthenticated', false);
       await prefs.setBool('rememberMe', false);
+
+      // CRITICAL: Clear only auth-related data, preserve app settings
+      // Don't use prefs.clear() as it will delete app settings too
+      // Just ensure auth data is completely removed
+      final allKeys = prefs.getKeys();
+      for (String key in allKeys) {
+        // Keep app settings but remove auth data
+        if (!key.startsWith('settings') &&
+            !key.startsWith('printer') &&
+            !key.startsWith('enable') &&
+            !key.startsWith('show') &&
+            !key.startsWith('receipt')) {
+          await prefs.remove(key);
+        }
+      }
+      // Then set the logout flag
+      await prefs.setBool('has_logged_out', true);
+      await prefs.setBool('is_logged_in', false);
 
       // Clear any device sync data
       await prefs.remove('device_id');
