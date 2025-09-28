@@ -8,6 +8,7 @@ import '../services/api_service.dart';
 import '../services/database_helper.dart';
 import '../services/device_info_helper.dart';
 import '../models/user.dart';
+import '../config/api_config.dart';
 
 class SimplifiedAuthProvider extends ChangeNotifier {
   bool _isAuthenticated = false;
@@ -117,10 +118,10 @@ class SimplifiedAuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Direct API call - exactly like SimpleAuthTest
+      // Direct API call using centralized config
       final response = await http.post(
-        Uri.parse('https://parkease-production-6679.up.railway.app/api/auth/login'),
-        headers: {'Content-Type': 'application/json'},
+        Uri.parse(ApiConfig.loginUrl),
+        headers: ApiConfig.defaultHeaders,
         body: jsonEncode({
           'username': email,
           'password': password,

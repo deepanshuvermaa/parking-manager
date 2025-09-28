@@ -8,12 +8,11 @@ import '../models/vehicle.dart';
 import '../models/settings.dart';
 import '../services/device_info_helper.dart';
 import '../config/app_config.dart';
+import '../config/api_config.dart';
 
 class ApiService {
-  // Base URL - Force production URL
-  static const String baseUrl = 'https://parkease-production-6679.up.railway.app';
-
-  static String get apiUrl => '$baseUrl/api';
+  // Use centralized API configuration
+  static String get apiUrl => ApiConfig.baseUrl;
 
   static String? _authToken;
   static String? _refreshToken;
@@ -419,10 +418,10 @@ class ApiService {
   static Future<bool> isBackendHealthy() async {
     try {
       print('=== HEALTH CHECK DEBUG ===');
-      print('Checking URL: $baseUrl/health');
+      print('Checking URL: ${ApiConfig.healthUrl}');
 
       final response = await http.get(
-        Uri.parse('$baseUrl/health'),
+        Uri.parse(ApiConfig.healthUrl),
         headers: {'Content-Type': 'application/json'},
       ).timeout(const Duration(seconds: 10));
 
@@ -452,7 +451,7 @@ class ApiService {
   static Future<Map<String, dynamic>?> getUserSubscriptionStatus(String userId) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/api/users/$userId/subscription-status'),
+        Uri.parse(ApiConfig.userSubscriptionUrl(userId)),
         headers: _headers,
       );
 
@@ -471,7 +470,7 @@ class ApiService {
   static Future<Map<String, dynamic>?> syncUserStatus() async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/api/users/sync-status'),
+        Uri.parse(ApiConfig.syncStatusUrl),
         headers: _headers,
       );
 
@@ -490,7 +489,7 @@ class ApiService {
   static Future<List<Map<String, dynamic>>> getPendingNotifications() async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/api/users/notifications'),
+        Uri.parse(ApiConfig.notificationsUrl),
         headers: _headers,
       );
 
@@ -509,7 +508,7 @@ class ApiService {
   static Future<bool> markNotificationsRead(List<String> notificationIds) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/api/users/notifications/mark-read'),
+        Uri.parse(ApiConfig.markNotificationsReadUrl),
         headers: _headers,
         body: json.encode({
           'notificationIds': notificationIds,

@@ -6,43 +6,32 @@ const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
+// Import centralized config
+const config = require('./config');
+const { transformRequest, transformResponse } = require('./middleware/dataTransform');
+
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = config.port;
 
 // Trust proxy for Railway deployment
 app.set('trust proxy', true);
 
-// Database connection
+// Database connection using config
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  connectionString: config.database.url,
+  ssl: config.database.ssl
 });
 
 // Middleware
-// CORS configuration - Allow mobile apps and localhost
-app.use(cors({
-  origin: function(origin, callback) {
-    // Allow requests with no origin (mobile apps)
-    if (!origin) {
-      return callback(null, true);
-    }
-
-    // Allow any localhost port for development
-    if (origin.startsWith('http://localhost:') ||
-        origin.startsWith('https://deepanshuvermaa.github.io')) {
-      return callback(null, true);
-    }
-
-    // Allow all origins for now (can be restricted later)
-    return callback(null, true);
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+// CORS configuration from config
+app.use(cors(config.cors));
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Add data transformation middleware
+app.use(transformRequest);
+app.use(transformResponse);
 
 // Rate limiting - temporarily disabled for debugging
 // const limiter = rateLimit({
@@ -993,6 +982,28 @@ app.use((error, req, res, next) => {
 // ================================
 // OPTIONAL: User Management Features
 // ================================
+// Mount new route handlers
+// Make pool available to routes
+app.locals.pool = pool;
+
+// Device management routes - stub implementation
+try {
+  const deviceRoutes = require('./routes/deviceRoutes');
+  app.use('/api/devices', deviceRoutes);
+  console.log('📱 Device routes loaded');
+} catch (error) {
+  console.log('⚠️ Device routes not found');
+}
+
+// Admin management routes - stub implementation
+try {
+  const adminRoutes = require('./routes/adminRoutes');
+  app.use('/api/admin', adminRoutes);
+  console.log('🔐 Admin routes loaded');
+} catch (error) {
+  console.log('⚠️ Admin routes not found');
+}
+
 // This is a safe addon that doesn't modify existing functionality
 // Comment out the next line to disable user management features
 try {

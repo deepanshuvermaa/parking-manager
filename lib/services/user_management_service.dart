@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../config/api_config.dart';
 
 class UserManagementService {
-  static const String baseUrl = 'https://parkease-production-6679.up.railway.app/api';
+  static String get baseUrl => ApiConfig.baseUrl;
 
   // Get stored tokens
   static Future<Map<String, String>> _getAuthHeaders() async {
