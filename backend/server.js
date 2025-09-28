@@ -6,9 +6,11 @@ const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
-// Import centralized config
+// Import centralized config and middleware
 const config = require('./config');
 const { transformRequest, transformResponse } = require('./middleware/dataTransform');
+const { verifyToken } = require('./middleware/session');
+const AuthController = require('./controllers/authController');
 
 const app = express();
 const PORT = config.port;
@@ -42,33 +44,10 @@ app.use(transformResponse);
 // });
 // app.use('/api/', limiter);
 
-// JWT Secret
-const JWT_SECRET = process.env.JWT_SECRET || 'parkease-super-secret-key-2024';
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'parkease-refresh-secret-key-2024';
+// Initialize auth controller
+const authController = new AuthController(pool);
 
-// Utility functions
-const generateTokens = (userId) => {
-  const token = jwt.sign({ userId }, JWT_SECRET, { expiresIn: '1h' });
-  const refreshToken = jwt.sign({ userId }, JWT_REFRESH_SECRET, { expiresIn: '7d' });
-  return { token, refreshToken };
-};
-
-const verifyToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({ success: false, error: 'Access token required' });
-  }
-
-  jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) {
-      return res.status(403).json({ success: false, error: 'Invalid or expired token' });
-    }
-    req.userId = user.userId;
-    next();
-  });
-};
+// OLD JWT code removed - using session middleware now
 
 // Audit logging function
 const logAudit = async (userId, action, entityType, entityId, oldValues, newValues, req) => {
@@ -110,9 +89,19 @@ app.get('/health', (req, res) => {
 // ================================
 // AUTHENTICATION ENDPOINTS
 // ================================
+// AUTH ROUTES - Using proper controller with session management
+// ================================
+app.post('/api/auth/guest-signup', (req, res) => authController.guestSignup(req, res));
+app.post('/api/auth/login', (req, res) => authController.login(req, res));
+app.post('/api/auth/logout', verifyToken, (req, res) => authController.logout(req, res));
+app.post('/api/auth/refresh', (req, res) => authController.refreshToken(req, res));
+app.get('/api/auth/validate', verifyToken, (req, res) => authController.validateToken(req, res));
 
-// User Registration (Guest Signup)
-app.post('/api/auth/guest-signup', async (req, res) => {
+// ================================
+// OLD AUTH ROUTES - COMMENTED OUT
+// ================================
+/*
+app.post('/api/auth/guest-signup-old', async (req, res) => {
   try {
     const { username, fullName, deviceId } = req.body;
 
@@ -204,236 +193,11 @@ app.post('/api/auth/guest-signup', async (req, res) => {
   }
 });
 
-// Full signup endpoint (with password)
-app.post('/api/auth/signup', async (req, res) => {
-  try {
-    const { email, password, fullName, deviceId } = req.body;
+// Signup endpoint removed - using authController
 
-    if (!email || !password || !fullName || !deviceId) {
-      return res.status(400).json({
-        success: false,
-        error: 'Email, password, full name, and device ID are required'
-      });
-    }
+// Login endpoint removed - using authController
 
-    // Check if email already exists
-    const existingUser = await pool.query(
-      'SELECT id FROM users WHERE username = $1',
-      [email]
-    );
-
-    if (existingUser.rows.length > 0) {
-      return res.status(409).json({
-        success: false,
-        error: 'Email already registered'
-      });
-    }
-
-    // Hash password
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    // Create new user with password (premium = registered user with trial)
-    const userResult = await pool.query(
-      `INSERT INTO users (username, full_name, password_hash, device_id, user_type, trial_starts_at, trial_expires_at)
-       VALUES ($1, $2, $3, $4, 'premium', NOW(), NOW() + INTERVAL '7 days')
-       RETURNING id, username, full_name, user_type, trial_expires_at`,
-      [email, fullName, passwordHash, deviceId]
-    );
-
-    const user = userResult.rows[0];
-
-    // Create default settings for the user
-    await pool.query(
-      `INSERT INTO settings (user_id, business_name, vehicle_types_json)
-       VALUES ($1, $2, $3)`,
-      [
-        user.id,
-        `${fullName}'s Parking`,
-        JSON.stringify([
-          {"name": "Car", "hourlyRate": 20, "dailyRate": 200, "monthlyRate": 5000, "minimumCharge": 20, "freeMinutes": 15},
-          {"name": "Bike", "hourlyRate": 10, "dailyRate": 100, "monthlyRate": 2500, "minimumCharge": 10, "freeMinutes": 10},
-          {"name": "Scooter", "hourlyRate": 10, "dailyRate": 100, "monthlyRate": 2500, "minimumCharge": 10, "freeMinutes": 10},
-          {"name": "SUV", "hourlyRate": 30, "dailyRate": 300, "monthlyRate": 7500, "minimumCharge": 30, "freeMinutes": 15},
-          {"name": "Auto Rickshaw", "hourlyRate": 15, "dailyRate": 150, "monthlyRate": 3500, "minimumCharge": 15, "freeMinutes": 10},
-          {"name": "E-Rickshaw", "hourlyRate": 12, "dailyRate": 120, "monthlyRate": 3000, "minimumCharge": 12, "freeMinutes": 10},
-          {"name": "Cycle", "hourlyRate": 5, "dailyRate": 50, "monthlyRate": 1200, "minimumCharge": 5, "freeMinutes": 30},
-          {"name": "E-Cycle", "hourlyRate": 8, "dailyRate": 80, "monthlyRate": 2000, "minimumCharge": 8, "freeMinutes": 20},
-          {"name": "Tempo", "hourlyRate": 25, "dailyRate": 250, "monthlyRate": 6000, "minimumCharge": 25, "freeMinutes": 10},
-          {"name": "Mini Truck", "hourlyRate": 35, "dailyRate": 350, "monthlyRate": 8000, "minimumCharge": 35, "freeMinutes": 10},
-          {"name": "Van", "hourlyRate": 25, "dailyRate": 250, "monthlyRate": 6000, "minimumCharge": 25, "freeMinutes": 15},
-          {"name": "Bus", "hourlyRate": 50, "dailyRate": 500, "monthlyRate": 12000, "minimumCharge": 50, "freeMinutes": 10},
-          {"name": "Truck", "hourlyRate": 60, "dailyRate": 600, "monthlyRate": 15000, "minimumCharge": 60, "freeMinutes": 10}
-        ])
-      ]
-    );
-
-    // Generate tokens
-    const { token, refreshToken } = generateTokens(user.id);
-
-    // Create session
-    await pool.query(
-      `INSERT INTO sessions (user_id, token_hash, refresh_token_hash, device_id, expires_at, ip_address, user_agent)
-       VALUES ($1, $2, $3, $4, NOW() + INTERVAL '1 hour', $5, $6)`,
-      [
-        user.id,
-        bcrypt.hashSync(token, 10),
-        bcrypt.hashSync(refreshToken, 10),
-        deviceId,
-        req.ip,
-        req.get('User-Agent')
-      ]
-    );
-
-    // Log audit
-    await logAudit(user.id, 'user_signup', 'user', user.id, null, user, req);
-
-    res.status(201).json({
-      success: true,
-      data: {
-        user: {
-          id: user.id,
-          username: user.username,
-          fullName: user.full_name,
-          userType: user.user_type,
-          email: user.username,
-          isGuest: false,
-          trialExpiresAt: user.trial_expires_at
-        },
-        token,
-        refreshToken
-      },
-      message: 'Account created successfully'
-    });
-
-  } catch (error) {
-    console.error('Signup error:', error);
-    res.status(500).json({ success: false, error: 'Internal server error' });
-  }
-});
-
-// User Login
-app.post('/api/auth/login', async (req, res) => {
-  try {
-    const { username, password, deviceId } = req.body;
-
-    if (!username || !deviceId) {
-      return res.status(400).json({
-        success: false,
-        error: 'Username and device ID are required'
-      });
-    }
-
-    // Find user
-    const userResult = await pool.query(
-      'SELECT * FROM users WHERE username = $1 AND is_active = true',
-      [username]
-    );
-
-    if (userResult.rows.length === 0) {
-      return res.status(401).json({ success: false, error: 'Invalid credentials' });
-    }
-
-    const user = userResult.rows[0];
-
-    // Check authentication based on user type
-    if (user.password_hash) {
-      // User has a password - verify it
-      if (!password) {
-        return res.status(401).json({ success: false, error: 'Password required' });
-      }
-      const isPasswordValid = await bcrypt.compare(password, user.password_hash);
-      if (!isPasswordValid) {
-        return res.status(401).json({ success: false, error: 'Invalid credentials' });
-      }
-      // For users with passwords, we don't check device ID (allows login from any device)
-    } else if (user.user_type === 'guest') {
-      // Guest user - check device ID
-      if (user.device_id !== deviceId) {
-        return res.status(401).json({ success: false, error: 'Device not authorized for this account' });
-      }
-    } else {
-      // User has no password and is not guest - this shouldn't happen
-      console.error('User has no password but is not guest:', user);
-      return res.status(401).json({ success: false, error: 'Account configuration error' });
-    }
-
-    // Update last login
-    await pool.query(
-      'UPDATE users SET last_login_at = NOW(), login_count = login_count + 1 WHERE id = $1',
-      [user.id]
-    );
-
-    // Generate tokens
-    const { token, refreshToken } = generateTokens(user.id);
-
-    // Create new session
-    await pool.query(
-      `INSERT INTO sessions (user_id, token_hash, refresh_token_hash, device_id, expires_at, ip_address, user_agent)
-       VALUES ($1, $2, $3, $4, NOW() + INTERVAL '1 hour', $5, $6)`,
-      [
-        user.id,
-        bcrypt.hashSync(token, 10),
-        bcrypt.hashSync(refreshToken, 10),
-        deviceId,
-        req.ip,
-        req.get('User-Agent')
-      ]
-    );
-
-    // Log audit
-    await logAudit(user.id, 'user_login', 'user', user.id, null, { deviceId }, req);
-
-    res.json({
-      success: true,
-      data: {
-        user: {
-          id: user.id,
-          username: user.username,
-          fullName: user.full_name,
-          userType: user.user_type,
-          trialExpiresAt: user.trial_expires_at
-        },
-        token,
-        refreshToken
-      },
-      message: 'Login successful'
-    });
-
-  } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ success: false, error: 'Internal server error' });
-  }
-});
-
-// Token Refresh
-app.post('/api/auth/refresh', async (req, res) => {
-  try {
-    const { refreshToken } = req.body;
-
-    if (!refreshToken) {
-      return res.status(401).json({ success: false, error: 'Refresh token required' });
-    }
-
-    jwt.verify(refreshToken, JWT_REFRESH_SECRET, async (err, decoded) => {
-      if (err) {
-        return res.status(403).json({ success: false, error: 'Invalid refresh token' });
-      }
-
-      // Generate new tokens
-      const { token, refreshToken: newRefreshToken } = generateTokens(decoded.userId);
-
-      res.json({
-        success: true,
-        data: { token, refreshToken: newRefreshToken },
-        message: 'Token refreshed'
-      });
-    });
-
-  } catch (error) {
-    console.error('Token refresh error:', error);
-    res.status(500).json({ success: false, error: 'Internal server error' });
-  }
-});
+// Token refresh endpoint removed - using authController
 
 // Validate Session
 app.get('/api/auth/validate', verifyToken, async (req, res) => {
@@ -459,24 +223,7 @@ app.get('/api/auth/validate', verifyToken, async (req, res) => {
   }
 });
 
-// Logout
-app.post('/api/auth/logout', verifyToken, async (req, res) => {
-  try {
-    // Deactivate all sessions for this user
-    await pool.query(
-      'UPDATE sessions SET is_active = false WHERE user_id = $1',
-      [req.userId]
-    );
-
-    await logAudit(req.userId, 'user_logout', 'user', req.userId, null, null, req);
-
-    res.json({ success: true, message: 'Logged out successfully' });
-
-  } catch (error) {
-    console.error('Logout error:', error);
-    res.status(500).json({ success: false, error: 'Internal server error' });
-  }
-});
+// Logout endpoint removed - using authController
 
 // ================================
 // VEHICLE MANAGEMENT ENDPOINTS
@@ -811,13 +558,13 @@ app.get('/api/settings', verifyToken, async (req, res) => {
 
       res.json({
         success: true,
-        data: { settings: defaultSettings.rows[0] },
+        data: defaultSettings.rows[0],
         message: 'Default settings created'
       });
     } else {
       res.json({
         success: true,
-        data: { settings: result.rows[0] },
+        data: result.rows[0],
         message: 'Settings retrieved successfully'
       });
     }
@@ -878,7 +625,7 @@ app.put('/api/settings', verifyToken, async (req, res) => {
 
       res.json({
         success: true,
-        data: { settings: createResult.rows[0] },
+        data: createResult.rows[0],
         message: 'Settings created successfully'
       });
     } else {
@@ -886,7 +633,7 @@ app.put('/api/settings', verifyToken, async (req, res) => {
 
       res.json({
         success: true,
-        data: { settings: result.rows[0] },
+        data: result.rows[0],
         message: 'Settings updated successfully'
       });
     }
