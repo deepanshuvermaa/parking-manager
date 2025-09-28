@@ -88,19 +88,24 @@ class SettingsProvider with ChangeNotifier {
     _showQRCode = prefs.getBool('showQRCode') ?? true;
     _receiptFooterText = prefs.getString('receiptFooterText') ?? 'Thank you!';
 
-    // Try to sync with backend if available
-    try {
-      final isOnline = await ApiService.isBackendHealthy();
-      if (isOnline) {
-        final backendSettings = await ApiService.getSettings();
-        if (backendSettings != null) {
-          _settings = Settings.fromJson(backendSettings);
-          await _persistSettings(); // Save backend settings locally
-          debugPrint('✅ Settings synced from backend');
+    // Try to sync with backend if available - but only if we don't have local settings
+    // This prevents backend from overwriting user's local changes
+    if (settingsJson == null) {
+      try {
+        final isOnline = await ApiService.isBackendHealthy();
+        if (isOnline) {
+          final backendSettings = await ApiService.getSettings();
+          if (backendSettings != null) {
+            _settings = Settings.fromJson(backendSettings);
+            await _persistSettings(); // Save backend settings locally
+            debugPrint('✅ Initial settings loaded from backend');
+          }
         }
+      } catch (e) {
+        debugPrint('⚠️ Could not sync with backend, using defaults: $e');
       }
-    } catch (e) {
-      debugPrint('⚠️ Could not sync with backend, using local settings: $e');
+    } else {
+      debugPrint('💾 Using local settings, not overwriting with backend');
     }
 
     notifyListeners();
@@ -115,7 +120,12 @@ class SettingsProvider with ChangeNotifier {
     try {
       final isOnline = await ApiService.isBackendHealthy();
       if (isOnline) {
-        await ApiService.updateSettings(_settings.toJson());
+        final success = await ApiService.updateSettings(_settings.toJson());
+        if (success) {
+          debugPrint('✅ Settings synced to backend');
+        } else {
+          debugPrint('⚠️ Backend rejected settings update');
+        }
       }
     } catch (e) {
       debugPrint('⚠️ Error syncing settings to backend: $e');
@@ -320,5 +330,23 @@ ${_settings.enableGST ? 'GST: ${_settings.gstNumber}' : ''}'''.trim();
   /// Format currency amount
   String formatCurrency(double amount) {
     return 'Rs ${amount.toStringAsFixed(2)}';
+  }
+
+  /// Force reload settings from backend (useful after login)
+  Future<void> reloadFromBackend() async {
+    try {
+      final isOnline = await ApiService.isBackendHealthy();
+      if (isOnline) {
+        final backendSettings = await ApiService.getSettings();
+        if (backendSettings != null) {
+          _settings = Settings.fromJson(backendSettings);
+          await _persistSettings(); // Save backend settings locally
+          notifyListeners();
+          debugPrint('✅ Settings reloaded from backend');
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ Could not reload from backend: $e');
+    }
   }
 }

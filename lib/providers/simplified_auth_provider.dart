@@ -53,6 +53,20 @@ class SimplifiedAuthProvider extends ChangeNotifier {
 
     try {
       final prefs = await SharedPreferences.getInstance();
+
+      // First check if we explicitly logged out
+      final hasLoggedOut = prefs.getBool('has_logged_out') ?? false;
+      if (hasLoggedOut) {
+        // Clear the flag and don't auto-login
+        await prefs.remove('has_logged_out');
+        _authToken = null;
+        _userData = null;
+        _isAuthenticated = false;
+        _isLoading = false;
+        notifyListeners();
+        return;
+      }
+
       final token = prefs.getString('auth_token');
       final isLoggedIn = prefs.getBool('is_logged_in') ?? false;
       final userJson = prefs.getString('user_data');
@@ -168,6 +182,9 @@ class SimplifiedAuthProvider extends ChangeNotifier {
           // Register device and sync data
           await _postLoginSetup();
 
+          // IMPORTANT: Load user's settings from backend after login
+          await _loadUserDataFromBackend();
+
           _isLoading = false;
           notifyListeners();
           return true;
@@ -244,6 +261,9 @@ class SimplifiedAuthProvider extends ChangeNotifier {
           // Register device and sync data
           await _postLoginSetup();
 
+          // IMPORTANT: Load user's settings from backend after login
+          await _loadUserDataFromBackend();
+
           _isLoading = false;
           notifyListeners();
           return true;
@@ -273,7 +293,7 @@ class SimplifiedAuthProvider extends ChangeNotifier {
       if (_authToken != null) {
         try {
           await http.post(
-            Uri.parse('https://parkease-production-6679.up.railway.app/api/auth/logout'),
+            Uri.parse(ApiConfig.logoutUrl),
             headers: {
               'Content-Type': 'application/json',
               'Authorization': 'Bearer $_authToken',
@@ -286,6 +306,9 @@ class SimplifiedAuthProvider extends ChangeNotifier {
 
       // Clear ALL auth-related data from SharedPreferences
       final prefs = await SharedPreferences.getInstance();
+
+      // Set a flag to prevent auto-login on next app start
+      await prefs.setBool('has_logged_out', true);
 
       // Remove all auth keys
       await prefs.remove('auth_token');
@@ -313,7 +336,7 @@ class SimplifiedAuthProvider extends ChangeNotifier {
       // Also clear tokens from ApiService to ensure complete logout
       await ApiService.clearTokens();
 
-      // Clear state variables
+      // Clear state variables BEFORE notifying listeners
       _authToken = null;
       _userData = null;
       _currentUserModel = null;
@@ -324,6 +347,8 @@ class SimplifiedAuthProvider extends ChangeNotifier {
       _sessionCheckTimer?.cancel();
 
       print('✅ Logout completed - all data cleared');
+      print('   isAuthenticated: $_isAuthenticated');
+      print('   authToken: $_authToken');
     } catch (e) {
       print('❌ Logout error: $e');
       _lastError = 'Logout failed: $e';
@@ -334,6 +359,34 @@ class SimplifiedAuthProvider extends ChangeNotifier {
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  /// Load user's data from backend after login
+  Future<void> _loadUserDataFromBackend() async {
+    try {
+      print('🔄 Loading user data from backend...');
+
+      // Load settings from backend
+      final settings = await ApiService.getSettings();
+      if (settings != null) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('settings', jsonEncode(settings));
+        print('✅ Settings loaded from backend');
+      }
+
+      // Load vehicles from backend
+      final vehicles = await ApiService.getVehicles();
+      if (vehicles != null) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('cached_vehicles', jsonEncode(vehicles));
+        print('✅ Vehicles loaded from backend: ${vehicles.length} vehicles');
+      }
+
+      print('✅ User data restored from backend');
+    } catch (e) {
+      print('⚠️ Error loading user data from backend: $e');
+      // Don't fail login even if data load fails
     }
   }
 
@@ -359,8 +412,7 @@ class SimplifiedAuthProvider extends ChangeNotifier {
         }
       }
 
-      // Sync data across devices
-      await DeviceSyncService.syncDataAcrossDevices();
+      // Note: Data sync moved to _loadUserDataFromBackend for better control
     } catch (e) {
       // Don't fail login for sync issues, just log the error
       print('Post-login setup error: $e');
