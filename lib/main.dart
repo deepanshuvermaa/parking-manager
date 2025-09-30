@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'screens/login_screen.dart';
+import 'screens/standalone_login_screen.dart';
 
 void main() {
   runApp(const EmergencyTestApp());
@@ -50,7 +50,7 @@ class EmergencyTestApp extends StatelessWidget {
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: const Text(
-                        'VERSION 3.0 - EMERGENCY BUILD',
+                        'VERSION 3.1 - STANDALONE LOGIN',
                         style: TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -78,7 +78,7 @@ class EmergencyTestApp extends StatelessWidget {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => const LoginScreen(),
+                            builder: (context) => const StandaloneLoginScreen(),
                           ),
                         );
                       },
