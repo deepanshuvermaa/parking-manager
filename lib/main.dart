@@ -1,34 +1,59 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'screens/dashboard_screen.dart';
+import 'utils/constants.dart';
 
 void main() {
-  runApp(MaterialApp(
-    home: AllInOneTestApp(),
-    debugShowCheckedModeBanner: false,
-  ));
+  runApp(const ParkEaseApp());
 }
 
-class AllInOneTestApp extends StatefulWidget {
+class ParkEaseApp extends StatelessWidget {
+  const ParkEaseApp({super.key});
+
   @override
-  State<AllInOneTestApp> createState() => _AllInOneTestAppState();
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'ParkEase Manager',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        primaryColor: AppColors.primary,
+        colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary),
+      ),
+      home: const SimpleLoginScreen(),
+    );
+  }
 }
 
-class _AllInOneTestAppState extends State<AllInOneTestApp> {
-  final _usernameController = TextEditingController(text: 'deepanshuverma966@gmail.com');
-  final _passwordController = TextEditingController(text: 'Dv12062001@');
+class SimpleLoginScreen extends StatefulWidget {
+  const SimpleLoginScreen({super.key});
+
+  @override
+  State<SimpleLoginScreen> createState() => _SimpleLoginScreenState();
+}
+
+class _SimpleLoginScreenState extends State<SimpleLoginScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _usernameController = TextEditingController();
+  final _passwordController = TextEditingController();
 
   bool _isLoading = false;
-  String _statusMessage = 'VERSION 3.2 - ALL IN ONE';
-  Color _statusColor = Colors.blue;
-  String _apiResponse = 'No API call yet';
+  bool _rememberMe = false;
+  String? _errorMessage;
 
-  Future<void> _testLogin() async {
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleLogin() async {
+    if (!_formKey.currentState!.validate()) return;
+
     setState(() {
       _isLoading = true;
-      _statusMessage = 'Calling API...';
-      _statusColor = Colors.orange;
-      _apiResponse = 'Waiting...';
+      _errorMessage = null;
     });
 
     try {
@@ -36,251 +61,412 @@ class _AllInOneTestAppState extends State<AllInOneTestApp> {
         Uri.parse('https://parkease-production-6679.up.railway.app/api/auth/login'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'username': _usernameController.text,
+          'username': _usernameController.text.trim(),
           'password': _passwordController.text,
         }),
-      ).timeout(Duration(seconds: 10));
+      ).timeout(const Duration(seconds: 15));
 
       final data = jsonDecode(response.body);
 
-      setState(() {
-        _apiResponse = 'Status: ${response.statusCode}\n${response.body.substring(0, 200)}...';
+      if (response.statusCode == 200 && data['success'] == true) {
+        // Store user data in memory (simplified)
+        final userData = data['data']['user'];
+        final token = data['data']['token'];
 
-        if (response.statusCode == 200 && data['success'] == true) {
-          _statusMessage = '✅ SUCCESS!';
-          _statusColor = Colors.green;
-        } else {
-          _statusMessage = '❌ FAILED';
-          _statusColor = Colors.red;
+        // Navigate to dashboard with user data
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => SimpleDashboard(
+                userName: userData['fullName'] ?? userData['email'],
+                userEmail: userData['email'],
+                userRole: userData['role'] ?? 'owner',
+                token: token,
+              ),
+            ),
+          );
         }
-      });
+      } else {
+        setState(() {
+          _errorMessage = data['error'] ?? 'Login failed';
+        });
+      }
     } catch (e) {
       setState(() {
-        _statusMessage = '❌ ERROR';
-        _statusColor = Colors.red;
-        _apiResponse = 'Error: $e';
+        _errorMessage = 'Connection error. Please check your internet.';
       });
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
-  Future<void> _testHealth() async {
+  Future<void> _handleGuestLogin() async {
     setState(() {
       _isLoading = true;
-      _statusMessage = 'Testing health...';
-      _apiResponse = 'Calling health endpoint...';
+      _errorMessage = null;
     });
 
     try {
-      final response = await http.get(
-        Uri.parse('https://parkease-production-6679.up.railway.app/health'),
-      ).timeout(Duration(seconds: 5));
+      final response = await http.post(
+        Uri.parse('https://parkease-production-6679.up.railway.app/api/auth/guest-signup'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({}),
+      ).timeout(const Duration(seconds: 15));
 
-      setState(() {
-        _apiResponse = 'Health Status: ${response.statusCode}\n${response.body}';
-        _statusMessage = response.statusCode == 200 ? '✅ API ONLINE' : '❌ API OFFLINE';
-        _statusColor = response.statusCode == 200 ? Colors.green : Colors.red;
-      });
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && data['success'] == true) {
+        final userData = data['data']['user'];
+        final token = data['data']['token'];
+
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => SimpleDashboard(
+                userName: 'Guest User',
+                userEmail: userData['username'] ?? 'guest',
+                userRole: 'guest',
+                token: token,
+              ),
+            ),
+          );
+        }
+      } else {
+        setState(() {
+          _errorMessage = 'Failed to create guest account';
+        });
+      }
     } catch (e) {
       setState(() {
-        _statusMessage = '❌ NETWORK ERROR';
-        _statusColor = Colors.red;
-        _apiResponse = 'Error: $e';
+        _errorMessage = 'Connection error. Please check your internet.';
       });
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.all(20),
-          child: Column(
-            children: [
-              // Version banner
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: _statusColor,
-                  borderRadius: BorderRadius.circular(8),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppColors.primary,
+              AppColors.primary.withOpacity(0.7),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Card(
+                elevation: 8,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                child: Column(
-                  children: [
-                    Text(
-                      _statusMessage,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Built: ${DateTime.now().toString().substring(0, 19)}',
-                      style: TextStyle(color: Colors.white70, fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-
-              SizedBox(height: 20),
-
-              // Login form card
-              Card(
-                child: Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'LOGIN TEST',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                child: Container(
+                  padding: const EdgeInsets.all(32),
+                  constraints: const BoxConstraints(maxWidth: 400),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Logo
+                        Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.local_parking,
+                            size: 48,
+                            color: AppColors.primary,
+                          ),
                         ),
-                      ),
-                      SizedBox(height: 16),
+                        const SizedBox(height: 24),
 
-                      // Username field
-                      TextField(
-                        controller: _usernameController,
-                        decoration: InputDecoration(
-                          labelText: 'Username',
-                          border: OutlineInputBorder(),
-                          isDense: true,
+                        const Text(
+                          'ParkEase Manager',
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                      SizedBox(height: 12),
-
-                      // Password field
-                      TextField(
-                        controller: _passwordController,
-                        obscureText: true,
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          border: OutlineInputBorder(),
-                          isDense: true,
+                        const SizedBox(height: 8),
+                        Text(
+                          'Version 4.0 - Working Build',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
                         ),
-                      ),
-                      SizedBox(height: 16),
+                        const SizedBox(height: 32),
 
-                      // Buttons row
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: _isLoading ? null : _testLogin,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue,
-                                foregroundColor: Colors.white,
+                        // Error message
+                        if (_errorMessage != null)
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            margin: const EdgeInsets.only(bottom: 16),
+                            decoration: BoxDecoration(
+                              color: Colors.red[50],
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.red[300]!),
+                            ),
+                            child: Text(
+                              _errorMessage!,
+                              style: TextStyle(color: Colors.red[800]),
+                            ),
+                          ),
+
+                        // Username field
+                        TextFormField(
+                          controller: _usernameController,
+                          decoration: InputDecoration(
+                            labelText: 'Email',
+                            prefixIcon: const Icon(Icons.email),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter your email';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Password field
+                        TextFormField(
+                          controller: _passwordController,
+                          obscureText: true,
+                          decoration: InputDecoration(
+                            labelText: 'Password',
+                            prefixIcon: const Icon(Icons.lock),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter your password';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Remember me
+                        Row(
+                          children: [
+                            Checkbox(
+                              value: _rememberMe,
+                              onChanged: (value) {
+                                setState(() {
+                                  _rememberMe = value ?? false;
+                                });
+                              },
+                            ),
+                            const Text('Remember me'),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Login button
+                        SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: ElevatedButton(
+                            onPressed: _isLoading ? null : _handleLogin,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              child: _isLoading
-                                ? SizedBox(
-                                    height: 20,
-                                    width: 20,
+                            ),
+                            child: _isLoading
+                                ? const SizedBox(
+                                    width: 24,
+                                    height: 24,
                                     child: CircularProgressIndicator(
+                                      color: Colors.white,
                                       strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                                     ),
                                   )
-                                : Text('TEST LOGIN'),
-                            ),
+                                : const Text(
+                                    'Login',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
                           ),
-                          SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: _isLoading ? null : _testHealth,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
-                                foregroundColor: Colors.white,
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Guest login button
+                        SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: OutlinedButton(
+                            onPressed: _isLoading ? null : _handleGuestLogin,
+                            style: OutlinedButton.styleFrom(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              child: Text('TEST API'),
+                            ),
+                            child: const Text(
+                              'Continue as Guest',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
-                        ],
-                      ),
-                    ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
-              SizedBox(height: 20),
+// Simple Dashboard (temporary, without providers)
+class SimpleDashboard extends StatelessWidget {
+  final String userName;
+  final String userEmail;
+  final String userRole;
+  final String token;
 
-              // Response card
-              Card(
-                child: Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'API RESPONSE:',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                      SizedBox(height: 8),
-                      Container(
-                        width: double.infinity,
-                        padding: EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[200],
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          _apiResponse,
-                          style: TextStyle(
-                            fontFamily: 'monospace',
-                            fontSize: 12,
-                            color: Colors.black87,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+  const SimpleDashboard({
+    super.key,
+    required this.userName,
+    required this.userEmail,
+    required this.userRole,
+    required this.token,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('ParkEase Dashboard'),
+        backgroundColor: AppColors.primary,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const SimpleLoginScreen(),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.check_circle,
+                size: 100,
+                color: Colors.green,
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Login Successful!',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green,
                 ),
               ),
-
-              SizedBox(height: 20),
-
-              // Info card
+              const SizedBox(height: 24),
               Card(
-                color: Colors.yellow[100],
                 child: Padding(
-                  padding: EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '📱 WHAT TO TEST:',
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                        'Welcome, $userName',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                      SizedBox(height: 8),
-                      Text('1. Press "TEST API" - Should show "healthy"'),
-                      Text('2. Press "TEST LOGIN" - Should show success/error'),
-                      Text('3. Check API RESPONSE box for details'),
-                      SizedBox(height: 8),
+                      const SizedBox(height: 12),
+                      Text('Email: $userEmail'),
+                      Text('Role: $userRole'),
+                      const SizedBox(height: 8),
                       Text(
-                        'No providers, no navigation, just API calls.',
-                        style: TextStyle(
-                          fontStyle: FontStyle.italic,
-                          fontSize: 12,
+                        'Token: ${token.substring(0, 30)}...',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontFamily: 'monospace',
                         ),
                       ),
                     ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 32),
+              const Text(
+                'Full dashboard coming soon...',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () {
+                  // Navigate to actual dashboard when ready
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const DashboardScreen(),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.dashboard),
+                label: const Text('Try Original Dashboard'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
                   ),
                 ),
               ),
