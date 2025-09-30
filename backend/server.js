@@ -263,22 +263,36 @@ app.get('/api/vehicles', verifyToken, async (req, res) => {
 // Add Vehicle
 app.post('/api/vehicles', verifyToken, async (req, res) => {
   try {
+    // Accept both camelCase and snake_case for compatibility
     const {
-      vehicleNumber,
-      vehicleType,
-      entryTime,
-      hourlyRate,
-      minimumRate,
-      ticketId,
+      vehicleNumber, vehicle_number,
+      vehicleType, vehicle_type,
+      entryTime, entry_time,
+      hourlyRate, hourly_rate,
+      minimumRate, minimum_rate,
+      ticketId, ticket_id,
       notes
     } = req.body;
 
-    if (!vehicleNumber || !vehicleType) {
+    // Normalize fields
+    const normalizedData = {
+      vehicleNumber: vehicleNumber || vehicle_number,
+      vehicleType: vehicleType || vehicle_type,
+      entryTime: entryTime || entry_time,
+      hourlyRate: hourlyRate || hourly_rate,
+      minimumRate: minimumRate || minimum_rate,
+      ticketId: ticketId || ticket_id,
+      notes
+    };
+
+    if (!normalizedData.vehicleNumber || !normalizedData.vehicleType) {
       return res.status(400).json({
         success: false,
         error: 'Vehicle number and type are required'
       });
     }
+
+    console.log('Adding vehicle with normalized data:', normalizedData);
 
     const result = await pool.query(
       `INSERT INTO vehicles (user_id, vehicle_number, vehicle_type, entry_time, hourly_rate, minimum_rate, ticket_id, notes)
@@ -286,13 +300,13 @@ app.post('/api/vehicles', verifyToken, async (req, res) => {
        RETURNING *`,
       [
         req.userId,
-        vehicleNumber,
-        vehicleType,
-        entryTime || new Date(),
-        hourlyRate,
-        minimumRate,
-        ticketId,
-        notes
+        normalizedData.vehicleNumber,
+        normalizedData.vehicleType,
+        normalizedData.entryTime || new Date(),
+        normalizedData.hourlyRate,
+        normalizedData.minimumRate,
+        normalizedData.ticketId,
+        normalizedData.notes
       ]
     );
 

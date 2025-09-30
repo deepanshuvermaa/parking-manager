@@ -83,15 +83,30 @@ function verifyToken(req, res, next) {
       });
     }
 
-    // Check session validity
-    const session = sessions.get(decoded.sessionId);
+    // Check session validity - if session not found, create a new one for valid JWTs
+    let session = sessions.get(decoded.sessionId);
 
     if (!session || !session.isValid) {
-      return res.status(401).json({
-        success: false,
-        error: 'Session expired or invalid',
-        code: 'SESSION_INVALID'
-      });
+      // If JWT is valid but session is missing (server restart), recreate session
+      if (decoded.userId) {
+        console.log('Recreating session for valid JWT after server restart');
+        session = {
+          userId: decoded.userId,
+          deviceId: decoded.deviceId,
+          accessToken: token,
+          refreshToken: null,
+          createdAt: new Date(),
+          lastActivity: new Date(),
+          isValid: true
+        };
+        sessions.set(decoded.sessionId, session);
+      } else {
+        return res.status(401).json({
+          success: false,
+          error: 'Session expired or invalid',
+          code: 'SESSION_INVALID'
+        });
+      }
     }
 
     // Update last activity
