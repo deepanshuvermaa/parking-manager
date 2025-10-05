@@ -17,8 +17,10 @@
 
 2. **Flutter APK Built**
    - File: `build/app/outputs/flutter-apk/app-release.apk`
-   - Size: 49.4MB
-   - Mode: Release
+   - Size: 49.4MB (50MB)
+   - Built: October 5, 2025 19:40
+   - MD5: f2ecc939df564a8ae10928026971c82a
+   - Mode: Release (with all bug fixes)
    - Status: ✅ READY TO INSTALL
 
 3. **Bug Fixes Applied**
