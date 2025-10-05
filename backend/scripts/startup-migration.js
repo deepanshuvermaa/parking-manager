@@ -129,9 +129,17 @@ async function runStartupMigrations(pool) {
     if (devicesSessionsMigrationCheck.rows.length === 0) {
       console.log('📦 Applying devices and sessions migration...');
 
+      // Drop existing tables if they exist (from failed migration attempts)
+      // This is safe because migration wasn't recorded as complete
+      console.log('🗑️  Cleaning up any partial migration tables...');
+      await pool.query(`DROP TABLE IF EXISTS user_permissions CASCADE`);
+      await pool.query(`DROP TABLE IF EXISTS sessions CASCADE`);
+      await pool.query(`DROP TABLE IF EXISTS devices CASCADE`);
+
       // Create devices table
+      console.log('📋 Creating devices table...');
       await pool.query(`
-        CREATE TABLE IF NOT EXISTS devices (
+        CREATE TABLE devices (
           id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
           user_id UUID REFERENCES users(id) ON DELETE CASCADE,
           device_id VARCHAR(255) UNIQUE NOT NULL,
@@ -149,15 +157,14 @@ async function runStartupMigrations(pool) {
       `);
 
       // Create indexes for devices table
-      await pool.query(`
-        CREATE INDEX IF NOT EXISTS idx_devices_user_id ON devices(user_id);
-        CREATE INDEX IF NOT EXISTS idx_devices_device_id ON devices(device_id);
-        CREATE INDEX IF NOT EXISTS idx_devices_is_active ON devices(is_active);
-      `);
+      await pool.query(`CREATE INDEX idx_devices_user_id ON devices(user_id)`);
+      await pool.query(`CREATE INDEX idx_devices_device_id ON devices(device_id)`);
+      await pool.query(`CREATE INDEX idx_devices_is_active ON devices(is_active)`);
 
-      // Create sessions table (persistent storage instead of in-memory)
+      // Create sessions table
+      console.log('📋 Creating sessions table...');
       await pool.query(`
-        CREATE TABLE IF NOT EXISTS sessions (
+        CREATE TABLE sessions (
           id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
           user_id UUID REFERENCES users(id) ON DELETE CASCADE,
           device_id VARCHAR(255) NOT NULL,
@@ -174,17 +181,16 @@ async function runStartupMigrations(pool) {
       `);
 
       // Create indexes for sessions table
-      await pool.query(`
-        CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
-        CREATE INDEX IF NOT EXISTS idx_sessions_device_id ON sessions(device_id);
-        CREATE INDEX IF NOT EXISTS idx_sessions_session_id ON sessions(session_id);
-        CREATE INDEX IF NOT EXISTS idx_sessions_is_valid ON sessions(is_valid);
-        CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
-      `);
+      await pool.query(`CREATE INDEX idx_sessions_user_id ON sessions(user_id)`);
+      await pool.query(`CREATE INDEX idx_sessions_device_id ON sessions(device_id)`);
+      await pool.query(`CREATE INDEX idx_sessions_session_id ON sessions(session_id)`);
+      await pool.query(`CREATE INDEX idx_sessions_is_valid ON sessions(is_valid)`);
+      await pool.query(`CREATE INDEX idx_sessions_expires_at ON sessions(expires_at)`);
 
-      // Create user_permissions table for granular access control
+      // Create user_permissions table
+      console.log('📋 Creating user_permissions table...');
       await pool.query(`
-        CREATE TABLE IF NOT EXISTS user_permissions (
+        CREATE TABLE user_permissions (
           id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
           user_id UUID REFERENCES users(id) ON DELETE CASCADE,
           permission_type VARCHAR(100) NOT NULL,
@@ -195,10 +201,8 @@ async function runStartupMigrations(pool) {
       `);
 
       // Create indexes for user_permissions table
-      await pool.query(`
-        CREATE INDEX IF NOT EXISTS idx_user_permissions_user_id ON user_permissions(user_id);
-        CREATE INDEX IF NOT EXISTS idx_user_permissions_type ON user_permissions(permission_type);
-      `);
+      await pool.query(`CREATE INDEX idx_user_permissions_user_id ON user_permissions(user_id)`);
+      await pool.query(`CREATE INDEX idx_user_permissions_type ON user_permissions(permission_type)`);
 
       // Add multi_device_enabled column to users table
       await pool.query(`
