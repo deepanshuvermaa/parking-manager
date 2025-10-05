@@ -218,6 +218,7 @@ class _SimpleLoginScreenState extends State<SimpleLoginScreen> {
       DebugLogger.log('Starting login process...');
 
       final deviceId = await DeviceService.getDeviceId();
+      final deviceInfo = await DeviceService.getDeviceInfo();
       DebugLogger.log('Device ID obtained: $deviceId');
       DebugLogger.log('Username: ${_usernameController.text.trim()}');
 
@@ -228,6 +229,8 @@ class _SimpleLoginScreenState extends State<SimpleLoginScreen> {
         'username': _usernameController.text.trim(),
         'password': _passwordController.text,
         'deviceId': deviceId,
+        'deviceName': deviceInfo['deviceName'] ?? 'Unknown Device',
+        'platform': deviceInfo['platform'] ?? 'Android',
       };
       DebugLogger.log('Request body: ${jsonEncode(requestBody)}');
 
@@ -521,6 +524,8 @@ class _SimpleLoginScreenState extends State<SimpleLoginScreen> {
           'phone': guestInfo['phone'],
           'parkingName': guestInfo['parkingName'],
           'deviceId': deviceId,
+          'deviceName': deviceInfo['deviceName'] ?? 'Unknown Device',
+          'platform': deviceInfo['platform'] ?? 'Android',
         }),
       ).timeout(const Duration(seconds: 15));
 

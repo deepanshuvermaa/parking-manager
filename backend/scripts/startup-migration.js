@@ -145,8 +145,11 @@ async function runStartupMigrations(pool) {
           user_agent TEXT,
           created_at TIMESTAMP DEFAULT NOW(),
           updated_at TIMESTAMP DEFAULT NOW()
-        );
+        )
+      `);
 
+      // Create indexes for devices table
+      await pool.query(`
         CREATE INDEX IF NOT EXISTS idx_devices_user_id ON devices(user_id);
         CREATE INDEX IF NOT EXISTS idx_devices_device_id ON devices(device_id);
         CREATE INDEX IF NOT EXISTS idx_devices_is_active ON devices(is_active);
@@ -167,8 +170,11 @@ async function runStartupMigrations(pool) {
           last_activity TIMESTAMP DEFAULT NOW(),
           ip_address VARCHAR(100),
           user_agent TEXT
-        );
+        )
+      `);
 
+      // Create indexes for sessions table
+      await pool.query(`
         CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
         CREATE INDEX IF NOT EXISTS idx_sessions_device_id ON sessions(device_id);
         CREATE INDEX IF NOT EXISTS idx_sessions_session_id ON sessions(session_id);
@@ -185,8 +191,11 @@ async function runStartupMigrations(pool) {
           permission_value JSONB DEFAULT '{}',
           created_at TIMESTAMP DEFAULT NOW(),
           UNIQUE(user_id, permission_type)
-        );
+        )
+      `);
 
+      // Create indexes for user_permissions table
+      await pool.query(`
         CREATE INDEX IF NOT EXISTS idx_user_permissions_user_id ON user_permissions(user_id);
         CREATE INDEX IF NOT EXISTS idx_user_permissions_type ON user_permissions(permission_type);
       `);
@@ -195,7 +204,7 @@ async function runStartupMigrations(pool) {
       await pool.query(`
         ALTER TABLE users
         ADD COLUMN IF NOT EXISTS multi_device_enabled BOOLEAN DEFAULT false,
-        ADD COLUMN IF NOT EXISTS max_devices INTEGER DEFAULT 1;
+        ADD COLUMN IF NOT EXISTS max_devices INTEGER DEFAULT 1
       `);
 
       // Record that migration has been applied
