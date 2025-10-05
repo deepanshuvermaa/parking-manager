@@ -9,7 +9,7 @@ require('dotenv').config();
 // Import centralized config and middleware
 const config = require('./config');
 const { transformRequest, transformResponse } = require('./middleware/dataTransform');
-const { verifyToken } = require('./middleware/session');
+const { verifyToken, initializeSessionMiddleware } = require('./middleware/session');
 const AuthController = require('./controllers/authController');
 
 const app = express();
@@ -43,6 +43,9 @@ app.use(transformResponse);
 //   trustProxy: true
 // });
 // app.use('/api/', limiter);
+
+// Initialize session middleware with database pool
+initializeSessionMiddleware(pool);
 
 // Initialize auth controller
 const authController = new AuthController(pool);

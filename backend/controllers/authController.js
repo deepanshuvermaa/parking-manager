@@ -12,10 +12,10 @@ class AuthController {
   }
 
   /**
-   * Login user
+   * Login user with device management
    */
   async login(req, res) {
-    const { username, password, deviceId } = req.body;
+    const { username, password, deviceId, deviceName, platform } = req.body;
 
     try {
       // Validate input
@@ -23,6 +23,13 @@ class AuthController {
         return res.status(400).json({
           success: false,
           error: 'Username is required'
+        });
+      }
+
+      if (!deviceId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Device ID is required'
         });
       }
 
@@ -79,8 +86,78 @@ class AuthController {
         }
       }
 
+      // ========================================
+      // DEVICE MANAGEMENT LOGIC
+      // ========================================
+
+      // Check if this device is already registered
+      const existingDeviceResult = await this.pool.query(
+        'SELECT * FROM devices WHERE device_id = $1',
+        [deviceId]
+      );
+
+      let deviceRecord = existingDeviceResult.rows[0];
+
+      if (deviceRecord) {
+        // Device exists - update its info and mark as active
+        await this.pool.query(
+          `UPDATE devices
+           SET user_id = $1, device_name = $2, platform = $3,
+               is_active = true, last_active_at = NOW(), updated_at = NOW()
+           WHERE device_id = $4`,
+          [user.id, deviceName || 'Unknown Device', platform || 'Unknown', deviceId]
+        );
+        console.log(`✅ Device ${deviceId} reactivated for user ${user.id}`);
+      } else {
+        // New device - check if user has multi-device permission
+        const activeDevicesResult = await this.pool.query(
+          'SELECT COUNT(*) as count FROM devices WHERE user_id = $1 AND is_active = true',
+          [user.id]
+        );
+
+        const activeDeviceCount = parseInt(activeDevicesResult.rows[0].count);
+        const maxDevices = user.max_devices || 1;
+        const multiDeviceEnabled = user.multi_device_enabled || false;
+
+        if (activeDeviceCount >= maxDevices && !multiDeviceEnabled) {
+          // User has reached device limit - offer to logout other devices
+          const activeDevices = await this.pool.query(
+            `SELECT device_id, device_name, platform, last_active_at
+             FROM devices
+             WHERE user_id = $1 AND is_active = true
+             ORDER BY last_active_at DESC`,
+            [user.id]
+          );
+
+          return res.status(403).json({
+            success: false,
+            error: 'Maximum device limit reached',
+            code: 'DEVICE_LIMIT_REACHED',
+            data: {
+              maxDevices,
+              currentDevices: activeDevices.rows,
+              message: 'You can only login on one device at a time. Would you like to logout from other devices?'
+            }
+          });
+        }
+
+        // Register new device
+        await this.pool.query(
+          `INSERT INTO devices (user_id, device_id, device_name, platform, is_active, is_primary)
+           VALUES ($1, $2, $3, $4, true, $5)`,
+          [
+            user.id,
+            deviceId,
+            deviceName || 'Unknown Device',
+            platform || 'Unknown',
+            activeDeviceCount === 0  // First device is primary
+          ]
+        );
+        console.log(`✅ New device ${deviceId} registered for user ${user.id}`);
+      }
+
       // Generate tokens
-      const tokens = generateTokens(user.id, deviceId || 'web');
+      const tokens = await generateTokens(user.id, deviceId, req);
 
       // Update last login
       await this.pool.query(
@@ -113,7 +190,9 @@ class AuthController {
             businessId: user.business_id,
             trialStartsAt: user.trial_starts_at,
             trialExpiresAt: user.trial_expires_at,
-            isActive: user.is_active
+            isActive: user.is_active,
+            multiDeviceEnabled: user.multi_device_enabled || false,
+            maxDevices: user.max_devices || 1
           },
           token: tokens.accessToken,
           refreshToken: tokens.refreshToken,
@@ -153,12 +232,19 @@ class AuthController {
   }
 
   /**
-   * Guest signup
+   * Guest signup with device registration
    */
   async guestSignup(req, res) {
-    const { fullName, parkingName, deviceId } = req.body;
+    const { fullName, parkingName, deviceId, deviceName, platform } = req.body;
 
     try {
+      if (!deviceId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Device ID is required'
+        });
+      }
+
       // Generate unique username
       const username = `guest_${Date.now()}@parkease.local`;
       const businessId = `biz_${Date.now()}`;
@@ -176,8 +262,16 @@ class AuthController {
 
       const user = userResult.rows[0];
 
+      // Register device
+      await this.pool.query(
+        `INSERT INTO devices (user_id, device_id, device_name, platform, is_active, is_primary)
+         VALUES ($1, $2, $3, $4, true, true)`,
+        [user.id, deviceId, deviceName || 'Mobile Device', platform || 'Android']
+      );
+      console.log(`✅ Device ${deviceId} registered for guest user ${user.id}`);
+
       // Generate tokens
-      const tokens = generateTokens(user.id, deviceId);
+      const tokens = await generateTokens(user.id, deviceId, req);
 
       res.json({
         success: true,

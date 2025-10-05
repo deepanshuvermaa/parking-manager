@@ -7,17 +7,27 @@ class ApiConfig {
 
   // API Base URLs
   static String get baseUrl {
-    // In production, always use Railway URL
-    if (isProduction) {
-      return 'https://parkease-production-6679.up.railway.app/api';
-    }
+    // IMPORTANT: Choose ONE option based on your deployment:
 
-    // In development, check if we're on a real device or emulator
-    // For now, always use Railway URL to ensure consistency
-    // Change this to local URL only when testing locally
+    // Option 1: Cloudflare Workers Proxy (RECOMMENDED - Works globally)
+    // Deploy cloudflare-worker.js to Cloudflare and update this URL
+    // This bypasses all DNS/ISP blocking issues
+    // return 'https://parkease-proxy.YOUR-SUBDOMAIN.workers.dev/api';
+
+    // Option 2: Use hosts file workaround (QUICK FIX)
+    // Add "66.33.22.37 parkease-production-6679.up.railway.app" to C:\Windows\System32\drivers\etc\hosts
+    // Then Railway URL will work
     return 'https://parkease-production-6679.up.railway.app/api';
 
-    // For local testing, uncomment this:
+    // Option 3: Direct Railway URL (May have DNS issues with some ISPs)
+    // Use this if you're sure all your users can access Railway domains
+    // return 'https://parkease-production-6679.up.railway.app/api';
+
+    // Option 4: Custom Domain with Cloudflare (Best for production)
+    // Buy a domain and point it to your backend
+    // return 'https://api.parkease.com/api';
+
+    // Option 5: Local testing only
     // return 'http://192.168.1.7:5000/api';
   }
 
