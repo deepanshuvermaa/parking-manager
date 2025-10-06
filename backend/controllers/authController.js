@@ -15,7 +15,18 @@ class AuthController {
    * Login user with device management
    */
   async login(req, res) {
-    const { username, password, deviceId, deviceName, platform } = req.body;
+    // Support both camelCase and snake_case (due to transform middleware)
+    const {
+      username,
+      password,
+      deviceId, device_id,
+      deviceName, device_name,
+      platform
+    } = req.body;
+
+    // Use whichever format was provided
+    const finalDeviceId = deviceId || device_id;
+    const finalDeviceName = deviceName || device_name;
 
     try {
       // Validate input
@@ -26,7 +37,7 @@ class AuthController {
         });
       }
 
-      if (!deviceId) {
+      if (!finalDeviceId) {
         return res.status(400).json({
           success: false,
           error: 'Device ID is required'
@@ -78,7 +89,7 @@ class AuthController {
         }
       } else {
         // Guest user - check device ID
-        if (user.device_id && user.device_id !== deviceId) {
+        if (user.device_id && user.device_id !== finalDeviceId) {
           return res.status(401).json({
             success: false,
             error: 'Device not authorized'
@@ -93,7 +104,7 @@ class AuthController {
       // Check if this device is already registered
       const existingDeviceResult = await this.pool.query(
         'SELECT * FROM devices WHERE device_id = $1',
-        [deviceId]
+        [finalDeviceId]
       );
 
       let deviceRecord = existingDeviceResult.rows[0];
@@ -105,9 +116,9 @@ class AuthController {
            SET user_id = $1, device_name = $2, platform = $3,
                is_active = true, last_active_at = NOW(), updated_at = NOW()
            WHERE device_id = $4`,
-          [user.id, deviceName || 'Unknown Device', platform || 'Unknown', deviceId]
+          [user.id, finalDeviceName || 'Unknown Device', platform || 'Unknown', finalDeviceId]
         );
-        console.log(`✅ Device ${deviceId} reactivated for user ${user.id}`);
+        console.log(`✅ Device ${finalDeviceId} reactivated for user ${user.id}`);
       } else {
         // New device - check if user has multi-device permission
         const activeDevicesResult = await this.pool.query(
@@ -147,17 +158,17 @@ class AuthController {
            VALUES ($1, $2, $3, $4, true, $5)`,
           [
             user.id,
-            deviceId,
-            deviceName || 'Unknown Device',
+            finalDeviceId,
+            finalDeviceName || 'Unknown Device',
             platform || 'Unknown',
             activeDeviceCount === 0  // First device is primary
           ]
         );
-        console.log(`✅ New device ${deviceId} registered for user ${user.id}`);
+        console.log(`✅ New device ${finalDeviceId} registered for user ${user.id}`);
       }
 
       // Generate tokens
-      const tokens = await generateTokens(user.id, deviceId, req);
+      const tokens = await generateTokens(user.id, finalDeviceId, req);
 
       // Update last login
       await this.pool.query(
@@ -235,10 +246,23 @@ class AuthController {
    * Guest signup with device registration
    */
   async guestSignup(req, res) {
-    const { fullName, parkingName, deviceId, deviceName, platform } = req.body;
+    // Support both camelCase and snake_case (due to transform middleware)
+    const {
+      fullName, full_name,
+      parkingName, parking_name,
+      deviceId, device_id,
+      deviceName, device_name,
+      platform
+    } = req.body;
+
+    // Use whichever format was provided
+    const finalFullName = fullName || full_name;
+    const finalParkingName = parkingName || parking_name;
+    const finalDeviceId = deviceId || device_id;
+    const finalDeviceName = deviceName || device_name;
 
     try {
-      if (!deviceId) {
+      if (!finalDeviceId) {
         return res.status(400).json({
           success: false,
           error: 'Device ID is required'
@@ -257,7 +281,7 @@ class AuthController {
           business_id, role
         ) VALUES ($1, $2, $3, 'guest', NOW(), NOW() + INTERVAL '3 days', true, $4, 'owner')
         RETURNING *`,
-        [username, fullName || parkingName || 'Guest User', deviceId, businessId]
+        [username, finalFullName || finalParkingName || 'Guest User', finalDeviceId, businessId]
       );
 
       const user = userResult.rows[0];
@@ -266,12 +290,12 @@ class AuthController {
       await this.pool.query(
         `INSERT INTO devices (user_id, device_id, device_name, platform, is_active, is_primary)
          VALUES ($1, $2, $3, $4, true, true)`,
-        [user.id, deviceId, deviceName || 'Mobile Device', platform || 'Android']
+        [user.id, finalDeviceId, finalDeviceName || 'Mobile Device', platform || 'Android']
       );
-      console.log(`✅ Device ${deviceId} registered for guest user ${user.id}`);
+      console.log(`✅ Device ${finalDeviceId} registered for guest user ${user.id}`);
 
       // Generate tokens
-      const tokens = await generateTokens(user.id, deviceId, req);
+      const tokens = await generateTokens(user.id, finalDeviceId, req);
 
       res.json({
         success: true,
