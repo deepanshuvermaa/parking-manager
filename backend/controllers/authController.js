@@ -291,10 +291,10 @@ class AuthController {
         `INSERT INTO users (
           username, full_name, device_id, user_type, password_hash,
           trial_starts_at, trial_expires_at, is_active,
-          business_id, role, phone
-        ) VALUES ($1, $2, $3, 'guest', $4, NOW(), NOW() + INTERVAL '3 days', true, $5, 'owner', $6)
+          business_id, role
+        ) VALUES ($1, $2, $3, 'guest', $4, NOW(), NOW() + INTERVAL '3 days', true, $5, 'owner')
         RETURNING *`,
-        [username, finalFullName || finalParkingName || 'Guest User', finalDeviceId, passwordHash, businessId, phone || null]
+        [username, finalFullName || finalParkingName || 'Guest User', finalDeviceId, passwordHash, businessId]
       );
 
       const user = userResult.rows[0];

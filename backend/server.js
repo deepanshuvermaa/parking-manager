@@ -335,9 +335,9 @@ app.put('/api/vehicles/:id/exit', verifyToken, async (req, res) => {
     const { id } = req.params;
     const { exitTime, amount, notes } = req.body;
 
-    // Get current vehicle data
+    // Get current vehicle data (handle both UUID and string IDs like "local_1759730204667")
     const currentResult = await pool.query(
-      'SELECT * FROM vehicles WHERE id = $1 AND user_id = $2',
+      'SELECT * FROM vehicles WHERE (CAST(id AS TEXT) = $1 OR ticket_id = $1) AND user_id = $2',
       [id, req.userId]
     );
 
@@ -352,11 +352,11 @@ app.put('/api/vehicles/:id/exit', verifyToken, async (req, res) => {
     const entry = new Date(currentVehicle.entry_time);
     const durationMinutes = Math.floor((exit - entry) / (1000 * 60));
 
-    // Update vehicle
+    // Update vehicle (handle both UUID and string IDs)
     const result = await pool.query(
       `UPDATE vehicles
        SET exit_time = $1, amount = $2, status = 'exited', duration_minutes = $3, notes = $4, updated_at = NOW()
-       WHERE id = $5 AND user_id = $6
+       WHERE (CAST(id AS TEXT) = $5 OR ticket_id = $5) AND user_id = $6
        RETURNING *`,
       [exit, amount, durationMinutes, notes, id, req.userId]
     );
@@ -372,8 +372,17 @@ app.put('/api/vehicles/:id/exit', verifyToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Exit vehicle error:', error);
-    res.status(500).json({ success: false, error: 'Internal server error' });
+    console.error('Exit vehicle error:', {
+      vehicleId: id,
+      error: error.message,
+      code: error.code,
+      stack: error.stack
+    });
+    res.status(500).json({
+      success: false,
+      error: 'Exit failed',
+      details: error.message
+    });
   }
 });
 
