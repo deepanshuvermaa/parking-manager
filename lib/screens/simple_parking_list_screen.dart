@@ -252,8 +252,9 @@ class _SimpleParkingListScreenState extends State<SimpleParkingListScreen>
           ),
         ],
       ),
-      body: Column(
-        children: [
+      body: SafeArea(
+        child: Column(
+          children: [
           // Search bar
           Container(
             padding: const EdgeInsets.all(16),
@@ -325,6 +326,7 @@ class _SimpleParkingListScreenState extends State<SimpleParkingListScreen>
                   ),
           ),
         ],
+        ),
       ),
     );
   }

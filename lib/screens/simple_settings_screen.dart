@@ -3,6 +3,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../utils/constants.dart';
 import '../services/simple_bluetooth_service.dart';
+import '../services/export_import_service.dart';
+import 'vehicle_rates_management_screen.dart';
 
 class SimpleSettingsScreen extends StatefulWidget {
   final String token;
@@ -26,21 +28,20 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
   final _receiptHeaderController = TextEditingController();
   final _receiptFooterController = TextEditingController();
 
-  // Rate settings
-  final Map<String, Map<String, double>> _vehicleRates = {
-    'Car': {'hourly': 20.0, 'minimum': 20.0, 'freeMinutes': 15},
-    'Bike': {'hourly': 10.0, 'minimum': 10.0, 'freeMinutes': 10},
-    'Scooter': {'hourly': 10.0, 'minimum': 10.0, 'freeMinutes': 10},
-    'SUV': {'hourly': 30.0, 'minimum': 30.0, 'freeMinutes': 15},
-    'Van': {'hourly': 25.0, 'minimum': 25.0, 'freeMinutes': 15},
-    'Bus': {'hourly': 50.0, 'minimum': 50.0, 'freeMinutes': 10},
-    'Truck': {'hourly': 40.0, 'minimum': 40.0, 'freeMinutes': 10},
-    'Auto Rickshaw': {'hourly': 15.0, 'minimum': 15.0, 'freeMinutes': 10},
-  };
-
   bool _isLoading = false;
   bool _autoPrint = true;
   bool _autoConnectPrinter = true;
+  int _paperWidth = 32; // 32 for 2", 48 for 3"
+
+  // Bill format customization
+  bool _showBusinessName = true;
+  bool _showBusinessAddress = true;
+  bool _showBusinessPhone = true;
+  bool _showGstNumber = true;
+  bool _showReceiptHeader = true;
+  bool _showReceiptFooter = true;
+  bool _showRateInfo = true;
+  bool _showNotes = true;
 
   @override
   void initState() {
@@ -71,13 +72,17 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
       _receiptFooterController.text = prefs.getString('receipt_footer') ?? 'Thank you for parking with us!';
       _autoPrint = prefs.getBool('auto_print') ?? true;
       _autoConnectPrinter = prefs.getBool(SimpleBluetoothService.PREF_AUTO_CONNECT) ?? true;
+      _paperWidth = prefs.getInt('paper_width') ?? 32;
 
-      // Load saved rates if any
-      _vehicleRates.forEach((type, rates) {
-        rates['hourly'] = prefs.getDouble('rate_${type}_hourly') ?? rates['hourly']!;
-        rates['minimum'] = prefs.getDouble('rate_${type}_minimum') ?? rates['minimum']!;
-        rates['freeMinutes'] = prefs.getDouble('rate_${type}_freeMinutes') ?? rates['freeMinutes']!;
-      });
+      // Load bill format settings
+      _showBusinessName = prefs.getBool('bill_show_business_name') ?? true;
+      _showBusinessAddress = prefs.getBool('bill_show_business_address') ?? true;
+      _showBusinessPhone = prefs.getBool('bill_show_business_phone') ?? true;
+      _showGstNumber = prefs.getBool('bill_show_gst_number') ?? true;
+      _showReceiptHeader = prefs.getBool('bill_show_receipt_header') ?? true;
+      _showReceiptFooter = prefs.getBool('bill_show_receipt_footer') ?? true;
+      _showRateInfo = prefs.getBool('bill_show_rate_info') ?? true;
+      _showNotes = prefs.getBool('bill_show_notes') ?? true;
     });
   }
 
@@ -102,13 +107,17 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
       await prefs.setString('receipt_footer', _receiptFooterController.text);
       await prefs.setBool('auto_print', _autoPrint);
       await prefs.setBool(SimpleBluetoothService.PREF_AUTO_CONNECT, _autoConnectPrinter);
+      await prefs.setInt('paper_width', _paperWidth);
 
-      // Save rates
-      _vehicleRates.forEach((type, rates) async {
-        await prefs.setDouble('rate_${type}_hourly', rates['hourly']!);
-        await prefs.setDouble('rate_${type}_minimum', rates['minimum']!);
-        await prefs.setDouble('rate_${type}_freeMinutes', rates['freeMinutes']!);
-      });
+      // Save bill format settings
+      await prefs.setBool('bill_show_business_name', _showBusinessName);
+      await prefs.setBool('bill_show_business_address', _showBusinessAddress);
+      await prefs.setBool('bill_show_business_phone', _showBusinessPhone);
+      await prefs.setBool('bill_show_gst_number', _showGstNumber);
+      await prefs.setBool('bill_show_receipt_header', _showReceiptHeader);
+      await prefs.setBool('bill_show_receipt_footer', _showReceiptFooter);
+      await prefs.setBool('bill_show_rate_info', _showRateInfo);
+      await prefs.setBool('bill_show_notes', _showNotes);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -134,70 +143,6 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
         });
       }
     }
-  }
-
-  void _showRateEditDialog(String vehicleType) {
-    final rates = _vehicleRates[vehicleType]!;
-    final hourlyController = TextEditingController(text: rates['hourly'].toString());
-    final minimumController = TextEditingController(text: rates['minimum'].toString());
-    final freeMinutesController = TextEditingController(text: rates['freeMinutes']!.toInt().toString());
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Edit $vehicleType Rates'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: hourlyController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Hourly Rate (₹)',
-                prefixIcon: Icon(Icons.access_time),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: minimumController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Minimum Charge (₹)',
-                prefixIcon: Icon(Icons.money),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: freeMinutesController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Free Minutes',
-                prefixIcon: Icon(Icons.timer),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              setState(() {
-                _vehicleRates[vehicleType] = {
-                  'hourly': double.tryParse(hourlyController.text) ?? rates['hourly']!,
-                  'minimum': double.tryParse(minimumController.text) ?? rates['minimum']!,
-                  'freeMinutes': double.tryParse(freeMinutesController.text) ?? rates['freeMinutes']!,
-                };
-              });
-              Navigator.pop(context);
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
   }
 
   Future<void> _showBluetoothScanDialog() async {
@@ -390,6 +335,202 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
     }
   }
 
+  Future<void> _exportData() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Creating backup...'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final success = await ExportImportService.exportToFile();
+      Navigator.pop(context); // Close loading dialog
+
+      if (success && mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.green),
+                SizedBox(width: 8),
+                Text('Export Successful'),
+              ],
+            ),
+            content: const Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Backup file has been created and shared.'),
+                SizedBox(height: 8),
+                Text(
+                  'Save this file in a safe location. You can use it to restore all your settings and data later.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      Navigator.pop(context); // Close loading dialog
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Export failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _importData() async {
+    // Show confirmation dialog
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('Import Backup'),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'This will replace ALL current settings with the imported data.',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 12),
+            Text('Current settings will be overwritten. Continue?'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    // Show loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Importing backup...'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final result = await ExportImportService.importFromFile();
+      Navigator.pop(context); // Close loading dialog
+
+      if (result['success'] == true && mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.green),
+                SizedBox(width: 8),
+                Text('Import Successful'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('${result['imported_count']} settings restored successfully!'),
+                const SizedBox(height: 8),
+                if (result['export_date'] != null)
+                  Text(
+                    'Backup date: ${result['export_date'].toString().split('T')[0]}',
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Please restart the app to see all changes.',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _loadSettings(); // Reload settings
+                },
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Import failed: ${result['error'] ?? 'Unknown error'}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      Navigator.pop(context); // Close loading dialog
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Import failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -405,9 +546,10 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -515,12 +657,123 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
                       const SizedBox(height: 16),
                       SwitchListTile(
                         title: const Text('Auto Print Receipt'),
-                        subtitle: const Text('Automatically print receipt after vehicle entry'),
+                        subtitle: const Text('Automatically print receipt after vehicle entry/exit'),
                         value: _autoPrint,
                         onChanged: (value) {
                           setState(() {
                             _autoPrint = value;
                           });
+                        },
+                      ),
+                      const Divider(height: 32),
+                      const Text(
+                        'Paper Width',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: RadioListTile<int>(
+                              title: const Text('2 inch (32 chars)'),
+                              subtitle: const Text('Standard thermal'),
+                              value: 32,
+                              groupValue: _paperWidth,
+                              onChanged: (value) {
+                                setState(() {
+                                  _paperWidth = value!;
+                                });
+                              },
+                            ),
+                          ),
+                          Expanded(
+                            child: RadioListTile<int>(
+                              title: const Text('3 inch (48 chars)'),
+                              subtitle: const Text('Wider paper'),
+                              value: 48,
+                              groupValue: _paperWidth,
+                              onChanged: (value) {
+                                setState(() {
+                                  _paperWidth = value!;
+                                });
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 32),
+                      const Text(
+                        'Bill Format Customization',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Choose which fields to show on receipts and reports',
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 16),
+                      CheckboxListTile(
+                        title: const Text('Business Name'),
+                        subtitle: const Text('Show business name on bills'),
+                        value: _showBusinessName,
+                        onChanged: (value) {
+                          setState(() => _showBusinessName = value ?? true);
+                        },
+                      ),
+                      CheckboxListTile(
+                        title: const Text('Business Address'),
+                        subtitle: const Text('Show address on bills'),
+                        value: _showBusinessAddress,
+                        onChanged: (value) {
+                          setState(() => _showBusinessAddress = value ?? true);
+                        },
+                      ),
+                      CheckboxListTile(
+                        title: const Text('Business Phone'),
+                        subtitle: const Text('Show phone number on bills'),
+                        value: _showBusinessPhone,
+                        onChanged: (value) {
+                          setState(() => _showBusinessPhone = value ?? true);
+                        },
+                      ),
+                      CheckboxListTile(
+                        title: const Text('GST Number'),
+                        subtitle: const Text('Show GST number on exit bills'),
+                        value: _showGstNumber,
+                        onChanged: (value) {
+                          setState(() => _showGstNumber = value ?? true);
+                        },
+                      ),
+                      CheckboxListTile(
+                        title: const Text('Receipt Header'),
+                        subtitle: const Text('Show welcome message'),
+                        value: _showReceiptHeader,
+                        onChanged: (value) {
+                          setState(() => _showReceiptHeader = value ?? true);
+                        },
+                      ),
+                      CheckboxListTile(
+                        title: const Text('Receipt Footer'),
+                        subtitle: const Text('Show thank you message'),
+                        value: _showReceiptFooter,
+                        onChanged: (value) {
+                          setState(() => _showReceiptFooter = value ?? true);
+                        },
+                      ),
+                      CheckboxListTile(
+                        title: const Text('Rate Information'),
+                        subtitle: const Text('Show hourly rate and minimum charge'),
+                        value: _showRateInfo,
+                        onChanged: (value) {
+                          setState(() => _showRateInfo = value ?? true);
+                        },
+                      ),
+                      CheckboxListTile(
+                        title: const Text('Notes Field'),
+                        subtitle: const Text('Show notes section if present'),
+                        value: _showNotes,
+                        onChanged: (value) {
+                          setState(() => _showNotes = value ?? true);
                         },
                       ),
                     ],
@@ -596,7 +849,55 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Vehicle Rates
+              // Vehicle Rates - Navigate to management screen
+              Card(
+                elevation: 2,
+                child: InkWell(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const VehicleRatesManagementScreen(),
+                      ),
+                    );
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        const CircleAvatar(
+                          backgroundColor: AppColors.primary,
+                          child: Icon(Icons.local_atm, color: Colors.white),
+                        ),
+                        const SizedBox(width: 16),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Vehicle Rates',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Manage pricing for different vehicle types',
+                                style: TextStyle(fontSize: 12, color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.arrow_forward_ios, size: 16),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Backup & Restore
               Card(
                 elevation: 2,
                 child: Padding(
@@ -604,40 +905,58 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Vehicle Rates',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      ..._vehicleRates.entries.map((entry) {
-                        final type = entry.key;
-                        final rates = entry.value;
-                        return Card(
-                          color: AppColors.primary.withOpacity(0.05),
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: AppColors.primary,
-                              child: Text(
-                                type[0],
-                                style: const TextStyle(color: Colors.white),
-                              ),
-                            ),
-                            title: Text(type),
-                            subtitle: Text(
-                              'Hourly: ₹${rates['hourly']!.toStringAsFixed(0)} | '
-                              'Min: ₹${rates['minimum']!.toStringAsFixed(0)} | '
-                              'Free: ${rates['freeMinutes']!.toInt()} min',
-                            ),
-                            trailing: IconButton(
-                              icon: const Icon(Icons.edit),
-                              onPressed: () => _showRateEditDialog(type),
+                      const Row(
+                        children: [
+                          Icon(Icons.backup, color: AppColors.primary),
+                          SizedBox(width: 8),
+                          Text(
+                            'Backup & Restore',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
-                        );
-                      }).toList(),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Export all your settings and data as a backup file, or restore from a previous backup.',
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: _exportData,
+                              icon: const Icon(Icons.download, color: Colors.white),
+                              label: const Text(
+                                'Export Backup',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                padding: const EdgeInsets.all(14),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: _importData,
+                              icon: const Icon(Icons.upload, color: Colors.white),
+                              label: const Text(
+                                'Import Backup',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.orange,
+                                padding: const EdgeInsets.all(14),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -676,6 +995,7 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
               const SizedBox(height: 20),
             ],
           ),
+        ),
         ),
       ),
     );

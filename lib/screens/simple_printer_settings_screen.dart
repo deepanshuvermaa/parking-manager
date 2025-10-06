@@ -236,9 +236,10 @@ class _SimplePrinterSettingsScreenState
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Connection Status Card
@@ -422,21 +423,58 @@ class _SimplePrinterSettingsScreenState
                     ] else ...[
                       ...(_availableDevices.map((device) {
                         final isConnected = device.platformName == _connectedDeviceName;
+                        final isPrinter = SimpleBluetoothService.isPrinterDevice(device.platformName);
                         return Card(
+                          elevation: isPrinter ? 4 : 1,
                           color: isConnected
                               ? AppColors.primary.withOpacity(0.1)
-                              : null,
+                              : isPrinter
+                                  ? Colors.blue.shade50
+                                  : null,
                           child: ListTile(
                             leading: Icon(
-                              Icons.print,
-                              color: isConnected ? AppColors.primary : null,
+                              isPrinter ? Icons.print : Icons.bluetooth,
+                              color: isConnected
+                                  ? AppColors.primary
+                                  : isPrinter
+                                      ? Colors.blue
+                                      : Colors.grey,
+                              size: isPrinter ? 32 : 24,
                             ),
-                            title: Text(
-                              device.platformName.isEmpty
-                                  ? 'Unknown Device'
-                                  : device.platformName,
+                            title: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    device.platformName.isEmpty
+                                        ? 'Unknown Device'
+                                        : device.platformName,
+                                    style: TextStyle(
+                                      fontWeight: isPrinter ? FontWeight.bold : FontWeight.normal,
+                                    ),
+                                  ),
+                                ),
+                                if (isPrinter)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: const Text(
+                                      'PRINTER',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
-                            subtitle: Text(device.remoteId.toString()),
+                            subtitle: Text(
+                              device.remoteId.toString(),
+                              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                            ),
                             trailing: isConnected
                                 ? const Chip(
                                     label: Text('Connected'),
@@ -445,6 +483,9 @@ class _SimplePrinterSettingsScreenState
                                   )
                                 : ElevatedButton(
                                     onPressed: () => _connectToPrinter(device),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: isPrinter ? AppColors.primary : null,
+                                    ),
                                     child: const Text('Connect'),
                                   ),
                           ),
@@ -505,6 +546,7 @@ class _SimplePrinterSettingsScreenState
               ),
             ),
           ],
+        ),
         ),
       ),
     );

@@ -12,6 +12,7 @@ import 'simple_vehicle_exit_screen.dart';
 import 'simple_parking_list_screen.dart';
 import 'simple_settings_screen.dart';
 import 'simple_printer_settings_screen.dart';
+import 'simple_reports_screen.dart';
 
 class SimpleDashboardScreen extends StatefulWidget {
   final String userName;
@@ -486,9 +487,10 @@ class _SimpleDashboardScreenState extends State<SimpleDashboardScreen> {
           ],
         ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
+      body: SafeArea(
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : RefreshIndicator(
               onRefresh: _loadDashboardData,
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
@@ -662,13 +664,9 @@ class _SimpleDashboardScreenState extends State<SimpleDashboardScreen> {
                           title: 'Reports',
                           icon: Icons.bar_chart,
                           color: Colors.purple,
-                          onTap: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Reports feature coming soon!'),
-                              ),
-                            );
-                          },
+                          onTap: () => _navigateToScreen(
+                            SimpleReportsScreen(token: widget.token),
+                          ),
                         ),
                       ],
                     ),
@@ -741,6 +739,7 @@ class _SimpleDashboardScreenState extends State<SimpleDashboardScreen> {
                 ),
               ),
             ),
+        ),
     );
   }
 }

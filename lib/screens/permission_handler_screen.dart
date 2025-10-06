@@ -67,9 +67,24 @@ class _PermissionHandlerScreenState extends State<PermissionHandlerScreen> {
       case 'Permission.bluetoothConnect':
         return 'Bluetooth Connect';
       case 'Permission.locationWhenInUse':
-        return 'Location (for Bluetooth)';
+        return 'Location';
       default:
         return permission.toString();
+    }
+  }
+
+  String _getPermissionDescription(Permission permission) {
+    switch (permission.toString()) {
+      case 'Permission.bluetooth':
+        return 'Required to enable Bluetooth functionality';
+      case 'Permission.bluetoothScan':
+        return 'Required to scan for nearby Bluetooth printers';
+      case 'Permission.bluetoothConnect':
+        return 'Required to connect to thermal printers for receipt printing';
+      case 'Permission.locationWhenInUse':
+        return 'Required for Bluetooth scanning on Android 11 and below (Android requirement, not used for tracking)';
+      default:
+        return 'Required for app functionality';
     }
   }
 
@@ -96,25 +111,45 @@ class _PermissionHandlerScreenState extends State<PermissionHandlerScreen> {
       subtitle = 'Permission status unknown';
     }
 
-    return ListTile(
-      leading: Icon(icon, color: color),
-      title: Text(_getPermissionName(permission)),
-      subtitle: Text(subtitle),
-      trailing: !status.isGranted
-          ? ElevatedButton(
-              onPressed: () async {
-                if (status.isPermanentlyDenied) {
-                  await openAppSettings();
-                } else {
-                  final newStatus = await permission.request();
-                  setState(() {
-                    _permissionStatuses[permission] = newStatus;
-                  });
-                }
-              },
-              child: Text(status.isPermanentlyDenied ? 'Settings' : 'Request'),
-            )
-          : null,
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        leading: Icon(icon, color: color, size: 32),
+        title: Text(
+          _getPermissionName(permission),
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(subtitle, style: TextStyle(color: color, fontSize: 12)),
+            const SizedBox(height: 4),
+            Text(
+              _getPermissionDescription(permission),
+              style: const TextStyle(fontSize: 11, color: Colors.black54),
+            ),
+          ],
+        ),
+        trailing: !status.isGranted
+            ? ElevatedButton(
+                onPressed: () async {
+                  if (status.isPermanentlyDenied) {
+                    await openAppSettings();
+                  } else {
+                    final newStatus = await permission.request();
+                    setState(() {
+                      _permissionStatuses[permission] = newStatus;
+                    });
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                ),
+                child: Text(status.isPermanentlyDenied ? 'Settings' : 'Allow'),
+              )
+            : const Icon(Icons.check_circle, color: Colors.green, size: 28),
+      ),
     );
   }
 

@@ -13,6 +13,16 @@ class ReceiptService {
     final businessPhone = prefs.getString('business_phone') ?? '';
     final receiptHeader = prefs.getString('receipt_header') ?? 'Welcome to our parking';
     final receiptFooter = prefs.getString('receipt_footer') ?? 'Thank you for parking with us!';
+    final paperWidth = prefs.getInt('paper_width') ?? 32; // Default 2" paper
+
+    // Get bill format settings
+    final showBusinessName = prefs.getBool('bill_show_business_name') ?? true;
+    final showBusinessAddress = prefs.getBool('bill_show_business_address') ?? true;
+    final showBusinessPhone = prefs.getBool('bill_show_business_phone') ?? true;
+    final showReceiptHeader = prefs.getBool('bill_show_receipt_header') ?? true;
+    final showReceiptFooter = prefs.getBool('bill_show_receipt_footer') ?? true;
+    final showRateInfo = prefs.getBool('bill_show_rate_info') ?? true;
+    final showNotes = prefs.getBool('bill_show_notes') ?? true;
 
     // Get rate info
     final hourlyRate = vehicle.hourlyRate ?? 0;
@@ -20,54 +30,62 @@ class ReceiptService {
 
     // Build receipt
     final receipt = StringBuffer();
+    final divider = '=' * paperWidth;
 
     // Header
-    receipt.writeln('================================');
-    receipt.writeln(centerText(businessName, 32));
-    if (businessAddress.isNotEmpty) {
-      receipt.writeln(centerText(businessAddress, 32));
+    receipt.writeln(divider);
+    if (showBusinessName) {
+      receipt.writeln(centerText(businessName, paperWidth));
     }
-    if (businessPhone.isNotEmpty) {
-      receipt.writeln(centerText(businessPhone, 32));
+    if (showBusinessAddress && businessAddress.isNotEmpty) {
+      receipt.writeln(centerText(businessAddress, paperWidth));
     }
-    receipt.writeln('================================');
-    receipt.writeln(centerText('PARKING RECEIPT', 32));
-    receipt.writeln('================================');
+    if (showBusinessPhone && businessPhone.isNotEmpty) {
+      receipt.writeln(centerText(businessPhone, paperWidth));
+    }
+    receipt.writeln(divider);
+    receipt.writeln(centerText('PARKING RECEIPT', paperWidth));
+    receipt.writeln(divider);
 
     // Receipt header message
-    if (receiptHeader.isNotEmpty) {
-      receipt.writeln(wrapText(receiptHeader, 32));
-      receipt.writeln('--------------------------------');
+    if (showReceiptHeader && receiptHeader.isNotEmpty) {
+      receipt.writeln(wrapText(receiptHeader, paperWidth));
+      receipt.writeln('-' * paperWidth);
     }
 
     // Ticket details
     receipt.writeln('Ticket ID: ${vehicle.ticketId ?? 'N/A'}');
     receipt.writeln('Date: ${Helpers.formatDate(vehicle.entryTime)}');
     receipt.writeln('Entry Time: ${Helpers.formatTime(vehicle.entryTime)}');
-    receipt.writeln('--------------------------------');
+    receipt.writeln('-' * paperWidth);
 
     // Vehicle details
     receipt.writeln('Vehicle No: ${vehicle.vehicleNumber}');
     receipt.writeln('Vehicle Type: ${vehicle.vehicleType}');
-    receipt.writeln('--------------------------------');
+    receipt.writeln('-' * paperWidth);
 
     // Rate information
-    receipt.writeln('Rate Information:');
-    receipt.writeln('Hourly Rate: Rs. ${hourlyRate.toStringAsFixed(2)}');
-    receipt.writeln('Minimum Charge: Rs. ${minimumRate.toStringAsFixed(2)}');
-    receipt.writeln('--------------------------------');
+    if (showRateInfo) {
+      receipt.writeln('Rate Information:');
+      receipt.writeln('Hourly Rate: Rs. ${hourlyRate.toStringAsFixed(2)}');
+      receipt.writeln('Minimum Charge: Rs. ${minimumRate.toStringAsFixed(2)}');
+      receipt.writeln('-' * paperWidth);
+    }
 
     // Notes if any
-    if (vehicle.notes != null && vehicle.notes!.isNotEmpty) {
+    if (showNotes && vehicle.notes != null && vehicle.notes!.isNotEmpty) {
       receipt.writeln('Notes: ${vehicle.notes}');
-      receipt.writeln('--------------------------------');
+      receipt.writeln('-' * paperWidth);
     }
 
     // Footer message
-    receipt.writeln(wrapText(receiptFooter, 32));
-    receipt.writeln('================================');
-    receipt.writeln(centerText('KEEP THIS RECEIPT SAFE', 32));
-    receipt.writeln('================================');
+    if (showReceiptFooter && receiptFooter.isNotEmpty) {
+      receipt.writeln(wrapText(receiptFooter, paperWidth));
+      receipt.writeln('-' * paperWidth);
+    }
+    receipt.writeln(divider);
+    receipt.writeln(centerText('KEEP THIS RECEIPT SAFE', paperWidth));
+    receipt.writeln(divider);
 
     return receipt.toString();
   }
@@ -86,6 +104,15 @@ class ReceiptService {
     final businessPhone = prefs.getString('business_phone') ?? '';
     final gstNumber = prefs.getString('gst_number') ?? '';
     final receiptFooter = prefs.getString('receipt_footer') ?? 'Thank you for parking with us!';
+    final paperWidth = prefs.getInt('paper_width') ?? 32; // Default 2" paper
+
+    // Get bill format settings
+    final showBusinessName = prefs.getBool('bill_show_business_name') ?? true;
+    final showBusinessAddress = prefs.getBool('bill_show_business_address') ?? true;
+    final showBusinessPhone = prefs.getBool('bill_show_business_phone') ?? true;
+    final showGstNumber = prefs.getBool('bill_show_gst_number') ?? true;
+    final showReceiptFooter = prefs.getBool('bill_show_receipt_footer') ?? true;
+    final showNotes = prefs.getBool('bill_show_notes') ?? true;
 
     // Calculate duration string
     final hours = duration.inHours;
@@ -96,55 +123,63 @@ class ReceiptService {
 
     // Build receipt
     final receipt = StringBuffer();
+    final divider = '=' * paperWidth;
+    final dashLine = '-' * paperWidth;
 
     // Header
-    receipt.writeln('================================');
-    receipt.writeln(centerText(businessName, 32));
-    if (businessAddress.isNotEmpty) {
-      receipt.writeln(centerText(businessAddress, 32));
+    receipt.writeln(divider);
+    if (showBusinessName) {
+      receipt.writeln(centerText(businessName, paperWidth));
     }
-    if (businessPhone.isNotEmpty) {
-      receipt.writeln(centerText(businessPhone, 32));
+    if (showBusinessAddress && businessAddress.isNotEmpty) {
+      receipt.writeln(centerText(businessAddress, paperWidth));
     }
-    receipt.writeln('================================');
-    receipt.writeln(centerText('EXIT RECEIPT', 32));
-    receipt.writeln('================================');
+    if (showBusinessPhone && businessPhone.isNotEmpty) {
+      receipt.writeln(centerText(businessPhone, paperWidth));
+    }
+    receipt.writeln(divider);
+    receipt.writeln(centerText('EXIT RECEIPT', paperWidth));
+    receipt.writeln(divider);
 
     // Ticket details
     receipt.writeln('Ticket ID: ${vehicle.ticketId ?? 'N/A'}');
     receipt.writeln('Date: ${Helpers.formatDate(DateTime.now())}');
-    receipt.writeln('--------------------------------');
+    receipt.writeln(dashLine);
 
     // Vehicle details
     receipt.writeln('Vehicle No: ${vehicle.vehicleNumber}');
     receipt.writeln('Vehicle Type: ${vehicle.vehicleType}');
-    receipt.writeln('--------------------------------');
+    receipt.writeln(dashLine);
 
     // Time details
     receipt.writeln('Entry: ${Helpers.formatDateTime(vehicle.entryTime)}');
     receipt.writeln('Exit: ${Helpers.formatDateTime(vehicle.exitTime ?? DateTime.now())}');
     receipt.writeln('Duration: $durationStr');
-    receipt.writeln('--------------------------------');
+    receipt.writeln(dashLine);
 
     // Amount details
     receipt.writeln('');
-    receipt.writeln(padRight('Total Amount:', 20) + padLeft('Rs. ${amount.toStringAsFixed(2)}', 12));
+    final amountPadding = paperWidth > 32 ? 28 : 20;
+    receipt.writeln(padRight('Total Amount:', amountPadding) + padLeft('Rs. ${amount.toStringAsFixed(2)}', paperWidth - amountPadding));
     receipt.writeln('');
-    receipt.writeln('================================');
+    receipt.writeln(divider);
 
     // GST if available
-    if (gstNumber.isNotEmpty) {
+    if (showGstNumber && gstNumber.isNotEmpty) {
       receipt.writeln('GST No: $gstNumber');
-      receipt.writeln('--------------------------------');
+      receipt.writeln(dashLine);
     }
 
     // Footer
-    receipt.writeln(centerText('PAID', 32));
-    receipt.writeln('--------------------------------');
-    receipt.writeln(wrapText(receiptFooter, 32));
-    receipt.writeln('================================');
-    receipt.writeln(centerText('THANK YOU! VISIT AGAIN', 32));
-    receipt.writeln('================================');
+    receipt.writeln(centerText('PAID', paperWidth));
+    receipt.writeln(dashLine);
+    if (showReceiptFooter && receiptFooter.isNotEmpty) {
+      receipt.writeln(wrapText(receiptFooter, paperWidth));
+      receipt.writeln(dashLine);
+    }
+    receipt.writeln(divider);
+    receipt.writeln(centerText('THANK YOU! VISIT AGAIN', paperWidth));
+    receipt.writeln(divider);
 
     return receipt.toString();
   }

@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/simple_dashboard_screen.dart';
+import 'screens/permission_handler_screen.dart';
 import 'services/device_service.dart';
 import 'services/simple_bluetooth_service.dart';
 import 'services/simple_vehicle_service.dart';
@@ -26,7 +27,10 @@ class ParkEaseApp extends StatelessWidget {
         primaryColor: AppColors.primary,
         colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary),
       ),
-      home: const DebugOverlay(child: SimpleLoginScreen()),
+      // Wrap with PermissionHandlerScreen to request permissions on first launch
+      home: PermissionHandlerScreen(
+        child: const DebugOverlay(child: SimpleLoginScreen()),
+      ),
     );
   }
 }

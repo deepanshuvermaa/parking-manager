@@ -4,6 +4,7 @@ import '../models/simple_vehicle.dart';
 import '../utils/debug_logger.dart';
 import '../config/api_config.dart';
 import 'local_database_service.dart';
+import 'vehicle_rate_service.dart';
 
 class SimpleVehicleService {
   static String get baseUrl => ApiConfig.baseUrl.replaceAll('/api', '');
@@ -335,7 +336,21 @@ class SimpleVehicleService {
     }
   }
 
-  // Calculate parking fee
+  // Calculate parking fee (uses new VehicleRateService with time-based pricing)
+  static Future<double> calculateFeeAsync({
+    required DateTime entryTime,
+    required String vehicleType,
+    DateTime? exitTime,
+  }) async {
+    final exit = exitTime ?? DateTime.now();
+    final duration = exit.difference(entryTime);
+    return await VehicleRateService.calculateFee(
+      vehicleType: vehicleType,
+      duration: duration,
+    );
+  }
+
+  // Legacy sync method for backward compatibility
   static double calculateFee({
     required DateTime entryTime,
     required String vehicleType,

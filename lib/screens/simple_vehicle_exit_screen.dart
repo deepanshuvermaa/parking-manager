@@ -137,23 +137,16 @@ class _SimpleVehicleExitScreenState extends State<SimpleVehicleExitScreen> {
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
-          if (SimpleBluetoothService.isConnected)
-            TextButton.icon(
-              icon: const Icon(Icons.print),
-              label: const Text('Print & Exit'),
-              onPressed: () async {
-                Navigator.pop(context);
-                await _printExitReceipt(vehicle, amount);
-                _processExit(vehicle, amount);
-              },
-            ),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
               _processExit(vehicle, amount);
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-            child: const Text('Confirm Exit', style: TextStyle(color: Colors.white)),
+            child: Text(
+              SimpleBluetoothService.isConnected ? 'Confirm & Print' : 'Confirm Exit',
+              style: const TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -190,6 +183,15 @@ class _SimpleVehicleExitScreenState extends State<SimpleVehicleExitScreen> {
 
       if (exitedVehicle != null) {
         Navigator.pop(context); // Close loading dialog
+
+        // Check auto-print setting
+        final prefs = await SharedPreferences.getInstance();
+        final autoPrint = prefs.getBool('auto_print_exit') ?? true;
+
+        // Auto-print if enabled and printer connected
+        if (autoPrint && SimpleBluetoothService.isConnected) {
+          await _printExitReceipt(exitedVehicle, amount);
+        }
 
         // Show success dialog
         showDialog(
@@ -232,13 +234,21 @@ class _SimpleVehicleExitScreenState extends State<SimpleVehicleExitScreen> {
                   'Vehicle has been successfully exited.',
                   textAlign: TextAlign.center,
                 ),
+                if (autoPrint && SimpleBluetoothService.isConnected)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8),
+                    child: Text(
+                      '✓ Receipt printed automatically',
+                      style: TextStyle(fontSize: 12, color: Colors.green),
+                    ),
+                  ),
               ],
             ),
             actions: [
               if (SimpleBluetoothService.isConnected)
                 TextButton.icon(
                   icon: const Icon(Icons.print),
-                  label: const Text('Print Receipt'),
+                  label: Text(autoPrint ? 'Print Again' : 'Print Receipt'),
                   onPressed: () async {
                     await _printExitReceipt(exitedVehicle, amount);
                   },
@@ -351,8 +361,9 @@ class _SimpleVehicleExitScreenState extends State<SimpleVehicleExitScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
+      body: SafeArea(
+        child: Column(
+          children: [
           // Search bar
           Container(
             color: Colors.white,
@@ -391,13 +402,19 @@ class _SimpleVehicleExitScreenState extends State<SimpleVehicleExitScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                Text(
-                  'Parked Vehicles: ${_filteredVehicles.length}',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                Flexible(
+                  child: Text(
+                    'Parked Vehicles: ${_filteredVehicles.length > 999 ? '999+' : _filteredVehicles.length}',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-                Text(
-                  'Total: ${_allVehicles.length}',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                Flexible(
+                  child: Text(
+                    'Total: ${_allVehicles.length > 999 ? '999+' : _allVehicles.length}',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
             ),
@@ -480,6 +497,7 @@ class _SimpleVehicleExitScreenState extends State<SimpleVehicleExitScreen> {
                       ),
           ),
         ],
+        ),
       ),
     );
   }

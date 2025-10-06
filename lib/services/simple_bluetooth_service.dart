@@ -95,7 +95,21 @@ class SimpleBluetoothService {
     }
   }
 
-  // Get list of paired/available devices
+  // Check if device is likely a printer based on name
+  static bool isPrinterDevice(String deviceName) {
+    if (deviceName.isEmpty) return false;
+
+    final printerKeywords = [
+      'printer', 'print', 'thermal', 'pos', 'receipt',
+      'bt', 'rp', 'escpos', 'mini', 'mobile printer',
+      'goojprt', 'xprinter', 'epson', 'star', 'citizen'
+    ];
+
+    final lowerName = deviceName.toLowerCase();
+    return printerKeywords.any((keyword) => lowerName.contains(keyword));
+  }
+
+  // Get list of paired/available devices with smart filtering
   static Future<List<BluetoothDevice>> scanForDevices() async {
     final permissionResult = await requestPermissions();
     if (!permissionResult['granted']) {
@@ -108,10 +122,16 @@ class SimpleBluetoothService {
     }
 
     final devices = <BluetoothDevice>[];
+    final deviceIds = <String>{};
 
     // Get already connected devices
     final connectedDevices = await FlutterBluePlus.connectedDevices;
-    devices.addAll(connectedDevices);
+    for (var device in connectedDevices) {
+      if (!deviceIds.contains(device.remoteId.toString())) {
+        devices.add(device);
+        deviceIds.add(device.remoteId.toString());
+      }
+    }
 
     // Start scanning for new devices
     _isScanning = true;
@@ -121,8 +141,9 @@ class SimpleBluetoothService {
     _scanSubscription = FlutterBluePlus.scanResults.listen((results) {
       for (ScanResult result in results) {
         if (result.device.platformName.isNotEmpty &&
-            !devices.contains(result.device)) {
+            !deviceIds.contains(result.device.remoteId.toString())) {
           devices.add(result.device);
+          deviceIds.add(result.device.remoteId.toString());
         }
       }
     });
@@ -132,6 +153,16 @@ class SimpleBluetoothService {
     await FlutterBluePlus.stopScan();
     _isScanning = false;
     _scanSubscription?.cancel();
+
+    // Sort devices: Printers first, then alphabetically
+    devices.sort((a, b) {
+      final aIsPrinter = isPrinterDevice(a.platformName);
+      final bIsPrinter = isPrinterDevice(b.platformName);
+
+      if (aIsPrinter && !bIsPrinter) return -1;
+      if (!aIsPrinter && bIsPrinter) return 1;
+      return a.platformName.compareTo(b.platformName);
+    });
 
     return devices;
   }
