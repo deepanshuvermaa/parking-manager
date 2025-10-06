@@ -252,7 +252,10 @@ class AuthController {
       parkingName, parking_name,
       deviceId, device_id,
       deviceName, device_name,
-      platform
+      platform,
+      password,
+      email,
+      phone
     } = req.body;
 
     // Use whichever format was provided
@@ -269,30 +272,58 @@ class AuthController {
         });
       }
 
-      // Generate unique username
-      const username = `guest_${Date.now()}@parkease.local`;
+      if (!password || password.length < 6) {
+        return res.status(400).json({
+          success: false,
+          error: 'Password is required and must be at least 6 characters'
+        });
+      }
+
+      // Generate unique username (use email if provided, otherwise generate one)
+      const username = email || `guest_${Date.now()}@parkease.local`;
       const businessId = `biz_${Date.now()}`;
 
-      // Create guest user
+      // Hash password
+      const passwordHash = await bcrypt.hash(password, 10);
+
+      // Create guest user with password
       const userResult = await this.pool.query(
         `INSERT INTO users (
-          username, full_name, device_id, user_type,
+          username, full_name, device_id, user_type, password_hash,
           trial_starts_at, trial_expires_at, is_active,
-          business_id, role
-        ) VALUES ($1, $2, $3, 'guest', NOW(), NOW() + INTERVAL '3 days', true, $4, 'owner')
+          business_id, role, phone
+        ) VALUES ($1, $2, $3, 'guest', $4, NOW(), NOW() + INTERVAL '3 days', true, $5, 'owner', $6)
         RETURNING *`,
-        [username, finalFullName || finalParkingName || 'Guest User', finalDeviceId, businessId]
+        [username, finalFullName || finalParkingName || 'Guest User', finalDeviceId, passwordHash, businessId, phone || null]
       );
 
       const user = userResult.rows[0];
 
-      // Register device
-      await this.pool.query(
-        `INSERT INTO devices (user_id, device_id, device_name, platform, is_active, is_primary)
-         VALUES ($1, $2, $3, $4, true, true)`,
-        [user.id, finalDeviceId, finalDeviceName || 'Mobile Device', platform || 'Android']
+      // Check if device already exists
+      const existingDeviceResult = await this.pool.query(
+        'SELECT * FROM devices WHERE device_id = $1',
+        [finalDeviceId]
       );
-      console.log(`✅ Device ${finalDeviceId} registered for guest user ${user.id}`);
+
+      if (existingDeviceResult.rows.length > 0) {
+        // Device exists - update it to link to new guest user
+        await this.pool.query(
+          `UPDATE devices
+           SET user_id = $1, device_name = $2, platform = $3,
+               is_active = true, is_primary = true, last_active_at = NOW(), updated_at = NOW()
+           WHERE device_id = $4`,
+          [user.id, finalDeviceName || 'Mobile Device', platform || 'Android', finalDeviceId]
+        );
+        console.log(`✅ Existing device ${finalDeviceId} updated for guest user ${user.id}`);
+      } else {
+        // Register new device
+        await this.pool.query(
+          `INSERT INTO devices (user_id, device_id, device_name, platform, is_active, is_primary)
+           VALUES ($1, $2, $3, $4, true, true)`,
+          [user.id, finalDeviceId, finalDeviceName || 'Mobile Device', platform || 'Android']
+        );
+        console.log(`✅ New device ${finalDeviceId} registered for guest user ${user.id}`);
+      }
 
       // Generate tokens
       const tokens = await generateTokens(user.id, finalDeviceId, req);
