@@ -1,49 +1,61 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/debug_logger.dart';
 
 class SimpleBluetoothService {
+  static BluetoothConnection? _connection;
   static BluetoothDevice? _connectedDevice;
-  static BluetoothCharacteristic? _writeCharacteristic;
-  static StreamSubscription? _scanSubscription;
-  static bool _isScanning = false;
+  static StreamSubscription<BluetoothDiscoveryResult>? _discoverySubscription;
+  static bool _isDiscovering = false;
 
   // Printer settings
   static const String PREF_PRINTER_MAC = 'printer_mac_address';
   static const String PREF_PRINTER_NAME = 'printer_name';
   static const String PREF_AUTO_CONNECT = 'printer_auto_connect';
 
-  // Request necessary Bluetooth permissions
+  // Get Bluetooth instance
+  static FlutterBluetoothSerial get _bluetooth => FlutterBluetoothSerial.instance;
+
+  /// Request Bluetooth permissions (simple check)
   static Future<Map<String, dynamic>> requestPermissions() async {
     DebugLogger.log('=== BLUETOOTH PERMISSION CHECK ===');
     Map<String, String> errors = {};
 
     try {
-      // Check Bluetooth is ON first
-      if (!await isBluetoothAvailable()) {
+      // Check if Bluetooth is available
+      final isAvailable = await _bluetooth.isAvailable ?? false;
+      if (!isAvailable) {
+        return {
+          'granted': false,
+          'errors': {'bluetooth': 'Bluetooth not available on this device'},
+        };
+      }
+
+      // Check if Bluetooth is enabled
+      final isEnabled = await _bluetooth.isEnabled ?? false;
+      if (!isEnabled) {
         return {
           'granted': false,
           'errors': {'bluetooth': 'Please turn on Bluetooth'},
         };
       }
 
-      // Request minimal permissions needed for scanning
-      // For Android 12+ we need bluetoothScan and bluetoothConnect
-      final scanStatus = await Permission.bluetoothScan.request();
-      final connectStatus = await Permission.bluetoothConnect.request();
+      // Request Bluetooth permissions for Android 12+
+      final bluetoothScan = await Permission.bluetoothScan.request();
+      final bluetoothConnect = await Permission.bluetoothConnect.request();
 
-      if (!scanStatus.isGranted) {
+      if (!bluetoothScan.isGranted) {
         errors['bluetoothScan'] = 'Bluetooth Scan permission required';
       }
 
-      if (!connectStatus.isGranted) {
+      if (!bluetoothConnect.isGranted) {
         errors['bluetoothConnect'] = 'Bluetooth Connect permission required';
       }
 
-      // If permissions denied, check if permanently denied
       if (errors.isNotEmpty) {
         if (await Permission.bluetoothScan.isPermanentlyDenied ||
             await Permission.bluetoothConnect.isPermanentlyDenied) {
@@ -56,13 +68,13 @@ class SimpleBluetoothService {
         };
       }
 
-      DebugLogger.log('Bluetooth permissions granted');
+      DebugLogger.log('✅ Bluetooth permissions granted');
       return {
         'granted': true,
         'errors': {},
       };
     } catch (e) {
-      DebugLogger.log('Permission check error: $e');
+      DebugLogger.log('❌ Permission check error: $e');
       return {
         'granted': false,
         'errors': {'error': 'Permission error: $e'},
@@ -70,173 +82,187 @@ class SimpleBluetoothService {
     }
   }
 
-  // Check if Bluetooth is available and on
+  /// Check if Bluetooth is available and enabled
   static Future<bool> isBluetoothAvailable() async {
     try {
-      final isAvailable = await FlutterBluePlus.isAvailable;
-      if (!isAvailable) return false;
-
-      final isOn = await FlutterBluePlus.adapterState.first;
-      return isOn == BluetoothAdapterState.on;
+      final isAvailable = await _bluetooth.isAvailable ?? false;
+      final isEnabled = await _bluetooth.isEnabled ?? false;
+      return isAvailable && isEnabled;
     } catch (e) {
+      DebugLogger.log('Error checking Bluetooth: $e');
       return false;
     }
   }
 
-  // Check if device is likely a printer based on name
-  static bool isPrinterDevice(String deviceName) {
-    if (deviceName.isEmpty) return false;
-
-    final printerKeywords = [
-      'printer', 'print', 'thermal', 'pos', 'receipt',
-      'bt', 'rp', 'escpos', 'mini', 'mobile printer',
-      'goojprt', 'xprinter', 'epson', 'star', 'citizen'
-    ];
-
-    final lowerName = deviceName.toLowerCase();
-    return printerKeywords.any((keyword) => lowerName.contains(keyword));
+  /// Enable Bluetooth (prompts user)
+  static Future<bool> enableBluetooth() async {
+    try {
+      final result = await _bluetooth.requestEnable();
+      return result ?? false;
+    } catch (e) {
+      DebugLogger.log('Error enabling Bluetooth: $e');
+      return false;
+    }
   }
 
-  // Scan for all nearby Bluetooth devices
+  /// Get list of already paired/bonded devices
+  static Future<List<BluetoothDevice>> getPairedDevices() async {
+    DebugLogger.log('=== GETTING PAIRED DEVICES ===');
+
+    try {
+      final bondedDevices = await _bluetooth.getBondedDevices();
+      DebugLogger.log('Found ${bondedDevices.length} paired devices');
+
+      for (var device in bondedDevices) {
+        DebugLogger.log('Paired: ${device.name ?? "Unknown"} (${device.address})');
+      }
+
+      return bondedDevices;
+    } catch (e) {
+      DebugLogger.log('❌ Error getting paired devices: $e');
+      return [];
+    }
+  }
+
+  /// Scan for ALL nearby Bluetooth devices (paired and unpaired)
   static Future<List<BluetoothDevice>> scanForDevices() async {
-    DebugLogger.log('=== STARTING BLUETOOTH SCAN ===');
+    DebugLogger.log('=== STARTING BLUETOOTH DISCOVERY ===');
 
     if (!await isBluetoothAvailable()) {
       throw Exception('Bluetooth is not available or turned off');
     }
 
     final devices = <BluetoothDevice>[];
-    final deviceIds = <String>{};
+    final deviceAddresses = <String>{};
+    final completer = Completer<List<BluetoothDevice>>();
 
     try {
-      // Get already connected devices
-      final connectedDevices = await FlutterBluePlus.connectedDevices;
-      for (var device in connectedDevices) {
-        if (!deviceIds.contains(device.remoteId.toString())) {
-          devices.add(device);
-          deviceIds.add(device.remoteId.toString());
-          DebugLogger.log('Found connected device: ${device.platformName}');
-        }
+      // First, get already paired devices
+      final pairedDevices = await getPairedDevices();
+      for (var device in pairedDevices) {
+        devices.add(device);
+        deviceAddresses.add(device.address);
       }
 
-      // Start scanning for new devices (15 seconds for better detection)
-      _isScanning = true;
-      DebugLogger.log('Starting BLE scan...');
-      await FlutterBluePlus.startScan(timeout: const Duration(seconds: 15));
+      // Start discovery for new devices
+      _isDiscovering = true;
+      DebugLogger.log('Starting device discovery...');
 
-      // Listen for scan results - SHOW ALL DEVICES
-      _scanSubscription = FlutterBluePlus.scanResults.listen((results) {
-        for (ScanResult result in results) {
-          // Add ALL devices, even without names
-          if (!deviceIds.contains(result.device.remoteId.toString())) {
+      _discoverySubscription = _bluetooth.startDiscovery().listen(
+        (result) {
+          // Add each discovered device
+          if (!deviceAddresses.contains(result.device.address)) {
             devices.add(result.device);
-            deviceIds.add(result.device.remoteId.toString());
-            final name = result.device.platformName.isNotEmpty
-                ? result.device.platformName
-                : 'Unknown Device';
-            DebugLogger.log('Found device: $name (${result.device.remoteId})');
+            deviceAddresses.add(result.device.address);
+
+            final name = result.device.name ?? 'Unknown Device';
+            final rssi = result.rssi;
+            DebugLogger.log('📡 Found: $name (${result.device.address}) RSSI: $rssi');
           }
-        }
-      });
+        },
+        onDone: () {
+          _isDiscovering = false;
+          _discoverySubscription?.cancel();
+          DebugLogger.log('✅ Discovery complete. Found ${devices.length} devices total');
 
-      // Wait for scan to complete
-      await Future.delayed(const Duration(seconds: 15));
-      await FlutterBluePlus.stopScan();
-      _isScanning = false;
-      _scanSubscription?.cancel();
+          // Sort: Paired first, then by name
+          devices.sort((a, b) {
+            if (a.isBonded && !b.isBonded) return -1;
+            if (!a.isBonded && b.isBonded) return 1;
 
-      DebugLogger.log('Scan complete. Found ${devices.length} devices');
+            final aName = a.name ?? 'Unknown Device';
+            final bName = b.name ?? 'Unknown Device';
+            return aName.compareTo(bName);
+          });
 
-      // Sort devices: Named devices first (printers prioritized), then unnamed
-      devices.sort((a, b) {
-        final aHasName = a.platformName.isNotEmpty;
-        final bHasName = b.platformName.isNotEmpty;
+          completer.complete(devices);
+        },
+        onError: (error) {
+          _isDiscovering = false;
+          _discoverySubscription?.cancel();
+          DebugLogger.log('❌ Discovery error: $error');
+          completer.completeError(error);
+        },
+      );
 
-        // Named devices before unnamed
-        if (aHasName && !bHasName) return -1;
-        if (!aHasName && bHasName) return 1;
-
-        // Among named devices, printers first
-        if (aHasName && bHasName) {
-          final aIsPrinter = isPrinterDevice(a.platformName);
-          final bIsPrinter = isPrinterDevice(b.platformName);
-
-          if (aIsPrinter && !bIsPrinter) return -1;
-          if (!aIsPrinter && bIsPrinter) return 1;
-          return a.platformName.compareTo(b.platformName);
-        }
-
-        // Unnamed devices by MAC address
-        return a.remoteId.toString().compareTo(b.remoteId.toString());
-      });
-
-      return devices;
+      // Wait for discovery to complete (max 15 seconds)
+      return await completer.future.timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          _isDiscovering = false;
+          _discoverySubscription?.cancel();
+          DebugLogger.log('⏱️ Discovery timeout. Found ${devices.length} devices');
+          return devices;
+        },
+      );
     } catch (e) {
-      DebugLogger.log('Scan error: $e');
-      _isScanning = false;
-      _scanSubscription?.cancel();
+      _isDiscovering = false;
+      _discoverySubscription?.cancel();
+      DebugLogger.log('❌ Scan error: $e');
       rethrow;
     }
   }
 
-  // Connect to a specific device
-  static Future<bool> connectToDevice(BluetoothDevice device) async {
-    try {
-      // Disconnect from any existing device
-      if (_connectedDevice != null && _connectedDevice != device) {
-        await _connectedDevice!.disconnect();
-      }
+  /// Stop ongoing discovery
+  static Future<void> stopDiscovery() async {
+    if (_isDiscovering) {
+      await _discoverySubscription?.cancel();
+      _discoverySubscription = null;
+      _isDiscovering = false;
+      DebugLogger.log('Discovery stopped');
+    }
+  }
 
-      // Connect to new device
-      await device.connect(autoConnect: false);
+  /// Connect to a specific device
+  static Future<bool> connectToDevice(BluetoothDevice device) async {
+    DebugLogger.log('=== CONNECTING TO DEVICE ===');
+    DebugLogger.log('Device: ${device.name ?? "Unknown"} (${device.address})');
+
+    try {
+      // Disconnect from any existing connection
+      await disconnect();
+
+      // Connect to the device
+      _connection = await BluetoothConnection.toAddress(device.address);
       _connectedDevice = device;
 
-      // Discover services
-      final services = await device.discoverServices();
-
-      // Find the write characteristic
-      for (BluetoothService service in services) {
-        for (BluetoothCharacteristic char in service.characteristics) {
-          if (char.properties.write || char.properties.writeWithoutResponse) {
-            _writeCharacteristic = char;
-            break;
-          }
-        }
-        if (_writeCharacteristic != null) break;
-      }
-
-      if (_writeCharacteristic == null) {
-        throw Exception('No write characteristic found on printer');
-      }
+      DebugLogger.log('✅ Connected successfully!');
 
       // Save printer details
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(PREF_PRINTER_MAC, device.remoteId.toString());
-      await prefs.setString(PREF_PRINTER_NAME, device.platformName);
+      await prefs.setString(PREF_PRINTER_MAC, device.address);
+      await prefs.setString(PREF_PRINTER_NAME, device.name ?? 'Unknown Device');
 
       return true;
     } catch (e) {
-      print('Connection error: $e');
+      DebugLogger.log('❌ Connection error: $e');
+      _connection = null;
+      _connectedDevice = null;
       return false;
     }
   }
 
-  // Disconnect from current device
+  /// Disconnect from current device
   static Future<void> disconnect() async {
-    if (_connectedDevice != null) {
-      await _connectedDevice!.disconnect();
-      _connectedDevice = null;
-      _writeCharacteristic = null;
+    try {
+      if (_connection != null) {
+        await _connection!.close();
+        _connection = null;
+        _connectedDevice = null;
+        DebugLogger.log('Disconnected from device');
+      }
+    } catch (e) {
+      DebugLogger.log('Error disconnecting: $e');
     }
   }
 
-  // Check if connected
-  static bool get isConnected => _connectedDevice != null && _writeCharacteristic != null;
+  /// Check if connected
+  static bool get isConnected => _connection != null && _connection!.isConnected;
 
-  // Get connected device info
-  static String? get connectedDeviceName => _connectedDevice?.platformName;
+  /// Get connected device info
+  static String? get connectedDeviceName => _connectedDevice?.name;
 
-  // Auto-connect to saved printer
+  /// Auto-connect to saved printer
   static Future<bool> autoConnect() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -245,63 +271,65 @@ class SimpleBluetoothService {
 
       if (!autoConnect || savedMac == null) return false;
 
-      // Scan for devices
-      final devices = await scanForDevices();
+      DebugLogger.log('Auto-connecting to saved device: $savedMac');
+
+      // Get paired devices
+      final pairedDevices = await getPairedDevices();
 
       // Find saved device
-      for (final device in devices) {
-        if (device.remoteId.toString() == savedMac) {
+      for (final device in pairedDevices) {
+        if (device.address == savedMac) {
           return await connectToDevice(device);
         }
       }
 
+      DebugLogger.log('Saved device not found in paired devices');
       return false;
     } catch (e) {
+      DebugLogger.log('Auto-connect error: $e');
       return false;
     }
   }
 
-  // Print text data
-  static Future<bool> printText(String text) async {
-    if (!isConnected || _writeCharacteristic == null) {
+  /// Print raw bytes to connected printer
+  static Future<bool> printBytes(Uint8List bytes) async {
+    if (!isConnected || _connection == null) {
       throw Exception('No printer connected');
     }
 
     try {
-      // Convert text to bytes
-      final bytes = Uint8List.fromList(text.codeUnits);
-
-      // Split into chunks if needed (most printers have a limit)
-      const chunkSize = 100;
-      for (int i = 0; i < bytes.length; i += chunkSize) {
-        final end = (i + chunkSize < bytes.length) ? i + chunkSize : bytes.length;
-        final chunk = bytes.sublist(i, end);
-
-        if (_writeCharacteristic!.properties.writeWithoutResponse) {
-          await _writeCharacteristic!.write(chunk, withoutResponse: true);
-        } else {
-          await _writeCharacteristic!.write(chunk);
-        }
-
-        // Small delay between chunks
-        await Future.delayed(const Duration(milliseconds: 50));
-      }
-
+      _connection!.output.add(bytes);
+      await _connection!.output.allSent;
       return true;
     } catch (e) {
-      print('Print error: $e');
+      DebugLogger.log('❌ Print error: $e');
       return false;
     }
   }
 
-  // Print formatted receipt
+  /// Print text data
+  static Future<bool> printText(String text) async {
+    if (!isConnected || _connection == null) {
+      throw Exception('No printer connected');
+    }
+
+    try {
+      final bytes = Uint8List.fromList(utf8.encode(text));
+      return await printBytes(bytes);
+    } catch (e) {
+      DebugLogger.log('❌ Print error: $e');
+      return false;
+    }
+  }
+
+  /// Print formatted receipt with ESC/POS commands
   static Future<bool> printReceipt(String receipt) async {
     // Add ESC/POS commands for better formatting
     final formattedReceipt = _formatWithESCPOS(receipt);
     return await printText(formattedReceipt);
   }
 
-  // Format text with ESC/POS commands
+  /// Format text with ESC/POS commands
   static String _formatWithESCPOS(String text) {
     // ESC/POS commands
     const String ESC = '\x1B';
@@ -337,5 +365,20 @@ class SimpleBluetoothService {
     formatted += '$LINE_FEED$LINE_FEED$LINE_FEED$CUT_PAPER';
 
     return formatted;
+  }
+
+  /// Check if device is likely a printer based on name
+  static bool isPrinterDevice(String? deviceName) {
+    if (deviceName == null || deviceName.isEmpty) return false;
+
+    final printerKeywords = [
+      'printer', 'print', 'thermal', 'pos', 'receipt',
+      'bt', 'rp', 'escpos', 'mini', 'mobile printer',
+      'goojprt', 'xprinter', 'epson', 'star', 'citizen',
+      'bixolon', 'zebra', 'tsc', 'honeywell'
+    ];
+
+    final lowerName = deviceName.toLowerCase();
+    return printerKeywords.any((keyword) => lowerName.contains(keyword));
   }
 }

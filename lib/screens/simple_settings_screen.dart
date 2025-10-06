@@ -215,16 +215,16 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Text('Scanning for Printers'),
+        title: const Text('Scanning for Devices'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const CircularProgressIndicator(),
             const SizedBox(height: 16),
-            const Text('Please wait while scanning for nearby printers...'),
+            const Text('Discovering nearby Bluetooth devices...'),
             const SizedBox(height: 8),
             Text(
-              'Make sure your printer is turned on',
+              'This may take up to 15 seconds',
               style: TextStyle(fontSize: 12, color: Colors.grey[600]),
             ),
           ],
@@ -257,7 +257,7 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Select Printer'),
+          title: Text('Found ${devices.length} Device(s)'),
           content: SizedBox(
             width: double.maxFinite,
             child: ListView.builder(
@@ -265,49 +265,81 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
               itemCount: devices.length,
               itemBuilder: (context, index) {
                 final device = devices[index];
-                return ListTile(
-                  leading: const Icon(Icons.print, color: Colors.blue),
-                  title: Text(device.platformName.isNotEmpty ? device.platformName : 'Unknown Device'),
-                  subtitle: Text(device.remoteId.toString()),
-                  onTap: () async {
-                    Navigator.pop(context); // Close selection dialog
+                final deviceName = device.name ?? 'Unknown Device';
+                final isPaired = device.isBonded;
+                final isPrinter = SimpleBluetoothService.isPrinterDevice(deviceName);
 
-                    // Show connecting dialog
-                    showDialog(
-                      context: context,
-                      barrierDismissible: false,
-                      builder: (context) => const AlertDialog(
-                        content: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            CircularProgressIndicator(),
-                            SizedBox(height: 16),
-                            Text('Connecting to printer...'),
-                          ],
-                        ),
+                return Card(
+                  color: isPrinter ? Colors.blue.shade50 : null,
+                  child: ListTile(
+                    leading: Icon(
+                      isPrinter ? Icons.print : Icons.bluetooth,
+                      color: isPrinter ? Colors.blue : Colors.grey,
+                    ),
+                    title: Text(
+                      deviceName,
+                      style: TextStyle(
+                        fontWeight: isPrinter ? FontWeight.bold : FontWeight.normal,
                       ),
-                    );
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(device.address),
+                        if (isPaired)
+                          const Text(
+                            '✓ Already Paired',
+                            style: TextStyle(color: Colors.green, fontSize: 12),
+                          ),
+                      ],
+                    ),
+                    trailing: isPrinter
+                        ? const Chip(
+                            label: Text('Printer', style: TextStyle(fontSize: 10)),
+                            backgroundColor: Colors.blue,
+                            labelStyle: TextStyle(color: Colors.white),
+                          )
+                        : null,
+                    onTap: () async {
+                      Navigator.pop(context); // Close selection dialog
 
-                    final connected = await SimpleBluetoothService.connectToDevice(device);
-                    Navigator.pop(context); // Close connecting dialog
-
-                    if (connected) {
-                      setState(() {});
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Connected to ${device.platformName}'),
-                          backgroundColor: Colors.green,
+                      // Show connecting dialog
+                      showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (context) => AlertDialog(
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const CircularProgressIndicator(),
+                              const SizedBox(height: 16),
+                              Text('Connecting to $deviceName...'),
+                            ],
+                          ),
                         ),
                       );
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Failed to connect to printer'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    }
-                  },
+
+                      final connected = await SimpleBluetoothService.connectToDevice(device);
+                      Navigator.pop(context); // Close connecting dialog
+
+                      if (connected) {
+                        setState(() {});
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('✓ Connected to $deviceName'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Failed to connect to $deviceName'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    },
+                  ),
                 );
               },
             ),
