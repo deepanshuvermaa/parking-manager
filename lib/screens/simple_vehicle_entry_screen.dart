@@ -75,6 +75,11 @@ class _SimpleVehicleEntryScreenState extends State<SimpleVehicleEntryScreen> {
           final prefs = await SharedPreferences.getInstance();
           final autoPrint = prefs.getBool('auto_print') ?? true;
 
+          // Auto-print BEFORE showing dialog if enabled and printer is connected
+          if (autoPrint && SimpleBluetoothService.isConnected) {
+            await _printReceipt(vehicle);
+          }
+
           // Show success dialog with ticket details
           showDialog(
             context: context,
@@ -130,11 +135,6 @@ class _SimpleVehicleEntryScreenState extends State<SimpleVehicleEntryScreen> {
               ],
             ),
           );
-
-          // Auto-print if enabled and printer is connected
-          if (autoPrint && SimpleBluetoothService.isConnected) {
-            await _printReceipt(vehicle);
-          }
         }
       } else {
         print('Vehicle add failed - returned null');

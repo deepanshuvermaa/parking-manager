@@ -251,6 +251,8 @@ class _SimpleDashboardScreenState extends State<SimpleDashboardScreen> {
                 Expanded(
                   child: Text(
                     title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey[700],
@@ -262,6 +264,8 @@ class _SimpleDashboardScreenState extends State<SimpleDashboardScreen> {
             const SizedBox(height: 12),
             Text(
               value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.bold,
@@ -272,6 +276,8 @@ class _SimpleDashboardScreenState extends State<SimpleDashboardScreen> {
               const SizedBox(height: 4),
               Text(
                 subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.grey[600],
@@ -313,27 +319,36 @@ class _SimpleDashboardScreenState extends State<SimpleDashboardScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Stack(
+                clipBehavior: Clip.none,
                 children: [
                   Icon(icon, size: 40, color: Colors.white),
                   if (badge != null)
                     Positioned(
-                      right: -8,
-                      top: -8,
+                      right: -10,
+                      top: -10,
                       child: Container(
-                        padding: const EdgeInsets.all(4),
+                        padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
                           color: Colors.red,
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white, width: 2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.3),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
                         constraints: const BoxConstraints(
-                          minWidth: 20,
-                          minHeight: 20,
+                          minWidth: 24,
+                          minHeight: 24,
                         ),
                         child: Text(
-                          badge,
+                          badge.length > 2 ? '99+' : badge,
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 12,
+                            fontSize: 11,
                             fontWeight: FontWeight.bold,
                           ),
                           textAlign: TextAlign.center,
@@ -346,6 +361,8 @@ class _SimpleDashboardScreenState extends State<SimpleDashboardScreen> {
               Text(
                 title,
                 textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 14,
