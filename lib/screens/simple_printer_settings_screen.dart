@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/simple_bluetooth_service.dart';
 import '../services/receipt_service.dart';
@@ -139,7 +139,7 @@ class _SimplePrinterSettingsScreenState
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Connected to ${device.platformName}'),
+              content: Text('Connected to ${device.name}'),
               backgroundColor: Colors.green,
             ),
           );
@@ -422,8 +422,8 @@ class _SimplePrinterSettingsScreenState
                       ),
                     ] else ...[
                       ...(_availableDevices.map((device) {
-                        final isConnected = device.platformName == _connectedDeviceName;
-                        final isPrinter = SimpleBluetoothService.isPrinterDevice(device.platformName);
+                        final isConnected = device.name == _connectedDeviceName;
+                        final isPrinter = SimpleBluetoothService.isPrinterDevice(device.name);
                         return Card(
                           elevation: isPrinter ? 4 : 1,
                           color: isConnected
@@ -445,9 +445,9 @@ class _SimplePrinterSettingsScreenState
                               children: [
                                 Expanded(
                                   child: Text(
-                                    device.platformName.isEmpty
+                                    (device.name == null || device.name!.isEmpty)
                                         ? 'Unknown Device'
-                                        : device.platformName,
+                                        : device.name!,
                                     style: TextStyle(
                                       fontWeight: isPrinter ? FontWeight.bold : FontWeight.normal,
                                     ),
@@ -472,7 +472,7 @@ class _SimplePrinterSettingsScreenState
                               ],
                             ),
                             subtitle: Text(
-                              device.remoteId.toString(),
+                              device.address.toString(),
                               style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
                             ),
                             trailing: isConnected
