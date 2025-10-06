@@ -331,49 +331,14 @@ class SimpleBluetoothService {
     }
   }
 
-  /// Print formatted receipt with ESC/POS commands
+  /// Print receipt - Receipt Service already handles all formatting
   static Future<bool> printReceipt(String receipt) async {
-    // Add ESC/POS commands for better formatting
-    final formattedReceipt = _formatWithESCPOS(receipt);
-    return await printText(formattedReceipt);
-  }
-
-  /// Format text with ESC/POS commands
-  static String _formatWithESCPOS(String text) {
-    // ESC/POS commands
-    const String ESC = '\x1B';
-    const String GS = '\x1D';
-    const String INIT = '$ESC@'; // Initialize printer
-    const String ALIGN_CENTER = '${ESC}a1'; // Center align
-    const String ALIGN_LEFT = '${ESC}a0'; // Left align
-    const String BOLD_ON = '${ESC}E1'; // Bold on
-    const String BOLD_OFF = '${ESC}E0'; // Bold off
-    const String DOUBLE_HEIGHT = '$GS!1'; // Double height
-    const String NORMAL_SIZE = '$GS!0'; // Normal size
-    const String CUT_PAPER = '${GS}V0'; // Cut paper
-    const String LINE_FEED = '\n';
-
-    // Format the receipt with ESC/POS commands
-    String formatted = INIT;
-
-    // Split text into lines and process each
-    final lines = text.split('\n');
-    for (final line in lines) {
-      if (line.contains('=====')) {
-        formatted += '$LINE_FEED$line$LINE_FEED';
-      } else if (line.contains('PARKEASE') || line.contains('RECEIPT')) {
-        formatted += '$ALIGN_CENTER$DOUBLE_HEIGHT$BOLD_ON$line$BOLD_OFF$NORMAL_SIZE$ALIGN_LEFT$LINE_FEED';
-      } else if (line.contains('Total:') || line.contains('Amount:')) {
-        formatted += '$BOLD_ON$line$BOLD_OFF$LINE_FEED';
-      } else {
-        formatted += '$line$LINE_FEED';
-      }
-    }
-
-    // Add paper feed and cut
-    formatted += '$LINE_FEED$LINE_FEED$LINE_FEED$CUT_PAPER';
-
-    return formatted;
+    // Receipt Service has already formatted the text perfectly with:
+    // - centerText() for headers
+    // - wrapText() for long text
+    // - Proper dividers based on paperWidth
+    // Just send it directly to the printer without additional formatting
+    return await printText(receipt);
   }
 
   /// Check if device is likely a printer based on name
