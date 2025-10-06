@@ -16,31 +16,56 @@ class SimpleBluetoothService {
   static const String PREF_PRINTER_NAME = 'printer_name';
   static const String PREF_AUTO_CONNECT = 'printer_auto_connect';
 
-  // Simplified Bluetooth check - just verify it's ON
+  // Request necessary Bluetooth permissions
   static Future<Map<String, dynamic>> requestPermissions() async {
-    DebugLogger.log('=== SIMPLIFIED BLUETOOTH CHECK ===');
+    DebugLogger.log('=== BLUETOOTH PERMISSION CHECK ===');
+    Map<String, String> errors = {};
 
     try {
-      final isOn = await isBluetoothAvailable();
-
-      if (isOn) {
-        DebugLogger.log('Bluetooth is ON and ready');
-        return {
-          'granted': true,
-          'errors': {},
-        };
-      } else {
-        DebugLogger.log('Bluetooth is OFF');
+      // Check Bluetooth is ON first
+      if (!await isBluetoothAvailable()) {
         return {
           'granted': false,
           'errors': {'bluetooth': 'Please turn on Bluetooth'},
         };
       }
+
+      // Request minimal permissions needed for scanning
+      // For Android 12+ we need bluetoothScan and bluetoothConnect
+      final scanStatus = await Permission.bluetoothScan.request();
+      final connectStatus = await Permission.bluetoothConnect.request();
+
+      if (!scanStatus.isGranted) {
+        errors['bluetoothScan'] = 'Bluetooth Scan permission required';
+      }
+
+      if (!connectStatus.isGranted) {
+        errors['bluetoothConnect'] = 'Bluetooth Connect permission required';
+      }
+
+      // If permissions denied, check if permanently denied
+      if (errors.isNotEmpty) {
+        if (await Permission.bluetoothScan.isPermanentlyDenied ||
+            await Permission.bluetoothConnect.isPermanentlyDenied) {
+          errors['settings'] = 'Please enable Bluetooth permissions in app settings';
+        }
+
+        return {
+          'granted': false,
+          'errors': errors,
+        };
+      }
+
+      DebugLogger.log('Bluetooth permissions granted');
+      return {
+        'granted': true,
+        'errors': {},
+      };
     } catch (e) {
-      DebugLogger.log('Bluetooth check error: $e');
+      DebugLogger.log('Permission check error: $e');
       return {
         'granted': false,
-        'errors': {'error': 'Bluetooth error: $e'},
+        'errors': {'error': 'Permission error: $e'},
       };
     }
   }
@@ -72,9 +97,9 @@ class SimpleBluetoothService {
     return printerKeywords.any((keyword) => lowerName.contains(keyword));
   }
 
-  // Simplified device scan - let flutter_blue_plus handle permissions
+  // Scan for all nearby Bluetooth devices
   static Future<List<BluetoothDevice>> scanForDevices() async {
-    DebugLogger.log('=== STARTING SIMPLIFIED BLUETOOTH SCAN ===');
+    DebugLogger.log('=== STARTING BLUETOOTH SCAN ===');
 
     if (!await isBluetoothAvailable()) {
       throw Exception('Bluetooth is not available or turned off');
@@ -94,38 +119,55 @@ class SimpleBluetoothService {
         }
       }
 
-      // Start scanning for new devices
+      // Start scanning for new devices (15 seconds for better detection)
       _isScanning = true;
-      await FlutterBluePlus.startScan(timeout: const Duration(seconds: 10));
+      DebugLogger.log('Starting BLE scan...');
+      await FlutterBluePlus.startScan(timeout: const Duration(seconds: 15));
 
-      // Listen for scan results
+      // Listen for scan results - SHOW ALL DEVICES
       _scanSubscription = FlutterBluePlus.scanResults.listen((results) {
         for (ScanResult result in results) {
-          if (result.device.platformName.isNotEmpty &&
-              !deviceIds.contains(result.device.remoteId.toString())) {
+          // Add ALL devices, even without names
+          if (!deviceIds.contains(result.device.remoteId.toString())) {
             devices.add(result.device);
             deviceIds.add(result.device.remoteId.toString());
-            DebugLogger.log('Found device: ${result.device.platformName}');
+            final name = result.device.platformName.isNotEmpty
+                ? result.device.platformName
+                : 'Unknown Device';
+            DebugLogger.log('Found device: $name (${result.device.remoteId})');
           }
         }
       });
 
       // Wait for scan to complete
-      await Future.delayed(const Duration(seconds: 10));
+      await Future.delayed(const Duration(seconds: 15));
       await FlutterBluePlus.stopScan();
       _isScanning = false;
       _scanSubscription?.cancel();
 
       DebugLogger.log('Scan complete. Found ${devices.length} devices');
 
-      // Sort devices: Printers first, then alphabetically
+      // Sort devices: Named devices first (printers prioritized), then unnamed
       devices.sort((a, b) {
-        final aIsPrinter = isPrinterDevice(a.platformName);
-        final bIsPrinter = isPrinterDevice(b.platformName);
+        final aHasName = a.platformName.isNotEmpty;
+        final bHasName = b.platformName.isNotEmpty;
 
-        if (aIsPrinter && !bIsPrinter) return -1;
-        if (!aIsPrinter && bIsPrinter) return 1;
-        return a.platformName.compareTo(b.platformName);
+        // Named devices before unnamed
+        if (aHasName && !bHasName) return -1;
+        if (!aHasName && bHasName) return 1;
+
+        // Among named devices, printers first
+        if (aHasName && bHasName) {
+          final aIsPrinter = isPrinterDevice(a.platformName);
+          final bIsPrinter = isPrinterDevice(b.platformName);
+
+          if (aIsPrinter && !bIsPrinter) return -1;
+          if (!aIsPrinter && bIsPrinter) return 1;
+          return a.platformName.compareTo(b.platformName);
+        }
+
+        // Unnamed devices by MAC address
+        return a.remoteId.toString().compareTo(b.remoteId.toString());
       });
 
       return devices;
