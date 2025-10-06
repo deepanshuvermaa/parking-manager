@@ -48,6 +48,10 @@ class SimpleBluetoothService {
       final bluetoothScan = await Permission.bluetoothScan.request();
       final bluetoothConnect = await Permission.bluetoothConnect.request();
 
+      // CRITICAL: Location permission required for Bluetooth scanning on Android
+      // This is mandatory - Android won't allow device discovery without it
+      final location = await Permission.location.request();
+
       if (!bluetoothScan.isGranted) {
         errors['bluetoothScan'] = 'Bluetooth Scan permission required';
       }
@@ -56,10 +60,15 @@ class SimpleBluetoothService {
         errors['bluetoothConnect'] = 'Bluetooth Connect permission required';
       }
 
+      if (!location.isGranted) {
+        errors['location'] = 'Location permission required for Bluetooth scanning';
+      }
+
       if (errors.isNotEmpty) {
         if (await Permission.bluetoothScan.isPermanentlyDenied ||
-            await Permission.bluetoothConnect.isPermanentlyDenied) {
-          errors['settings'] = 'Please enable Bluetooth permissions in app settings';
+            await Permission.bluetoothConnect.isPermanentlyDenied ||
+            await Permission.location.isPermanentlyDenied) {
+          errors['settings'] = 'Please enable all permissions in app settings';
         }
 
         return {
@@ -68,7 +77,7 @@ class SimpleBluetoothService {
         };
       }
 
-      DebugLogger.log('✅ Bluetooth permissions granted');
+      DebugLogger.log('✅ All permissions granted (Bluetooth + Location)');
       return {
         'granted': true,
         'errors': {},
