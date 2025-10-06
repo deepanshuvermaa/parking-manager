@@ -361,6 +361,8 @@ class _SimpleLoginScreenState extends State<SimpleLoginScreen> {
     final emailController = TextEditingController();
     final phoneController = TextEditingController();
     final parkingNameController = TextEditingController();
+    final passwordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
     final formKey = GlobalKey<FormState>();
 
     final guestInfo = await showDialog<Map<String, String>>(
@@ -448,6 +450,46 @@ class _SimpleLoginScreenState extends State<SimpleLoginScreen> {
                     return null;
                   },
                 ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: passwordController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Password*',
+                    hintText: 'Min 6 characters',
+                    prefixIcon: Icon(Icons.lock),
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter a password';
+                    }
+                    if (value.length < 6) {
+                      return 'Password must be at least 6 characters';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: confirmPasswordController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Confirm Password*',
+                    hintText: 'Re-enter password',
+                    prefixIcon: Icon(Icons.lock_outline),
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please confirm your password';
+                    }
+                    if (value != passwordController.text) {
+                      return 'Passwords do not match';
+                    }
+                    return null;
+                  },
+                ),
                 const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -486,6 +528,7 @@ class _SimpleLoginScreenState extends State<SimpleLoginScreen> {
                   'email': emailController.text.trim(),
                   'phone': phoneController.text.trim(),
                   'parkingName': parkingNameController.text.trim(),
+                  'password': passwordController.text,
                 });
               }
             },
@@ -507,7 +550,7 @@ class _SimpleLoginScreenState extends State<SimpleLoginScreen> {
       final deviceInfo = await DeviceService.getDeviceInfo();
       final deviceId = deviceInfo['device_id']!;
 
-      // Generate a unique username if no email provided
+      // Use provided email or generate unique one
       final email = guestInfo['email']!.isEmpty
           ? 'guest_${deviceId.substring(0, 8)}@parkease.temp'
           : guestInfo['email']!;
@@ -527,6 +570,7 @@ class _SimpleLoginScreenState extends State<SimpleLoginScreen> {
           'email': email,
           'phone': guestInfo['phone'],
           'parkingName': guestInfo['parkingName'],
+          'password': guestInfo['password'],
           'deviceId': deviceId,
           'deviceName': deviceInfo['deviceName'] ?? 'Unknown Device',
           'platform': deviceInfo['platform'] ?? 'Android',
