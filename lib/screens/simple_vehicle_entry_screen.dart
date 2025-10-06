@@ -89,24 +89,31 @@ class _SimpleVehicleEntryScreenState extends State<SimpleVehicleEntryScreen> {
                 children: [
                   Icon(Icons.check_circle, color: Colors.green, size: 28),
                   SizedBox(width: 8),
-                  Text('Vehicle Entry Successful'),
-                ],
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildDetailRow('Ticket ID', vehicle.ticketId ?? 'N/A'),
-                  _buildDetailRow('Vehicle', vehicle.vehicleNumber),
-                  _buildDetailRow('Type', vehicle.vehicleType),
-                  _buildDetailRow('Entry Time', Helpers.formatDateTime(vehicle.entryTime)),
-                  _buildDetailRow('Hourly Rate', '₹${vehicle.hourlyRate?.toStringAsFixed(2) ?? '0.00'}'),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Please give this ticket to the customer.',
-                    style: TextStyle(fontStyle: FontStyle.italic, fontSize: 12),
+                  Flexible(
+                    child: Text(
+                      'Vehicle Entry Successful',
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildDetailRow('Ticket ID', vehicle.ticketId ?? 'N/A'),
+                    _buildDetailRow('Vehicle', vehicle.vehicleNumber),
+                    _buildDetailRow('Type', vehicle.vehicleType),
+                    _buildDetailRow('Entry Time', Helpers.formatDateTime(vehicle.entryTime)),
+                    _buildDetailRow('Hourly Rate', '₹${vehicle.hourlyRate?.toStringAsFixed(2) ?? '0.00'}'),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Please give this ticket to the customer.',
+                      style: TextStyle(fontStyle: FontStyle.italic, fontSize: 12),
+                    ),
+                  ],
+                ),
               ),
               actions: [
                 if (SimpleBluetoothService.isConnected)

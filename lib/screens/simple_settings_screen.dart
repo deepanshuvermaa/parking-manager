@@ -30,6 +30,7 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
 
   bool _isLoading = false;
   bool _autoPrint = true;
+  bool _autoPrintExit = true;
   bool _autoConnectPrinter = true;
   int _paperWidth = 32; // 32 for 2", 48 for 3"
 
@@ -70,7 +71,8 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
       _gstNumberController.text = prefs.getString('gst_number') ?? '';
       _receiptHeaderController.text = prefs.getString('receipt_header') ?? 'Welcome to our parking';
       _receiptFooterController.text = prefs.getString('receipt_footer') ?? 'Thank you for parking with us!';
-      _autoPrint = prefs.getBool('auto_print') ?? true;
+      _autoPrint = prefs.getBool('auto_print') ?? false;
+      _autoPrintExit = prefs.getBool('auto_print_exit') ?? false;
       _autoConnectPrinter = prefs.getBool(SimpleBluetoothService.PREF_AUTO_CONNECT) ?? true;
       _paperWidth = prefs.getInt('paper_width') ?? 32;
 
@@ -106,6 +108,7 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
       await prefs.setString('receipt_header', _receiptHeaderController.text);
       await prefs.setString('receipt_footer', _receiptFooterController.text);
       await prefs.setBool('auto_print', _autoPrint);
+      await prefs.setBool('auto_print_exit', _autoPrintExit);
       await prefs.setBool(SimpleBluetoothService.PREF_AUTO_CONNECT, _autoConnectPrinter);
       await prefs.setInt('paper_width', _paperWidth);
 
@@ -654,16 +657,49 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
                           border: OutlineInputBorder(),
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      SwitchListTile(
-                        title: const Text('Auto Print Receipt'),
-                        subtitle: const Text('Automatically print receipt after vehicle entry/exit'),
-                        value: _autoPrint,
-                        onChanged: (value) {
-                          setState(() {
-                            _autoPrint = value;
-                          });
-                        },
+                      const Divider(height: 32),
+                      const Text(
+                        'Auto-Print Settings',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Printer must be connected for auto-print to work',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                      const SizedBox(height: 12),
+                      Card(
+                        color: _autoPrint ? Colors.green.shade50 : Colors.grey.shade50,
+                        child: SwitchListTile(
+                          title: const Text(
+                            'Auto-print on Vehicle Entry',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: const Text('Print receipt automatically when vehicle enters'),
+                          value: _autoPrint,
+                          onChanged: (value) {
+                            setState(() {
+                              _autoPrint = value;
+                            });
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Card(
+                        color: _autoPrintExit ? Colors.green.shade50 : Colors.grey.shade50,
+                        child: SwitchListTile(
+                          title: const Text(
+                            'Auto-print on Vehicle Exit',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: const Text('Print receipt automatically when vehicle exits'),
+                          value: _autoPrintExit,
+                          onChanged: (value) {
+                            setState(() {
+                              _autoPrintExit = value;
+                            });
+                          },
+                        ),
                       ),
                       const Divider(height: 32),
                       const Text(
