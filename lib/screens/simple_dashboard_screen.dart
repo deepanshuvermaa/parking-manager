@@ -495,9 +495,9 @@ class _SimpleDashboardScreenState extends State<SimpleDashboardScreen> {
                 Navigator.pop(context);
                 showAboutDialog(
                   context: context,
-                  applicationName: 'ParkEase Manager',
+                  applicationName: 'Go2-Parking',
                   applicationVersion: '4.0',
-                  applicationLegalese: '© 2024 ParkEase',
+                  applicationLegalese: '© 2024 Go2Billing',
                 );
               },
             ),

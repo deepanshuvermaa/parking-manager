@@ -45,7 +45,7 @@ class AppRadius {
 }
 
 class AppStrings {
-  static const String appName = 'ParkEase Manager';
+  static const String appName = 'Go2-Parking';
   static const String activeVehicles = 'Active Vehicles';
   static const String todayCollection = 'Today\'s Collection';
   static const String completedToday = 'Completed Today';

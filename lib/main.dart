@@ -21,7 +21,7 @@ class ParkEaseApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'ParkEase Manager',
+      title: 'Go2-Parking',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         primaryColor: AppColors.primary,
@@ -713,7 +713,7 @@ class _SimpleLoginScreenState extends State<SimpleLoginScreen> {
                         const SizedBox(height: 24),
 
                         const Text(
-                          'ParkEase Manager',
+                          'Go2-Parking',
                           style: TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.bold,

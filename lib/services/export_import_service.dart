@@ -16,7 +16,7 @@ class ExportImportService {
     final Map<String, dynamic> exportData = {
       'export_version': '1.0',
       'export_date': DateTime.now().toIso8601String(),
-      'app_name': 'ParkEase Manager',
+      'app_name': 'Go2-Parking',
     };
 
     // Export all settings
@@ -58,7 +58,7 @@ class ExportImportService {
       // Share the file
       final result = await Share.shareXFiles(
         [XFile(filePath)],
-        subject: 'ParkEase Manager Backup',
+        subject: 'Go2-Parking Backup',
         text: 'Backup created on ${DateTime.now().toString().split('.')[0]}',
       );
 
