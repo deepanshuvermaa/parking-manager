@@ -6,8 +6,11 @@ class ReceiptService {
   // ESC/POS Commands for formatting
   static const String ESC_BOLD_ON = '\x1B\x45\x01';
   static const String ESC_BOLD_OFF = '\x1B\x45\x00';
-  static const String ESC_DOUBLE_WIDTH = '\x1D\x21\x10'; // Double width only (slightly bigger)
-  static const String ESC_NORMAL = '\x1D\x21\x00';
+
+  /// Helper function to make text bold (Option A: Just bold, not bigger)
+  static String boldText(String text) {
+    return '$ESC_BOLD_ON$text$ESC_BOLD_OFF';
+  }
 
   // Generate entry receipt
   static Future<String> generateEntryReceipt(SimpleVehicle vehicle) async {
@@ -59,14 +62,16 @@ class ReceiptService {
       receipt.writeln('-' * paperWidth);
     }
 
-    // Ticket details - Highlighted Ticket ID
-    receipt.writeln('${ESC_BOLD_ON}${ESC_DOUBLE_WIDTH}Ticket ID: ${vehicle.ticketId ?? 'N/A'}${ESC_NORMAL}${ESC_BOLD_OFF}');
+    // Ticket details - Ticket ID on separate line (bold, no wrapping)
+    receipt.writeln('Ticket ID:');
+    receipt.writeln(boldText(vehicle.ticketId ?? 'N/A'));
     receipt.writeln('Date: ${Helpers.formatDate(vehicle.entryTime)}');
     receipt.writeln('Entry Time: ${Helpers.formatTime(vehicle.entryTime)}');
     receipt.writeln('-' * paperWidth);
 
-    // Vehicle details - Highlighted Vehicle Number
-    receipt.writeln('${ESC_BOLD_ON}${ESC_DOUBLE_WIDTH}Vehicle No: ${vehicle.vehicleNumber}${ESC_NORMAL}${ESC_BOLD_OFF}');
+    // Vehicle details - Vehicle Number on separate line (bold, no wrapping)
+    receipt.writeln('Vehicle No:');
+    receipt.writeln(boldText(vehicle.vehicleNumber));
     receipt.writeln('Vehicle Type: ${vehicle.vehicleType}');
     receipt.writeln('-' * paperWidth);
 
@@ -147,13 +152,15 @@ class ReceiptService {
     receipt.writeln(centerText('EXIT RECEIPT', paperWidth));
     receipt.writeln(divider);
 
-    // Ticket details - Highlighted Ticket ID
-    receipt.writeln('${ESC_BOLD_ON}${ESC_DOUBLE_WIDTH}Ticket ID: ${vehicle.ticketId ?? 'N/A'}${ESC_NORMAL}${ESC_BOLD_OFF}');
+    // Ticket details - Ticket ID on separate line (bold, no wrapping)
+    receipt.writeln('Ticket ID:');
+    receipt.writeln(boldText(vehicle.ticketId ?? 'N/A'));
     receipt.writeln('Date: ${Helpers.formatDate(DateTime.now())}');
     receipt.writeln(dashLine);
 
-    // Vehicle details - Highlighted Vehicle Number
-    receipt.writeln('${ESC_BOLD_ON}${ESC_DOUBLE_WIDTH}Vehicle No: ${vehicle.vehicleNumber}${ESC_NORMAL}${ESC_BOLD_OFF}');
+    // Vehicle details - Vehicle Number on separate line (bold, no wrapping)
+    receipt.writeln('Vehicle No:');
+    receipt.writeln(boldText(vehicle.vehicleNumber));
     receipt.writeln('Vehicle Type: ${vehicle.vehicleType}');
     receipt.writeln(dashLine);
 

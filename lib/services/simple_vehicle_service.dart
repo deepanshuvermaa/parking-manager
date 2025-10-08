@@ -5,6 +5,7 @@ import '../utils/debug_logger.dart';
 import '../config/api_config.dart';
 import 'local_database_service.dart';
 import 'vehicle_rate_service.dart';
+import 'ticket_id_service.dart';
 
 class SimpleVehicleService {
   static String get baseUrl => ApiConfig.baseUrl.replaceAll('/api', '');
@@ -117,6 +118,9 @@ class SimpleVehicleService {
     double? minimumRate,
     String? notes,
   }) async {
+    // Generate sequential ticket ID in format PT{DDMM}{serial}
+    final ticketId = await TicketIdService.generateNextTicketId();
+
     // Create vehicle object
     final vehicle = SimpleVehicle(
       id: 'local_${DateTime.now().millisecondsSinceEpoch}',
@@ -124,7 +128,7 @@ class SimpleVehicleService {
       vehicleType: vehicleType,
       entryTime: DateTime.now(),
       status: 'parked',
-      ticketId: 'PE${DateTime.now().millisecondsSinceEpoch}',
+      ticketId: ticketId,
       hourlyRate: hourlyRate ?? getDefaultRate(vehicleType)['hourly'],
       minimumRate: minimumRate ?? getDefaultRate(vehicleType)['minimum'],
       notes: notes,

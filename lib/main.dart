@@ -29,7 +29,9 @@ class Go2ParkingApp extends StatelessWidget {
       ),
       // Wrap with PermissionHandlerScreen to request permissions on first launch
       home: PermissionHandlerScreen(
-        child: const DebugOverlay(child: SimpleLoginScreen()),
+        // PRODUCTION: Debug overlay disabled for production build
+        // child: const DebugOverlay(child: SimpleLoginScreen()),
+        child: const SimpleLoginScreen(),
       ),
     );
   }
