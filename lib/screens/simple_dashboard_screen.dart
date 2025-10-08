@@ -381,7 +381,7 @@ class _SimpleDashboardScreenState extends State<SimpleDashboardScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('ParkEase Dashboard'),
+        title: const Text('Go2-Parking Dashboard'),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         actions: [

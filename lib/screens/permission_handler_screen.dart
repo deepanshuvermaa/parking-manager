@@ -223,7 +223,7 @@ class _PermissionHandlerScreenState extends State<PermissionHandlerScreen> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'ParkEase needs these permissions to work properly',
+                  'Go2-Parking needs these permissions to work properly',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.black54),
                 ),

@@ -12,11 +12,11 @@ import 'utils/debug_logger.dart';
 import 'config/api_config.dart';
 
 void main() {
-  runApp(const ParkEaseApp());
+  runApp(const Go2ParkingApp());
 }
 
-class ParkEaseApp extends StatelessWidget {
-  const ParkEaseApp({super.key});
+class Go2ParkingApp extends StatelessWidget {
+  const Go2ParkingApp({super.key});
 
   @override
   Widget build(BuildContext context) {
