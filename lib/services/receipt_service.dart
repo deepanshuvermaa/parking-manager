@@ -64,15 +64,21 @@ class ReceiptService {
 
     // Ticket details - Ticket ID on separate line (bold, no wrapping)
     receipt.writeln('Ticket ID:');
-    receipt.writeln(boldText(vehicle.ticketId ?? 'N/A'));
+    receipt.write(ESC_BOLD_ON);
+    receipt.writeln(vehicle.ticketId ?? 'N/A');
+    receipt.write(ESC_BOLD_OFF);
     receipt.writeln('Date: ${Helpers.formatDate(vehicle.entryTime)}');
     receipt.writeln('Entry Time: ${Helpers.formatTime(vehicle.entryTime)}');
     receipt.writeln('-' * paperWidth);
 
     // Vehicle details - Vehicle Number on separate line (bold, no wrapping)
     receipt.writeln('Vehicle No:');
-    receipt.writeln(boldText(vehicle.vehicleNumber));
+    receipt.write(ESC_BOLD_ON);
+    receipt.writeln(vehicle.vehicleNumber);
+    receipt.write(ESC_BOLD_OFF);
+    receipt.write(ESC_BOLD_ON);
     receipt.writeln('Vehicle Type: ${vehicle.vehicleType}');
+    receipt.write(ESC_BOLD_OFF);
     receipt.writeln('-' * paperWidth);
 
     // Rate information
@@ -83,9 +89,24 @@ class ReceiptService {
       receipt.writeln('-' * paperWidth);
     }
 
-    // Notes if any
+    // Notes if any - Format Owner and Phone on separate lines
     if (showNotes && vehicle.notes != null && vehicle.notes!.isNotEmpty) {
-      receipt.writeln('Notes: ${vehicle.notes}');
+      receipt.writeln('Notes:');
+
+      // Check if notes contain "Owner:" and "Phone:" and split them
+      if (vehicle.notes!.contains('Owner:') || vehicle.notes!.contains('Phone:')) {
+        // Split by comma and trim each part
+        final parts = vehicle.notes!.split(',');
+        for (var part in parts) {
+          final trimmed = part.trim();
+          if (trimmed.isNotEmpty) {
+            receipt.writeln(trimmed);
+          }
+        }
+      } else {
+        // If no structured format, just print the notes as-is
+        receipt.writeln(vehicle.notes);
+      }
       receipt.writeln('-' * paperWidth);
     }
 
@@ -154,14 +175,20 @@ class ReceiptService {
 
     // Ticket details - Ticket ID on separate line (bold, no wrapping)
     receipt.writeln('Ticket ID:');
-    receipt.writeln(boldText(vehicle.ticketId ?? 'N/A'));
+    receipt.write(ESC_BOLD_ON);
+    receipt.writeln(vehicle.ticketId ?? 'N/A');
+    receipt.write(ESC_BOLD_OFF);
     receipt.writeln('Date: ${Helpers.formatDate(DateTime.now())}');
     receipt.writeln(dashLine);
 
     // Vehicle details - Vehicle Number on separate line (bold, no wrapping)
     receipt.writeln('Vehicle No:');
-    receipt.writeln(boldText(vehicle.vehicleNumber));
+    receipt.write(ESC_BOLD_ON);
+    receipt.writeln(vehicle.vehicleNumber);
+    receipt.write(ESC_BOLD_OFF);
+    receipt.write(ESC_BOLD_ON);
     receipt.writeln('Vehicle Type: ${vehicle.vehicleType}');
+    receipt.write(ESC_BOLD_OFF);
     receipt.writeln(dashLine);
 
     // Time details

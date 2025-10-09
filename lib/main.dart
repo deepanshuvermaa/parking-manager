@@ -698,18 +698,25 @@ class _SimpleLoginScreenState extends State<SimpleLoginScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Logo
+                        // Go2-Parking Logo
                         Container(
-                          width: 80,
-                          height: 80,
+                          padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.1),
-                            shape: BoxShape.circle,
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 10,
+                                spreadRadius: 2,
+                              ),
+                            ],
                           ),
-                          child: Icon(
-                            Icons.local_parking,
-                            size: 48,
-                            color: AppColors.primary,
+                          child: Image.asset(
+                            'assets/images/Parking.png',
+                            width: 120,
+                            height: 120,
+                            fit: BoxFit.contain,
                           ),
                         ),
                         const SizedBox(height: 24),
