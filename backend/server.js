@@ -10,6 +10,7 @@ require('dotenv').config();
 const config = require('./config');
 const { transformRequest, transformResponse } = require('./middleware/dataTransform');
 const { verifyToken, initializeSessionMiddleware } = require('./middleware/session');
+const { initializeTrialCheck } = require('./middleware/trialCheck');
 const AuthController = require('./controllers/authController');
 
 const app = express();
@@ -46,6 +47,9 @@ app.use(transformResponse);
 
 // Initialize session middleware with database pool
 initializeSessionMiddleware(pool);
+
+// Initialize trial check middleware
+const checkTrialExpiry = initializeTrialCheck(pool);
 
 // Initialize auth controller
 const authController = new AuthController(pool);
@@ -233,8 +237,8 @@ app.get('/api/auth/validate', verifyToken, async (req, res) => {
 // VEHICLE MANAGEMENT ENDPOINTS
 // ================================
 
-// Get Vehicles
-app.get('/api/vehicles', verifyToken, async (req, res) => {
+// Get Vehicles (with trial check)
+app.get('/api/vehicles', verifyToken, checkTrialExpiry, async (req, res) => {
   try {
     const { status, limit = 100, offset = 0 } = req.query;
 
@@ -264,7 +268,7 @@ app.get('/api/vehicles', verifyToken, async (req, res) => {
 });
 
 // Add Vehicle
-app.post('/api/vehicles', verifyToken, async (req, res) => {
+app.post('/api/vehicles', verifyToken, checkTrialExpiry, async (req, res) => {
   try {
     // Accept both camelCase and snake_case for compatibility
     const {
@@ -330,7 +334,7 @@ app.post('/api/vehicles', verifyToken, async (req, res) => {
 });
 
 // Exit Vehicle
-app.put('/api/vehicles/:id/exit', verifyToken, async (req, res) => {
+app.put('/api/vehicles/:id/exit', verifyToken, checkTrialExpiry, async (req, res) => {
   try {
     const { id } = req.params;
     const { exitTime, amount, notes } = req.body;
@@ -387,7 +391,7 @@ app.put('/api/vehicles/:id/exit', verifyToken, async (req, res) => {
 });
 
 // Update Vehicle
-app.put('/api/vehicles/:id', verifyToken, async (req, res) => {
+app.put('/api/vehicles/:id', verifyToken, checkTrialExpiry, async (req, res) => {
   try {
     const { id } = req.params;
     const updateFields = req.body;
@@ -444,7 +448,7 @@ app.put('/api/vehicles/:id', verifyToken, async (req, res) => {
 });
 
 // Delete Vehicle
-app.delete('/api/vehicles/:id', verifyToken, async (req, res) => {
+app.delete('/api/vehicles/:id', verifyToken, checkTrialExpiry, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -471,7 +475,7 @@ app.delete('/api/vehicles/:id', verifyToken, async (req, res) => {
 });
 
 // Sync Vehicles (Bulk Upload)
-app.post('/api/vehicles/sync', verifyToken, async (req, res) => {
+app.post('/api/vehicles/sync', verifyToken, checkTrialExpiry, async (req, res) => {
   try {
     const { vehicles } = req.body;
 

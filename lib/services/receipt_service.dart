@@ -7,6 +7,10 @@ class ReceiptService {
   static const String ESC_BOLD_ON = '\x1B\x45\x01';
   static const String ESC_BOLD_OFF = '\x1B\x45\x00';
 
+  // Size commands for 1.5x enlarged text (Option A: Balanced & Professional)
+  static const String ESC_SIZE_1_5X_BOLD = '\x1D\x21\x11\x1B\x45\x01';  // 1.5x size + Bold
+  static const String ESC_NORMAL = '\x1D\x21\x00\x1B\x45\x00';          // Back to normal size
+
   /// Helper function to make text bold (Option A: Just bold, not bigger)
   static String boldText(String text) {
     return '$ESC_BOLD_ON$text$ESC_BOLD_OFF';
@@ -62,20 +66,20 @@ class ReceiptService {
       receipt.writeln('-' * paperWidth);
     }
 
-    // Ticket details - Ticket ID on separate line (bold, no wrapping)
+    // Ticket details - Ticket ID on separate line (1.5x bold - prominent)
     receipt.writeln('Ticket ID:');
-    receipt.write(ESC_BOLD_ON);
+    receipt.write(ESC_SIZE_1_5X_BOLD);
     receipt.writeln(vehicle.ticketId ?? 'N/A');
-    receipt.write(ESC_BOLD_OFF);
+    receipt.write(ESC_NORMAL);
     receipt.writeln('Date: ${Helpers.formatDate(vehicle.entryTime)}');
     receipt.writeln('Entry Time: ${Helpers.formatTime(vehicle.entryTime)}');
     receipt.writeln('-' * paperWidth);
 
-    // Vehicle details - Vehicle Number on separate line (bold, no wrapping)
+    // Vehicle details - Vehicle Number on separate line (1.5x bold - prominent)
     receipt.writeln('Vehicle No:');
-    receipt.write(ESC_BOLD_ON);
+    receipt.write(ESC_SIZE_1_5X_BOLD);
     receipt.writeln(vehicle.vehicleNumber);
-    receipt.write(ESC_BOLD_OFF);
+    receipt.write(ESC_NORMAL);
     receipt.write(ESC_BOLD_ON);
     receipt.writeln('Vehicle Type: ${vehicle.vehicleType}');
     receipt.write(ESC_BOLD_OFF);
@@ -173,19 +177,19 @@ class ReceiptService {
     receipt.writeln(centerText('EXIT RECEIPT', paperWidth));
     receipt.writeln(divider);
 
-    // Ticket details - Ticket ID on separate line (bold, no wrapping)
+    // Ticket details - Ticket ID on separate line (1.5x bold - prominent)
     receipt.writeln('Ticket ID:');
-    receipt.write(ESC_BOLD_ON);
+    receipt.write(ESC_SIZE_1_5X_BOLD);
     receipt.writeln(vehicle.ticketId ?? 'N/A');
-    receipt.write(ESC_BOLD_OFF);
+    receipt.write(ESC_NORMAL);
     receipt.writeln('Date: ${Helpers.formatDate(DateTime.now())}');
     receipt.writeln(dashLine);
 
-    // Vehicle details - Vehicle Number on separate line (bold, no wrapping)
+    // Vehicle details - Vehicle Number on separate line (1.5x bold - prominent)
     receipt.writeln('Vehicle No:');
-    receipt.write(ESC_BOLD_ON);
+    receipt.write(ESC_SIZE_1_5X_BOLD);
     receipt.writeln(vehicle.vehicleNumber);
-    receipt.write(ESC_BOLD_OFF);
+    receipt.write(ESC_NORMAL);
     receipt.write(ESC_BOLD_ON);
     receipt.writeln('Vehicle Type: ${vehicle.vehicleType}');
     receipt.write(ESC_BOLD_OFF);
@@ -197,10 +201,12 @@ class ReceiptService {
     receipt.writeln('Duration: $durationStr');
     receipt.writeln(dashLine);
 
-    // Amount details
+    // Amount details (1.5x bold - prominent)
     receipt.writeln('');
-    final amountPadding = paperWidth > 32 ? 28 : 20;
-    receipt.writeln(padRight('Total Amount:', amountPadding) + padLeft('Rs. ${amount.toStringAsFixed(2)}', paperWidth - amountPadding));
+    receipt.write('Total Amount:         ');
+    receipt.write(ESC_SIZE_1_5X_BOLD);
+    receipt.writeln('Rs. ${amount.toStringAsFixed(2)}');
+    receipt.write(ESC_NORMAL);
     receipt.writeln('');
     receipt.writeln(divider);
 
