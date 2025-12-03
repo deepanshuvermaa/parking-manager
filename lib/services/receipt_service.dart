@@ -80,9 +80,9 @@ class ReceiptService {
     receipt.write(ESC_SIZE_1_5X_BOLD);
     receipt.writeln(vehicle.vehicleNumber);
     receipt.write(ESC_NORMAL);
-    receipt.write(ESC_BOLD_ON);
+    receipt.write(ESC_SIZE_1_5X_BOLD);
     receipt.writeln('Vehicle Type: ${vehicle.vehicleType}');
-    receipt.write(ESC_BOLD_OFF);
+    receipt.write(ESC_NORMAL);
     receipt.writeln('-' * paperWidth);
 
     // Rate information
@@ -190,9 +190,9 @@ class ReceiptService {
     receipt.write(ESC_SIZE_1_5X_BOLD);
     receipt.writeln(vehicle.vehicleNumber);
     receipt.write(ESC_NORMAL);
-    receipt.write(ESC_BOLD_ON);
+    receipt.write(ESC_SIZE_1_5X_BOLD);
     receipt.writeln('Vehicle Type: ${vehicle.vehicleType}');
-    receipt.write(ESC_BOLD_OFF);
+    receipt.write(ESC_NORMAL);
     receipt.writeln(dashLine);
 
     // Time details
