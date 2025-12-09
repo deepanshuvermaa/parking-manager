@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../utils/constants.dart';
@@ -22,7 +23,15 @@ class _PermissionHandlerScreenState extends State<PermissionHandlerScreen> {
   }
 
   Future<void> _checkAndRequestPermissions() async {
-    // List of permissions needed
+    // Skip permissions on desktop platforms
+    if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
+      setState(() {
+        _isCheckingPermissions = false;
+      });
+      return;
+    }
+
+    // List of permissions needed (mobile only)
     final permissions = [
       Permission.bluetooth,
       Permission.bluetoothScan,

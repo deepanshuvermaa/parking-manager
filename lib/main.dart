@@ -1,7 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'screens/simple_dashboard_screen.dart';
 import 'screens/permission_handler_screen.dart';
 import 'services/device_service.dart';
@@ -12,6 +14,12 @@ import 'utils/debug_logger.dart';
 import 'config/api_config.dart';
 
 void main() {
+  // Initialize sqflite for desktop platforms
+  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  }
+
   runApp(const Go2ParkingApp());
 }
 

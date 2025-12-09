@@ -33,6 +33,7 @@ dependencies:
   
   # Database
   sqflite: ^2.3.0
+  sqflite_common_ffi: ^2.3.0  # Desktop SQLite support
   path: ^1.8.3
   
   # HTTP Client
@@ -46,6 +47,12 @@ dependencies:
   
   # Image Picker
   image_picker: ^1.0.7
+
+  # Desktop Printing (USB/System printers)
+  printing: ^5.12.0
+
+  # Platform detection
+  flutter_platform_widgets: ^7.0.1
 
 dev_dependencies:
   flutter_test:

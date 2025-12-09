@@ -230,6 +230,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.0.2"
+  flutter_platform_widgets:
+    dependency: "direct main"
+    description:
+      name: flutter_platform_widgets
+      sha256: "84f39540cf433aa44b235b7fca6518d1bd30aa281d8196f00be60bc76cac96f4"
+      url: "https://pub.dev"
+    source: hosted
+    version: "7.0.1"
   flutter_plugin_android_lifecycle:
     dependency: transitive
     description:
@@ -512,6 +520,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.11.3"
+  pdf_widget_wrapper:
+    dependency: transitive
+    description:
+      name: pdf_widget_wrapper
+      sha256: c930860d987213a3d58c7ec3b7ecf8085c3897f773e8dc23da9cae60a5d6d0f5
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.4"
   permission_handler:
     dependency: "direct main"
     description:
@@ -592,6 +608,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.0.3"
+  printing:
+    dependency: "direct main"
+    description:
+      name: printing
+      sha256: "482cd5a5196008f984bb43ed0e47cbfdca7373490b62f3b27b3299275bf22a93"
+      url: "https://pub.dev"
+    source: hosted
+    version: "5.14.2"
   qr:
     dependency: transitive
     description:
@@ -725,6 +749,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.5.6"
+  sqflite_common_ffi:
+    dependency: "direct main"
+    description:
+      name: sqflite_common_ffi
+      sha256: "9faa2fedc5385ef238ce772589f7718c24cdddd27419b609bb9c6f703ea27988"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.3.6"
   sqflite_darwin:
     dependency: transitive
     description:
@@ -741,6 +773,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.4.0"
+  sqlite3:
+    dependency: transitive
+    description:
+      name: sqlite3
+      sha256: "3145bd74dcdb4fd6f5c6dda4d4e4490a8087d7f286a14dee5d37087290f0f8a2"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.9.4"
   stack_trace:
     dependency: transitive
     description:
