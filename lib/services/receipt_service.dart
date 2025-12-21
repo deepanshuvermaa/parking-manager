@@ -454,7 +454,7 @@ class ReceiptService {
 
     // Fare
     receipt.writeln(divider);
-    receipt.writeln('${ESC_SIZE_2X_BOLD}FARE: ${formatCurrency(booking.fareAmount)}$ESC_NORMAL');
+    receipt.writeln('${ESC_SIZE_2X_BOLD}FARE: ${Helpers.formatCurrency(booking.fareAmount)}$ESC_NORMAL');
     receipt.writeln(divider);
 
     // Status and time

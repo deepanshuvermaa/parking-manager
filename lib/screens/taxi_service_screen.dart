@@ -540,7 +540,7 @@ class _TaxiServiceScreenState extends State<TaxiServiceScreen>
                           ),
                         ),
                         Text(
-                          formatCurrency(booking.fareAmount),
+                          Helpers.formatCurrency(booking.fareAmount),
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
