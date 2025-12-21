@@ -50,12 +50,29 @@ class TaxiController {
         driverMobile,
       } = req.body;
 
-      // Validate required fields
-      if (!customerName || !customerMobile || !vehicleName || !vehicleNumber ||
-          !fromLocation || !toLocation || !fareAmount || !driverName || !driverMobile) {
+      // Log received data for debugging
+      console.log('📝 Creating taxi booking with data:', {
+        customerName, customerMobile, vehicleName, vehicleNumber,
+        fromLocation, toLocation, fareAmount, driverName, driverMobile
+      });
+
+      // Validate required fields (check for undefined/null/empty string)
+      const missingFields = [];
+      if (!customerName || customerName.trim() === '') missingFields.push('customerName');
+      if (!customerMobile || customerMobile.trim() === '') missingFields.push('customerMobile');
+      if (!vehicleName || vehicleName.trim() === '') missingFields.push('vehicleName');
+      if (!vehicleNumber || vehicleNumber.trim() === '') missingFields.push('vehicleNumber');
+      if (!fromLocation || fromLocation.trim() === '') missingFields.push('fromLocation');
+      if (!toLocation || toLocation.trim() === '') missingFields.push('toLocation');
+      if (fareAmount === undefined || fareAmount === null || fareAmount === '') missingFields.push('fareAmount');
+      if (!driverName || driverName.trim() === '') missingFields.push('driverName');
+      if (!driverMobile || driverMobile.trim() === '') missingFields.push('driverMobile');
+
+      if (missingFields.length > 0) {
+        console.error('❌ Missing fields:', missingFields);
         return res.status(400).json({
           success: false,
-          error: 'All required fields must be provided'
+          error: `Missing required fields: ${missingFields.join(', ')}`
         });
       }
 
