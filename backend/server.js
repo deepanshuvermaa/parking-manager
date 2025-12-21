@@ -747,21 +747,6 @@ app.get('/api/analytics/dashboard', verifyToken, async (req, res) => {
 });
 
 // ================================
-// ERROR HANDLING
-// ================================
-
-// 404 handler
-app.use('*', (req, res) => {
-  res.status(404).json({ success: false, error: 'Endpoint not found' });
-});
-
-// Global error handler
-app.use((error, req, res, next) => {
-  console.error('Unhandled error:', error);
-  res.status(500).json({ success: false, error: 'Internal server error' });
-});
-
-// ================================
 // OPTIONAL: User Management Features
 // ================================
 // Mount new route handlers
@@ -819,6 +804,21 @@ try {
 } catch (error) {
   console.log('⚠️ User Management addon not found or disabled');
 }
+
+// ================================
+// ERROR HANDLING - Must be AFTER all routes
+// ================================
+
+// 404 handler - catches all unmatched routes
+app.use('*', (req, res) => {
+  res.status(404).json({ success: false, error: 'Endpoint not found' });
+});
+
+// Global error handler
+app.use((error, req, res, next) => {
+  console.error('Unhandled error:', error);
+  res.status(500).json({ success: false, error: 'Internal server error' });
+});
 
 // Run database migrations on startup
 const runStartupMigrations = require('./scripts/startup-migration');
