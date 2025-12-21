@@ -7,11 +7,37 @@ class ReceiptService {
   static const String ESC_BOLD_ON = '\x1B\x45\x01';
   static const String ESC_BOLD_OFF = '\x1B\x45\x00';
 
-  // Size commands for 1.5x enlarged text (Option A: Balanced & Professional)
-  static const String ESC_SIZE_1_5X_BOLD = '\x1D\x21\x11\x1B\x45\x01';  // 1.5x size + Bold
-  static const String ESC_NORMAL = '\x1D\x21\x00\x1B\x45\x00';          // Back to normal size
+  // Size commands - ALL OPTIONS for complete customization
+  static const String ESC_SIZE_NORMAL = '\x1D\x21\x00';           // 1x (normal)
+  static const String ESC_SIZE_1_2X = '\x1D\x21\x10';            // 1.2x width only
+  static const String ESC_SIZE_1_25X = '\x1D\x21\x01';           // 1.25x height only
+  static const String ESC_SIZE_1_5X = '\x1D\x21\x11';            // 1.5x (width + height)
+  static const String ESC_SIZE_2X = '\x1D\x21\x22';              // 2x (double size)
 
-  /// Helper function to make text bold (Option A: Just bold, not bigger)
+  // Combined size + bold commands
+  static const String ESC_SIZE_NORMAL_BOLD = '\x1D\x21\x00\x1B\x45\x01';
+  static const String ESC_SIZE_1_2X_BOLD = '\x1D\x21\x10\x1B\x45\x01';
+  static const String ESC_SIZE_1_25X_BOLD = '\x1D\x21\x01\x1B\x45\x01';
+  static const String ESC_SIZE_1_5X_BOLD = '\x1D\x21\x11\x1B\x45\x01';
+  static const String ESC_SIZE_2X_BOLD = '\x1D\x21\x22\x1B\x45\x01';
+  static const String ESC_NORMAL = '\x1D\x21\x00\x1B\x45\x00';   // Reset to normal
+
+  /// Get ESC/POS command based on size and bold settings
+  static String getSizeCommand(double size, bool bold) {
+    if (size >= 2.0) {
+      return bold ? ESC_SIZE_2X_BOLD : ESC_SIZE_2X;
+    } else if (size >= 1.5) {
+      return bold ? ESC_SIZE_1_5X_BOLD : ESC_SIZE_1_5X;
+    } else if (size >= 1.25) {
+      return bold ? ESC_SIZE_1_25X_BOLD : ESC_SIZE_1_25X;
+    } else if (size >= 1.2) {
+      return bold ? ESC_SIZE_1_2X_BOLD : ESC_SIZE_1_2X;
+    } else {
+      return bold ? ESC_SIZE_NORMAL_BOLD : ESC_SIZE_NORMAL;
+    }
+  }
+
+  /// Helper function to make text bold
   static String boldText(String text) {
     return '$ESC_BOLD_ON$text$ESC_BOLD_OFF';
   }
@@ -37,6 +63,32 @@ class ReceiptService {
     final showRateInfo = prefs.getBool('bill_show_rate_info') ?? true;
     final showNotes = prefs.getBool('bill_show_notes') ?? true;
 
+    // Get receipt customization settings
+    final businessNameBold = prefs.getBool('receipt_business_name_bold') ?? true;
+    final businessNameSize = prefs.getDouble('receipt_business_name_size') ?? 1.0;
+    final businessAddressBold = prefs.getBool('receipt_business_address_bold') ?? false;
+    final businessAddressSize = prefs.getDouble('receipt_business_address_size') ?? 1.0;
+    final businessPhoneBold = prefs.getBool('receipt_business_phone_bold') ?? false;
+    final businessPhoneSize = prefs.getDouble('receipt_business_phone_size') ?? 1.0;
+
+    final ticketIdBold = prefs.getBool('receipt_ticket_id_bold') ?? true;
+    final ticketIdSize = prefs.getDouble('receipt_ticket_id_size') ?? 1.5;
+
+    final vehicleNumberBold = prefs.getBool('receipt_vehicle_number_bold') ?? true;
+    final vehicleNumberSize = prefs.getDouble('receipt_vehicle_number_size') ?? 1.5;
+    final vehicleTypeBold = prefs.getBool('receipt_vehicle_type_bold') ?? true;
+    final vehicleTypeSize = prefs.getDouble('receipt_vehicle_type_size') ?? 1.0;
+
+    final travelHeaderBold = prefs.getBool('receipt_travel_header_bold') ?? true;
+    final travelHeaderSize = prefs.getDouble('receipt_travel_header_size') ?? 1.25;
+    final travelFromBold = prefs.getBool('receipt_travel_from_bold') ?? false;
+    final travelFromSize = prefs.getDouble('receipt_travel_from_size') ?? 1.0;
+    final travelToBold = prefs.getBool('receipt_travel_to_bold') ?? false;
+    final travelToSize = prefs.getDouble('receipt_travel_to_size') ?? 1.0;
+
+    final amountBold = prefs.getBool('receipt_amount_bold') ?? true;
+    final amountSize = prefs.getDouble('receipt_amount_size') ?? 1.5;
+
     // Get rate info
     final hourlyRate = vehicle.hourlyRate ?? 0;
     final minimumRate = vehicle.minimumRate ?? 0;
@@ -48,13 +100,19 @@ class ReceiptService {
     // Header
     receipt.writeln(divider);
     if (showBusinessName) {
+      receipt.write(getSizeCommand(businessNameSize, businessNameBold));
       receipt.writeln(centerText(businessName, paperWidth));
+      receipt.write(ESC_NORMAL);
     }
     if (showBusinessAddress && businessAddress.isNotEmpty) {
+      receipt.write(getSizeCommand(businessAddressSize, businessAddressBold));
       receipt.writeln(centerText(businessAddress, paperWidth));
+      receipt.write(ESC_NORMAL);
     }
     if (showBusinessPhone && businessPhone.isNotEmpty) {
+      receipt.write(getSizeCommand(businessPhoneSize, businessPhoneBold));
       receipt.writeln(centerText(businessPhone, paperWidth));
+      receipt.write(ESC_NORMAL);
     }
     receipt.writeln(divider);
     receipt.writeln(centerText('PARKING RECEIPT', paperWidth));
@@ -66,24 +124,43 @@ class ReceiptService {
       receipt.writeln('-' * paperWidth);
     }
 
-    // Ticket details - Ticket ID on separate line (1.5x bold - prominent)
+    // Ticket details - Ticket ID on separate line
     receipt.writeln('Ticket ID:');
-    receipt.write(ESC_SIZE_1_5X_BOLD);
+    receipt.write(getSizeCommand(ticketIdSize, ticketIdBold));
     receipt.writeln(vehicle.ticketId ?? 'N/A');
     receipt.write(ESC_NORMAL);
     receipt.writeln('Date: ${Helpers.formatDate(vehicle.entryTime)}');
     receipt.writeln('Entry Time: ${Helpers.formatTime(vehicle.entryTime)}');
     receipt.writeln('-' * paperWidth);
 
-    // Vehicle details - Vehicle Number on separate line (1.5x bold - prominent)
+    // Vehicle details - Vehicle Number on separate line
     receipt.writeln('Vehicle No:');
-    receipt.write(ESC_SIZE_1_5X_BOLD);
+    receipt.write(getSizeCommand(vehicleNumberSize, vehicleNumberBold));
     receipt.writeln(vehicle.vehicleNumber);
     receipt.write(ESC_NORMAL);
-    receipt.write(ESC_SIZE_1_5X_BOLD);
+    receipt.write(getSizeCommand(vehicleTypeSize, vehicleTypeBold));
     receipt.writeln('Vehicle Type: ${vehicle.vehicleType}');
     receipt.write(ESC_NORMAL);
     receipt.writeln('-' * paperWidth);
+
+    // Travel Details (if provided)
+    if (vehicle.fromLocation != null && vehicle.fromLocation!.isNotEmpty ||
+        vehicle.toLocation != null && vehicle.toLocation!.isNotEmpty) {
+      receipt.write(getSizeCommand(travelHeaderSize, travelHeaderBold));
+      receipt.writeln('TRAVEL DETAILS:');
+      receipt.write(ESC_NORMAL);
+      if (vehicle.fromLocation != null && vehicle.fromLocation!.isNotEmpty) {
+        receipt.write(getSizeCommand(travelFromSize, travelFromBold));
+        receipt.writeln('From: ${vehicle.fromLocation}');
+        receipt.write(ESC_NORMAL);
+      }
+      if (vehicle.toLocation != null && vehicle.toLocation!.isNotEmpty) {
+        receipt.write(getSizeCommand(travelToSize, travelToBold));
+        receipt.writeln('To:   ${vehicle.toLocation}');
+        receipt.write(ESC_NORMAL);
+      }
+      receipt.writeln('-' * paperWidth);
+    }
 
     // Rate information
     if (showRateInfo) {
@@ -150,6 +227,32 @@ class ReceiptService {
     final showReceiptFooter = prefs.getBool('bill_show_receipt_footer') ?? true;
     final showNotes = prefs.getBool('bill_show_notes') ?? true;
 
+    // Get receipt customization settings
+    final businessNameBold = prefs.getBool('receipt_business_name_bold') ?? true;
+    final businessNameSize = prefs.getDouble('receipt_business_name_size') ?? 1.0;
+    final businessAddressBold = prefs.getBool('receipt_business_address_bold') ?? false;
+    final businessAddressSize = prefs.getDouble('receipt_business_address_size') ?? 1.0;
+    final businessPhoneBold = prefs.getBool('receipt_business_phone_bold') ?? false;
+    final businessPhoneSize = prefs.getDouble('receipt_business_phone_size') ?? 1.0;
+
+    final ticketIdBold = prefs.getBool('receipt_ticket_id_bold') ?? true;
+    final ticketIdSize = prefs.getDouble('receipt_ticket_id_size') ?? 1.5;
+
+    final vehicleNumberBold = prefs.getBool('receipt_vehicle_number_bold') ?? true;
+    final vehicleNumberSize = prefs.getDouble('receipt_vehicle_number_size') ?? 1.5;
+    final vehicleTypeBold = prefs.getBool('receipt_vehicle_type_bold') ?? true;
+    final vehicleTypeSize = prefs.getDouble('receipt_vehicle_type_size') ?? 1.0;
+
+    final travelHeaderBold = prefs.getBool('receipt_travel_header_bold') ?? true;
+    final travelHeaderSize = prefs.getDouble('receipt_travel_header_size') ?? 1.25;
+    final travelFromBold = prefs.getBool('receipt_travel_from_bold') ?? false;
+    final travelFromSize = prefs.getDouble('receipt_travel_from_size') ?? 1.0;
+    final travelToBold = prefs.getBool('receipt_travel_to_bold') ?? false;
+    final travelToSize = prefs.getDouble('receipt_travel_to_size') ?? 1.0;
+
+    final amountBold = prefs.getBool('receipt_amount_bold') ?? true;
+    final amountSize = prefs.getDouble('receipt_amount_size') ?? 1.5;
+
     // Calculate duration string
     final hours = duration.inHours;
     final minutes = duration.inMinutes.remainder(60);
@@ -165,35 +268,60 @@ class ReceiptService {
     // Header
     receipt.writeln(divider);
     if (showBusinessName) {
+      receipt.write(getSizeCommand(businessNameSize, businessNameBold));
       receipt.writeln(centerText(businessName, paperWidth));
+      receipt.write(ESC_NORMAL);
     }
     if (showBusinessAddress && businessAddress.isNotEmpty) {
+      receipt.write(getSizeCommand(businessAddressSize, businessAddressBold));
       receipt.writeln(centerText(businessAddress, paperWidth));
+      receipt.write(ESC_NORMAL);
     }
     if (showBusinessPhone && businessPhone.isNotEmpty) {
+      receipt.write(getSizeCommand(businessPhoneSize, businessPhoneBold));
       receipt.writeln(centerText(businessPhone, paperWidth));
+      receipt.write(ESC_NORMAL);
     }
     receipt.writeln(divider);
     receipt.writeln(centerText('EXIT RECEIPT', paperWidth));
     receipt.writeln(divider);
 
-    // Ticket details - Ticket ID on separate line (1.5x bold - prominent)
+    // Ticket details - Ticket ID on separate line
     receipt.writeln('Ticket ID:');
-    receipt.write(ESC_SIZE_1_5X_BOLD);
+    receipt.write(getSizeCommand(ticketIdSize, ticketIdBold));
     receipt.writeln(vehicle.ticketId ?? 'N/A');
     receipt.write(ESC_NORMAL);
     receipt.writeln('Date: ${Helpers.formatDate(DateTime.now())}');
     receipt.writeln(dashLine);
 
-    // Vehicle details - Vehicle Number on separate line (1.5x bold - prominent)
+    // Vehicle details - Vehicle Number on separate line
     receipt.writeln('Vehicle No:');
-    receipt.write(ESC_SIZE_1_5X_BOLD);
+    receipt.write(getSizeCommand(vehicleNumberSize, vehicleNumberBold));
     receipt.writeln(vehicle.vehicleNumber);
     receipt.write(ESC_NORMAL);
-    receipt.write(ESC_SIZE_1_5X_BOLD);
+    receipt.write(getSizeCommand(vehicleTypeSize, vehicleTypeBold));
     receipt.writeln('Vehicle Type: ${vehicle.vehicleType}');
     receipt.write(ESC_NORMAL);
     receipt.writeln(dashLine);
+
+    // Travel Details (if provided)
+    if (vehicle.fromLocation != null && vehicle.fromLocation!.isNotEmpty ||
+        vehicle.toLocation != null && vehicle.toLocation!.isNotEmpty) {
+      receipt.write(getSizeCommand(travelHeaderSize, travelHeaderBold));
+      receipt.writeln('TRAVEL DETAILS:');
+      receipt.write(ESC_NORMAL);
+      if (vehicle.fromLocation != null && vehicle.fromLocation!.isNotEmpty) {
+        receipt.write(getSizeCommand(travelFromSize, travelFromBold));
+        receipt.writeln('From: ${vehicle.fromLocation}');
+        receipt.write(ESC_NORMAL);
+      }
+      if (vehicle.toLocation != null && vehicle.toLocation!.isNotEmpty) {
+        receipt.write(getSizeCommand(travelToSize, travelToBold));
+        receipt.writeln('To:   ${vehicle.toLocation}');
+        receipt.write(ESC_NORMAL);
+      }
+      receipt.writeln(dashLine);
+    }
 
     // Time details
     receipt.writeln('Entry: ${Helpers.formatDateTime(vehicle.entryTime)}');
@@ -201,10 +329,10 @@ class ReceiptService {
     receipt.writeln('Duration: $durationStr');
     receipt.writeln(dashLine);
 
-    // Amount details (1.5x bold - prominent)
+    // Amount details
     receipt.writeln('');
-    receipt.write('Total Amount:         ');
-    receipt.write(ESC_SIZE_1_5X_BOLD);
+    receipt.writeln('Total Amount:');
+    receipt.write(getSizeCommand(amountSize, amountBold));
     receipt.writeln('Rs. ${amount.toStringAsFixed(2)}');
     receipt.write(ESC_NORMAL);
     receipt.writeln('');
@@ -272,6 +400,91 @@ class ReceiptService {
   static String padLeft(String text, int width) {
     if (text.length >= width) return text;
     return ' ' * (width - text.length) + text;
+  }
+
+  // Generate taxi booking receipt
+  static Future<String> generateTaxiReceipt(dynamic booking) async {
+    final prefs = await SharedPreferences.getInstance();
+
+    // Get business details
+    final businessName = prefs.getString('business_name') ?? 'Go2 Parking';
+    final businessPhone = prefs.getString('business_phone') ?? '';
+    final paperWidth = prefs.getInt('paper_width') ?? 32;
+
+    final receipt = StringBuffer();
+    final divider = '=' * paperWidth;
+
+    // Header
+    receipt.writeln(divider);
+    receipt.writeln(centerText(ESC_SIZE_1_5X_BOLD + businessName + ESC_NORMAL, paperWidth));
+    if (businessPhone.isNotEmpty) {
+      receipt.writeln(centerText('Tel: $businessPhone', paperWidth));
+    }
+    receipt.writeln(centerText('${ESC_SIZE_1_2X_BOLD}TAXI BOOKING$ESC_NORMAL', paperWidth));
+    receipt.writeln(divider);
+
+    // Ticket number
+    receipt.writeln('${ESC_SIZE_1_5X_BOLD}Ticket: ${booking.ticketNumber}$ESC_NORMAL');
+    receipt.writeln('Date: ${Helpers.formatDateTime(booking.bookingDate)}');
+    receipt.writeln(divider);
+
+    // Customer info
+    receipt.writeln('${ESC_BOLD_ON}CUSTOMER:$ESC_BOLD_OFF');
+    receipt.writeln('Name: ${booking.customerName}');
+    receipt.writeln('Phone: ${booking.customerMobile}');
+    receipt.writeln('');
+
+    // Trip details
+    receipt.writeln('${ESC_BOLD_ON}TRIP DETAILS:$ESC_BOLD_OFF');
+    receipt.writeln('From: ${booking.fromLocation}');
+    receipt.writeln('To: ${booking.toLocation}');
+    receipt.writeln('');
+
+    // Vehicle info
+    receipt.writeln('${ESC_BOLD_ON}VEHICLE:$ESC_BOLD_OFF');
+    receipt.writeln('${booking.vehicleName}');
+    receipt.writeln('${ESC_SIZE_1_5X_BOLD}${booking.vehicleNumber}$ESC_NORMAL');
+    receipt.writeln('');
+
+    // Driver info
+    receipt.writeln('${ESC_BOLD_ON}DRIVER:$ESC_BOLD_OFF');
+    receipt.writeln('Name: ${booking.driverName}');
+    receipt.writeln('Phone: ${booking.driverMobile}');
+    receipt.writeln('');
+
+    // Fare
+    receipt.writeln(divider);
+    receipt.writeln('${ESC_SIZE_2X_BOLD}FARE: ${formatCurrency(booking.fareAmount)}$ESC_NORMAL');
+    receipt.writeln(divider);
+
+    // Status and time
+    if (booking.startTime != null) {
+      receipt.writeln('Start: ${Helpers.formatDateTime(booking.startTime)}');
+    }
+    if (booking.endTime != null) {
+      receipt.writeln('End: ${Helpers.formatDateTime(booking.endTime)}');
+    }
+    receipt.writeln('Status: ${booking.statusDisplay}');
+
+    // Remarks if any
+    if (booking.remarks1?.isNotEmpty == true ||
+        booking.remarks2?.isNotEmpty == true ||
+        booking.remarks3?.isNotEmpty == true) {
+      receipt.writeln('');
+      receipt.writeln('${ESC_BOLD_ON}REMARKS:$ESC_BOLD_OFF');
+      if (booking.remarks1?.isNotEmpty == true) receipt.writeln(booking.remarks1);
+      if (booking.remarks2?.isNotEmpty == true) receipt.writeln(booking.remarks2);
+      if (booking.remarks3?.isNotEmpty == true) receipt.writeln(booking.remarks3);
+    }
+
+    // Footer
+    receipt.writeln(divider);
+    receipt.writeln(centerText('Thank you!', paperWidth));
+    receipt.writeln(centerText('Have a safe journey', paperWidth));
+    receipt.writeln(divider);
+    receipt.writeln('\n\n\n');
+
+    return receipt.toString();
   }
 
   // Generate test receipt

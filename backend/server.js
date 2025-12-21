@@ -302,8 +302,8 @@ app.post('/api/vehicles', verifyToken, checkTrialExpiry, async (req, res) => {
     console.log('Adding vehicle with normalized data:', normalizedData);
 
     const result = await pool.query(
-      `INSERT INTO vehicles (user_id, vehicle_number, vehicle_type, entry_time, hourly_rate, minimum_rate, ticket_id, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO vehicles (user_id, vehicle_number, vehicle_type, entry_time, hourly_rate, minimum_rate, ticket_id, notes, from_location, to_location)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
       [
         req.userId,
@@ -313,7 +313,9 @@ app.post('/api/vehicles', verifyToken, checkTrialExpiry, async (req, res) => {
         normalizedData.hourlyRate,
         normalizedData.minimumRate,
         normalizedData.ticketId,
-        normalizedData.notes
+        normalizedData.notes,
+        normalizedData.fromLocation || null,
+        normalizedData.toLocation || null
       ]
     );
 
@@ -780,6 +782,15 @@ try {
   console.log('🔐 Admin routes loaded');
 } catch (error) {
   console.log('⚠️ Admin routes not found');
+}
+
+// Taxi booking routes
+try {
+  const taxiRoutes = require('./routes/taxiRoutes')(pool, verifyToken, checkTrialExpiry);
+  app.use('/api/taxi-bookings', taxiRoutes);
+  console.log('🚕 Taxi booking routes loaded');
+} catch (error) {
+  console.log('⚠️ Taxi booking routes not found:', error.message);
 }
 
 // This is a safe addon that doesn't modify existing functionality

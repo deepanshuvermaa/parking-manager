@@ -221,6 +221,29 @@ async function runStartupMigrations(pool) {
       console.log('✅ Devices and sessions migration already applied');
     }
 
+    // ========================================
+    // MIGRATION 3: Add Taxi Bookings Table
+    // ========================================
+    const taxiMigrationCheck = await pool.query(
+      "SELECT * FROM schema_migrations WHERE migration_name = 'add_taxi_bookings'"
+    );
+
+    if (taxiMigrationCheck.rows.length === 0) {
+      console.log('📦 Applying taxi bookings migration...');
+
+      const taxiMigration = require('../migrations/002_create_taxi_bookings');
+      await taxiMigration.up(pool);
+
+      // Record that migration has been applied
+      await pool.query(
+        "INSERT INTO schema_migrations (migration_name) VALUES ('add_taxi_bookings')"
+      );
+
+      console.log('✅ Taxi bookings migration applied successfully');
+    } else {
+      console.log('✅ Taxi bookings migration already applied');
+    }
+
   } catch (error) {
     console.error('❌ Migration error:', error);
     // Don't crash the server if migration fails

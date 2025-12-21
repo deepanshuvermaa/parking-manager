@@ -70,6 +70,14 @@ class ApiConfig {
   static String get adminValidateDeletionUrl => '$baseUrl/admin/validate-deletion';
   static String get adminValidatePasswordUrl => '$baseUrl/admin/validate-password';
 
+  // Taxi booking endpoints
+  static String get taxiBookingsUrl => '$baseUrl/taxi-bookings';
+  static String taxiBookingByIdUrl(String id) => '$baseUrl/taxi-bookings/$id';
+  static String taxiBookingStartUrl(String id) => '$baseUrl/taxi-bookings/$id/start';
+  static String taxiBookingCompleteUrl(String id) => '$baseUrl/taxi-bookings/$id/complete';
+  static String taxiBookingCancelUrl(String id) => '$baseUrl/taxi-bookings/$id/cancel';
+  static String get taxiAnalyticsUrl => '$baseUrl/taxi-bookings/analytics/summary';
+
   // Health check
   static String get healthUrl => '${baseUrl.replaceAll('/api', '')}/health';
 

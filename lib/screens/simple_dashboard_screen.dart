@@ -1,7 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/simple_vehicle_service.dart';
+import '../services/desktop_printer_service.dart';
 import '../models/simple_vehicle.dart';
 import '../utils/constants.dart';
 import '../utils/helpers.dart';
@@ -13,6 +15,8 @@ import 'simple_parking_list_screen.dart';
 import 'simple_settings_screen.dart';
 import 'simple_printer_settings_screen.dart';
 import 'simple_reports_screen.dart';
+import 'taxi_service_screen.dart';
+import '../services/platform_printer_service.dart';
 
 class SimpleDashboardScreen extends StatefulWidget {
   final String userName;
@@ -125,9 +129,11 @@ class _SimpleDashboardScreenState extends State<SimpleDashboardScreen> {
 
   Future<void> _autoConnectPrinter() async {
     try {
-      await SimpleBluetoothService.autoConnect();
+      // Use platform-aware printer service that handles USB and Bluetooth
+      await PlatformPrinterService.autoConnect();
     } catch (e) {
       // Silent fail - user can manually connect from settings
+      print('Auto-connect printer failed: $e');
     }
   }
 
@@ -644,14 +650,28 @@ class _SimpleDashboardScreenState extends State<SimpleDashboardScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    GridView.count(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 12,
-                      crossAxisSpacing: 12,
-                      childAspectRatio: 1.3,
-                      children: [
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        // Calculate responsive aspect ratio based on screen width
+                        final screenWidth = MediaQuery.of(context).size.width;
+                        double aspectRatio;
+
+                        if (screenWidth > 1200) {
+                          aspectRatio = 2.5; // Desktop: wider buttons
+                        } else if (screenWidth > 600) {
+                          aspectRatio = 1.8; // Tablet
+                        } else {
+                          aspectRatio = 1.3; // Mobile
+                        }
+
+                        return GridView.count(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          crossAxisCount: 2,
+                          mainAxisSpacing: 12,
+                          crossAxisSpacing: 12,
+                          childAspectRatio: aspectRatio,
+                          children: [
                         _buildActionButton(
                           title: 'Vehicle Entry',
                           icon: Icons.add_circle,
@@ -685,7 +705,17 @@ class _SimpleDashboardScreenState extends State<SimpleDashboardScreen> {
                             SimpleReportsScreen(token: widget.token),
                           ),
                         ),
+                        _buildActionButton(
+                          title: 'Taxi Service',
+                          icon: Icons.local_taxi,
+                          color: const Color(0xFFFFA726), // Orange/Amber for taxi
+                          onTap: () => _navigateToScreen(
+                            TaxiServiceScreen(token: widget.token),
+                          ),
+                        ),
                       ],
+                        );
+                      },
                     ),
                     const SizedBox(height: 20),
 
