@@ -786,14 +786,27 @@ try {
   console.log('⚠️ Admin routes not found');
 }
 
-// Taxi booking routes
+// Taxi booking routes - CRITICAL FEATURE v4.3
+console.log('📍 Loading taxi routes...');
 try {
   const taxiRoutes = require('./routes/taxiRoutes')(pool, verifyToken, checkTrialExpiry);
   app.use('/api/taxi-bookings', taxiRoutes);
-  console.log('🚕 Taxi booking routes loaded');
+  console.log('✅ 🚕 Taxi booking routes SUCCESSFULLY loaded at /api/taxi-bookings');
 } catch (error) {
-  console.log('⚠️ Taxi booking routes not found:', error.message);
+  console.error('❌ CRITICAL: Taxi booking routes failed to load!');
+  console.error('Error message:', error.message);
+  console.error('Stack trace:', error.stack);
 }
+
+// Test endpoint to verify deployment
+app.get('/api/taxi-test', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Taxi service endpoint active',
+    version: '4.3.1',
+    timestamp: new Date().toISOString()
+  });
+});
 
 // This is a safe addon that doesn't modify existing functionality
 // Comment out the next line to disable user management features
