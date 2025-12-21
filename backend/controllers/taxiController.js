@@ -34,20 +34,21 @@ class TaxiController {
   async createBooking(req, res) {
     try {
       const userId = req.userId;
+      // Extract from snake_case (transformed by middleware from camelCase)
       const {
-        customerName,
-        customerMobile,
-        vehicleName,
-        vehicleNumber,
-        fromLocation,
-        toLocation,
-        fareAmount,
-        startTime,
-        remarks1,
-        remarks2,
-        remarks3,
-        driverName,
-        driverMobile,
+        customer_name: customerName,
+        customer_mobile: customerMobile,
+        vehicle_name: vehicleName,
+        vehicle_number: vehicleNumber,
+        from_location: fromLocation,
+        to_location: toLocation,
+        fare_amount: fareAmount,
+        start_time: startTime,
+        remarks_1: remarks1,
+        remarks_2: remarks2,
+        remarks_3: remarks3,
+        driver_name: driverName,
+        driver_mobile: driverMobile,
       } = req.body;
 
       // Log received data for debugging
