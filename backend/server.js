@@ -6,6 +6,8 @@ const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
+// Version: 4.3.1 - Taxi Service Release
+
 // Import centralized config and middleware
 const config = require('./config');
 const { transformRequest, transformResponse } = require('./middleware/dataTransform');
