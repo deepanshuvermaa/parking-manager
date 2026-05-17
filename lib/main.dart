@@ -52,6 +52,18 @@ class Go2ParkingApp extends StatelessWidget {
             theme: Go2Theme.light(),
             darkTheme: Go2Theme.dark(),
             themeMode: ThemeMode.system,
+            builder: (context, child) {
+              return MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  padding: MediaQuery.of(context).padding,
+                ),
+                child: SafeArea(
+                  top: false, // AppBar handles top
+                  bottom: true,
+                  child: child ?? const SizedBox.shrink(),
+                ),
+              );
+            },
             initialRoute: '/',
             routes: {
               '/': (context) => const SplashScreen(),

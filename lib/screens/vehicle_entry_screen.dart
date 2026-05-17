@@ -74,7 +74,8 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
         // Auto-print if enabled
         final prefs = await SharedPreferences.getInstance();
         final autoPrint = prefs.getBool('auto_print') ?? true;
-        if (autoPrint && SimpleBluetoothService.isConnected) {
+        final printerConnected = await PlatformPrinterService.isConnected();
+        if (autoPrint && printerConnected) {
           try {
             final receipt = await ReceiptService.generateEntryReceipt(vehicle);
             await PlatformPrinterService.printText(receipt);
@@ -199,7 +200,7 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
             Text('Vehicle Type', style: theme.textTheme.titleMedium),
             const SizedBox(height: Go2Spacing.md),
             SizedBox(
-              height: 80,
+              height: 64,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: _vehicleTypes.length,
@@ -211,7 +212,7 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
                     onTap: () => setState(() => _selectedType = vt['type'] as String),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
-                      width: 72,
+                      width: 62,
                       decoration: BoxDecoration(
                         color: isSelected
                             ? Go2Colors.primary
@@ -260,14 +261,14 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
               focusNode: _plateFocus,
               textCapitalization: TextCapitalization.characters,
               style: const TextStyle(
-                fontSize: 22,
+                fontSize: 18,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 1.5,
               ),
               decoration: InputDecoration(
                 hintText: 'MH 12 AB 1234',
                 hintStyle: TextStyle(
-                  fontSize: 22,
+                  fontSize: 18,
                   fontWeight: FontWeight.w400,
                   color: Go2Colors.textHint,
                   letterSpacing: 1.5,
@@ -294,7 +295,7 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
 
             // Submit — tap 3
             SizedBox(
-              height: 56,
+              height: 46,
               child: ElevatedButton.icon(
                 onPressed: _isSubmitting || _plateController.text.trim().isEmpty
                     ? null

@@ -452,16 +452,16 @@ class _StatTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(Go2Spacing.lg),
+        padding: const EdgeInsets.all(Go2Spacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: color, size: 22),
-            const SizedBox(height: Go2Spacing.sm),
+            Icon(icon, color: color, size: 18),
+            const SizedBox(height: Go2Spacing.xs),
             Text(
               value,
               style: TextStyle(
-                fontSize: 22,
+                fontSize: 18,
                 fontWeight: FontWeight.w800,
                 color: color,
               ),
