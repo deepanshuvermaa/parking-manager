@@ -1,0 +1,21 @@
+ParkEase Manager - Release Build
+================================
+Version: 4.3
+Build Date: 2025-01-Su_23-22
+
+Features in this release:
+- Parking Management (Entry/Exit/List/Reports)
+- Taxi Service (Complete booking system)
+- USB Printer Support (Android/Desktop)
+- Bluetooth Printer Support
+- Receipt Customization
+- Multi-platform (Android + Windows)
+
+File Locations:
+- Android APK: ParkEase-v4.3-Android.apk
+- Windows: ParkEase-v4.3-Windows\ folder
+
+Installation:
+- Android: Install APK on device
+- Windows: Run parkease_manager.exe from the Windows folder
+

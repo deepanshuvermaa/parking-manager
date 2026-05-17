@@ -23,6 +23,14 @@ class SimpleVehicleService {
       return;
     }
 
+    // Skip backend for offline mode
+    if (token.isEmpty || token == 'offline_local_token') {
+      await loadFromLocalDatabase();
+      _isInitialized = true;
+      print('✅ SimpleVehicleService initialized (offline)');
+      return;
+    }
+
     try {
       await syncWithBackend(token);
       _isInitialized = true;
@@ -97,10 +105,12 @@ class SimpleVehicleService {
       await initialize(token);
     }
 
-    // Try to refresh from backend in background
-    syncWithBackend(token).catchError((e) {
-      print('Background sync failed: $e');
-    });
+    // Try to refresh from backend in background (skip for offline)
+    if (token.isNotEmpty && token != 'offline_local_token') {
+      syncWithBackend(token).catchError((e) {
+        print('Background sync failed: $e');
+      });
+    }
 
     return _cachedVehicles;
   }
@@ -117,6 +127,8 @@ class SimpleVehicleService {
     double? hourlyRate,
     double? minimumRate,
     String? notes,
+    String? fromLocation,
+    String? toLocation,
   }) async {
     // Generate sequential ticket ID in format PT{DDMM}{serial}
     final ticketId = await TicketIdService.generateNextTicketId();
@@ -132,6 +144,8 @@ class SimpleVehicleService {
       hourlyRate: hourlyRate ?? getDefaultRate(vehicleType)['hourly'],
       minimumRate: minimumRate ?? getDefaultRate(vehicleType)['minimum'],
       notes: notes,
+      fromLocation: fromLocation,
+      toLocation: toLocation,
     );
 
     // 1. SAVE LOCALLY FIRST (guaranteed to succeed)
@@ -144,7 +158,11 @@ class SimpleVehicleService {
       return null;
     }
 
-    // 2. TRY TO SYNC TO BACKEND (optional - will retry later if fails)
+    // 2. TRY TO SYNC TO BACKEND (skip for offline mode)
+    if (token.isEmpty || token == 'offline_local_token') {
+      return vehicle;
+    }
+
     try {
       final requestBody = {
         'vehicleNumber': vehicle.vehicleNumber,
@@ -154,6 +172,8 @@ class SimpleVehicleService {
         'minimumRate': vehicle.minimumRate,
         'notes': vehicle.notes,
         'ticketId': vehicle.ticketId,
+        'fromLocation': vehicle.fromLocation,
+        'toLocation': vehicle.toLocation,
       };
 
       DebugLogger.log('=== VEHICLE ADD REQUEST ===');
@@ -234,7 +254,11 @@ class SimpleVehicleService {
       return null;
     }
 
-    // 2. TRY TO SYNC TO BACKEND
+    // 2. TRY TO SYNC TO BACKEND (skip for offline mode)
+    if (token.isEmpty || token == 'offline_local_token') {
+      return vehicle;
+    }
+
     try {
       final response = await http.put(
         Uri.parse('$baseUrl/api/vehicles/$vehicleId/exit'),

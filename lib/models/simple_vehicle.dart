@@ -12,6 +12,8 @@ class SimpleVehicle {
   double? amount;
   String? notes;
   int? durationMinutes;
+  String? fromLocation;
+  String? toLocation;
 
   SimpleVehicle({
     required this.id,
@@ -26,6 +28,8 @@ class SimpleVehicle {
     this.amount,
     this.notes,
     this.durationMinutes,
+    this.fromLocation,
+    this.toLocation,
   });
 
   Duration get parkingDuration {
@@ -54,6 +58,8 @@ class SimpleVehicle {
       amount: json['amount']?.toDouble(),
       notes: json['notes'],
       durationMinutes: json['duration_minutes'] ?? json['durationMinutes'],
+      fromLocation: json['from_location'] ?? json['fromLocation'],
+      toLocation: json['to_location'] ?? json['toLocation'],
     );
   }
 
@@ -71,6 +77,8 @@ class SimpleVehicle {
       'amount': amount,
       'notes': notes,
       'duration_minutes': durationMinutes,
+      'from_location': fromLocation,
+      'to_location': toLocation,
     };
   }
 }

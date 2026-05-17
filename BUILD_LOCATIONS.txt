@@ -1,0 +1,133 @@
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                   ParkEase Manager v4.2 - Build Locations                 ║
+║                         Built: December 10, 2025                          ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+📱 ANDROID APK
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+File: app-release.apk
+Size: 54.0 MB
+Location:
+  C:\Users\Asus\parkease_manager\build\app\outputs\flutter-apk\app-release.apk
+
+How to Install:
+  1. Copy app-release.apk to your Android device
+  2. Enable "Install from Unknown Sources" in Settings
+  3. Tap the APK file to install
+  4. Open ParkEase Manager app
+
+✅ Ready for distribution - Single file, no dependencies
+
+
+🖥️ WINDOWS DESKTOP EXE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Main File: parkease_manager.exe
+Location:
+  C:\Users\Asus\parkease_manager\build\windows\x64\runner\Release\
+
+⚠️  IMPORTANT: You MUST distribute the ENTIRE "Release" folder!
+
+Required Files:
+  ├── parkease_manager.exe                      ← Main application
+  ├── flutter_windows.dll                       ← Flutter runtime (REQUIRED)
+  ├── permission_handler_windows_plugin.dll     ← Permissions (REQUIRED)
+  ├── file_selector_windows_plugin.dll          ← File selection (REQUIRED)
+  ├── printing_plugin.dll                       ← USB printer support (REQUIRED)
+  ├── share_plus_plugin.dll                     ← Share functionality (REQUIRED)
+  ├── url_launcher_windows_plugin.dll           ← URL handling (REQUIRED)
+  ├── pdfium.dll                                ← PDF rendering (REQUIRED)
+  └── data/                                     ← App resources folder (REQUIRED)
+
+How to Distribute:
+  Option 1: ZIP the entire Release folder
+  Option 2: Copy entire Release folder to USB drive
+  Option 3: Network share the Release folder
+
+How to Run:
+  1. Extract/copy the entire Release folder
+  2. Double-click parkease_manager.exe
+  3. Go to Settings → Printer Settings to configure USB printer
+
+
+📊 NEW FEATURES IN THIS BUILD
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ Destination Tracking (From → To)
+   - Perfect for tour/travel businesses
+   - Optional collapsible section in vehicle entry
+   - Prints on receipts when provided
+
+✅ Full Desktop Support
+   - USB/System printer support
+   - Responsive UI (proper button sizing)
+   - Works on Windows/Mac/Linux
+
+✅ Platform-Aware Printing
+   - Auto-detects Android vs Desktop
+   - Bluetooth on mobile, USB on desktop
+   - 100% backward compatible
+
+✅ Database Enhancements
+   - Auto-migration v2→v3
+   - Destination columns added
+   - Zero data loss
+
+
+🔗 BACKEND DATABASE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Migration Status: ✅ COMPLETED
+
+Database: Railway PostgreSQL
+Columns Added:
+  - from_location (VARCHAR 255)
+  - to_location (VARCHAR 255)
+  - Index: idx_vehicles_destinations
+
+Migration File:
+  C:\Users\Asus\parkease_manager\backend\migrations\add_destination_fields.sql
+
+
+📝 NEXT STEPS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+For Android:
+  1. Test APK on your device
+  2. Verify vehicle entry with destinations works
+  3. Check receipt printing (should show destinations)
+  4. Distribute to users
+
+For Windows Desktop:
+  1. Copy entire Release folder to desktop PC
+  2. Run parkease_manager.exe
+  3. Configure printer in Settings
+  4. Test vehicle entry + printing
+  5. Package for distribution (ZIP or installer)
+
+
+⚡ TESTING PRIORITY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+High Priority:
+  □ Test destination fields on Android
+  □ Test desktop USB printing
+  □ Verify receipts show destinations correctly
+  □ Test database migration (install on device that had v4.1)
+
+Medium Priority:
+  □ Test desktop UI responsiveness
+  □ Test printer auto-connect
+  □ Verify all existing features still work
+
+Low Priority:
+  □ Performance testing
+  □ Extended stress testing
+
+
+Need Help? Check RELEASE_v4.2_NOTES.md for detailed information.
+
+═══════════════════════════════════════════════════════════════════════════
+                    All builds completed successfully! 🎉
+═══════════════════════════════════════════════════════════════════════════

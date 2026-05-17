@@ -13,10 +13,17 @@ dependencies:
   # Core
   cupertino_icons: ^1.0.2
   shared_preferences: ^2.2.2
+  provider: ^6.1.1
+  
+  # Charts
+  fl_chart: ^0.66.0
   
   # Bluetooth
   flutter_bluetooth_serial: ^0.4.0
   permission_handler: ^11.2.0
+
+  # USB Printer (Android)
+  usb_serial: ^0.5.0
   
   # UI
   google_fonts: ^6.1.0
@@ -39,6 +46,9 @@ dependencies:
   # HTTP Client
   http: ^1.1.0
   
+  # URL Launcher
+  url_launcher: ^6.2.1
+  
   # Security
   crypto: ^3.0.3
   
@@ -51,8 +61,13 @@ dependencies:
   # Desktop Printing (USB/System printers)
   printing: ^5.12.0
 
+  # Windows native APIs
+  win32: ^5.0.0
+  ffi: ^2.1.0
+
   # Platform detection
   flutter_platform_widgets: ^7.0.1
+  esc_pos_utils_plus: ^2.0.4
 
 dev_dependencies:
   flutter_test:

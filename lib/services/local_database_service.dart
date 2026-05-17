@@ -21,7 +21,7 @@ class LocalDatabaseService {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: (db, version) async {
         print('🗄️ Creating local database...');
 
@@ -40,6 +40,8 @@ class LocalDatabaseService {
             minimum_rate REAL,
             notes TEXT,
             duration_minutes INTEGER,
+            from_location TEXT,
+            to_location TEXT,
             synced INTEGER DEFAULT 0,
             user_id TEXT,
             created_at TEXT,
@@ -86,6 +88,13 @@ class LocalDatabaseService {
           // Add duration_minutes column if upgrading from v1
           await db.execute('ALTER TABLE vehicles ADD COLUMN duration_minutes INTEGER');
         }
+
+        if (oldVersion < 3) {
+          // Add destination fields (v2 → v3)
+          await db.execute('ALTER TABLE vehicles ADD COLUMN from_location TEXT');
+          await db.execute('ALTER TABLE vehicles ADD COLUMN to_location TEXT');
+          print('✅ Added destination fields to vehicles table');
+        }
       },
     );
   }
@@ -113,6 +122,8 @@ class LocalDatabaseService {
         'minimum_rate': vehicle.minimumRate,
         'notes': vehicle.notes,
         'duration_minutes': vehicle.durationMinutes,
+        'from_location': vehicle.fromLocation,
+        'to_location': vehicle.toLocation,
         'synced': synced ? 1 : 0,
         'created_at': DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
@@ -158,6 +169,8 @@ class LocalDatabaseService {
         minimumRate: maps[i]['minimum_rate'],
         notes: maps[i]['notes'],
         durationMinutes: maps[i]['duration_minutes'],
+        fromLocation: maps[i]['from_location'],
+        toLocation: maps[i]['to_location'],
       );
     });
 
@@ -179,6 +192,8 @@ class LocalDatabaseService {
         'status': vehicle.status,
         'notes': vehicle.notes,
         'duration_minutes': vehicle.durationMinutes,
+        'from_location': vehicle.fromLocation,
+        'to_location': vehicle.toLocation,
         'synced': synced ? 1 : 0,
         'updated_at': DateTime.now().toIso8601String(),
       },
@@ -216,6 +231,8 @@ class LocalDatabaseService {
         minimumRate: maps[i]['minimum_rate'],
         notes: maps[i]['notes'],
         durationMinutes: maps[i]['duration_minutes'],
+        fromLocation: maps[i]['from_location'],
+        toLocation: maps[i]['to_location'],
       );
     });
 

@@ -199,6 +199,7 @@ class AuthController {
             userType: user.user_type,
             role: user.role || 'owner',
             businessId: user.business_id,
+            parkingName: user.parking_name || '',
             trialStartsAt: user.trial_starts_at,
             trialExpiresAt: user.trial_expires_at,
             isActive: user.is_active,
@@ -338,6 +339,7 @@ class AuthController {
             userType: user.user_type,
             role: 'owner',
             businessId: user.business_id,
+            parkingName: user.parking_name || '',
             trialStartsAt: user.trial_starts_at,
             trialExpiresAt: user.trial_expires_at
           },

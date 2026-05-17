@@ -64,35 +64,36 @@ class TaxiBooking {
   });
 
   /// Create from JSON (from API)
+  /// Handles both snake_case (from DB) and camelCase (from middleware)
   factory TaxiBooking.fromJson(Map<String, dynamic> json) {
     return TaxiBooking(
-      id: json['id'] as String,
-      userId: json['user_id'] as String,
-      ticketNumber: json['ticket_number'] as String,
-      bookingDate: DateTime.parse(json['booking_date'] as String),
-      customerName: json['customer_name'] as String,
-      customerMobile: json['customer_mobile'] as String,
-      vehicleName: json['vehicle_name'] as String,
-      vehicleNumber: json['vehicle_number'] as String,
-      fromLocation: json['from_location'] as String,
-      toLocation: json['to_location'] as String,
-      fareAmount: (json['fare_amount'] is String)
-          ? double.parse(json['fare_amount'])
-          : (json['fare_amount'] as num).toDouble(),
-      startTime: json['start_time'] != null
-          ? DateTime.parse(json['start_time'] as String)
+      id: json['id'] ?? '',
+      userId: json['user_id'] ?? json['userId'] ?? '',
+      ticketNumber: json['ticket_number'] ?? json['ticketNumber'] ?? '',
+      bookingDate: DateTime.parse(json['booking_date'] ?? json['bookingDate']),
+      customerName: json['customer_name'] ?? json['customerName'] ?? '',
+      customerMobile: json['customer_mobile'] ?? json['customerMobile'] ?? '',
+      vehicleName: json['vehicle_name'] ?? json['vehicleName'] ?? '',
+      vehicleNumber: json['vehicle_number'] ?? json['vehicleNumber'] ?? '',
+      fromLocation: json['from_location'] ?? json['fromLocation'] ?? '',
+      toLocation: json['to_location'] ?? json['toLocation'] ?? '',
+      fareAmount: ((json['fare_amount'] ?? json['fareAmount']) is String)
+          ? double.parse(json['fare_amount'] ?? json['fareAmount'])
+          : (json['fare_amount'] ?? json['fareAmount'] ?? 0).toDouble(),
+      startTime: (json['start_time'] ?? json['startTime']) != null
+          ? DateTime.parse(json['start_time'] ?? json['startTime'])
           : null,
-      endTime: json['end_time'] != null
-          ? DateTime.parse(json['end_time'] as String)
+      endTime: (json['end_time'] ?? json['endTime']) != null
+          ? DateTime.parse(json['end_time'] ?? json['endTime'])
           : null,
-      remarks1: json['remarks_1'] as String?,
-      remarks2: json['remarks_2'] as String?,
-      remarks3: json['remarks_3'] as String?,
-      driverName: json['driver_name'] as String,
-      driverMobile: json['driver_mobile'] as String,
-      status: json['status'] as String,
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+      remarks1: json['remarks_1'] ?? json['remarks1'],
+      remarks2: json['remarks_2'] ?? json['remarks2'],
+      remarks3: json['remarks_3'] ?? json['remarks3'],
+      driverName: json['driver_name'] ?? json['driverName'] ?? '',
+      driverMobile: json['driver_mobile'] ?? json['driverMobile'] ?? '',
+      status: json['status'] ?? 'booked',
+      createdAt: DateTime.parse(json['created_at'] ?? json['createdAt']),
+      updatedAt: DateTime.parse(json['updated_at'] ?? json['updatedAt']),
     );
   }
 

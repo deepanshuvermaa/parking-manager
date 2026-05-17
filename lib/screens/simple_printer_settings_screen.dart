@@ -1,9 +1,16 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:printing/printing.dart';
+import 'package:usb_serial/usb_serial.dart';
 import '../services/simple_bluetooth_service.dart';
+import '../services/desktop_printer_service.dart';
+import '../services/platform_printer_service.dart';
+import '../services/usb_thermal_printer_service.dart';
 import '../services/receipt_service.dart';
 import '../utils/constants.dart';
+import 'usb_debug_log_screen.dart';
 
 class SimplePrinterSettingsScreen extends StatefulWidget {
   const SimplePrinterSettingsScreen({super.key});
@@ -16,16 +23,24 @@ class SimplePrinterSettingsScreen extends StatefulWidget {
 class _SimplePrinterSettingsScreenState
     extends State<SimplePrinterSettingsScreen> {
   List<BluetoothDevice> _availableDevices = [];
+  List<Printer> _desktopPrinters = [];
+  List<UsbDevice> _usbDevices = [];
   bool _isScanning = false;
+  bool _isScanningUsb = false;
   bool _autoConnect = true;
   String? _connectedDeviceName;
   String? _savedDeviceName;
+  String? _selectedDesktopPrinter;
+  String _printerConnectionType = 'bluetooth'; // 'bluetooth' or 'usb'
 
   @override
   void initState() {
     super.initState();
     _loadSettings();
     _checkConnectionStatus();
+    if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
+      _loadDesktopPrinters();
+    }
   }
 
   Future<void> _loadSettings() async {
@@ -33,6 +48,15 @@ class _SimplePrinterSettingsScreenState
     setState(() {
       _autoConnect = prefs.getBool('printer_auto_connect') ?? true;
       _savedDeviceName = prefs.getString('printer_name');
+      _printerConnectionType = prefs.getString('printer_connection_type') ?? 'bluetooth';
+    });
+  }
+
+  Future<void> _savePrinterConnectionType(String type) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('printer_connection_type', type);
+    setState(() {
+      _printerConnectionType = type;
     });
   }
 
@@ -40,6 +64,19 @@ class _SimplePrinterSettingsScreenState
     setState(() {
       _connectedDeviceName = SimpleBluetoothService.connectedDeviceName;
     });
+  }
+
+  Future<void> _loadDesktopPrinters() async {
+    try {
+      final printers = await DesktopPrinterService.getAvailablePrinters();
+      final prefs = await SharedPreferences.getInstance();
+      setState(() {
+        _desktopPrinters = printers;
+        _selectedDesktopPrinter = prefs.getString('desktop_printer_name');
+      });
+    } catch (e) {
+      print('Error loading desktop printers: $e');
+    }
   }
 
   Future<void> _scanForPrinters() async {
@@ -161,7 +198,11 @@ class _SimplePrinterSettingsScreenState
   }
 
   Future<void> _disconnectPrinter() async {
-    await SimpleBluetoothService.disconnect();
+    if (_printerConnectionType == 'usb') {
+      await UsbThermalPrinterService.disconnect();
+    } else {
+      await SimpleBluetoothService.disconnect();
+    }
     _checkConnectionStatus();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -172,8 +213,201 @@ class _SimplePrinterSettingsScreenState
     }
   }
 
+  // USB Printer Methods
+  Future<void> _scanForUsbPrinters() async {
+    if (!Platform.isAndroid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('USB printing is only available on Android'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isScanningUsb = true;
+      _usbDevices.clear();
+    });
+
+    try {
+      final devices = await UsbThermalPrinterService.scanDevices();
+      setState(() {
+        _usbDevices = devices;
+      });
+
+      if (devices.isEmpty && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No USB printers found. Please connect via USB OTG cable'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error scanning USB devices: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isScanningUsb = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _connectToUsbPrinter(UsbDevice device) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Connecting to USB printer...'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final connected = await UsbThermalPrinterService.connectToDevice(device);
+      Navigator.pop(context); // Close loading dialog
+
+      if (connected) {
+        setState(() {
+          _connectedDeviceName = device.productName ?? 'USB Printer';
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Connected to ${device.productName ?? "USB Printer"}'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        throw Exception('Failed to connect to USB printer');
+      }
+    } catch (e) {
+      Navigator.pop(context); // Close loading dialog
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('USB connection failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Build categorized USB device list with grouping
+  List<Widget> _buildCategorizedUsbDeviceList() {
+    List<Widget> widgets = [];
+
+    // Group devices by category
+    final knownPrinters = _usbDevices.where((d) => UsbThermalPrinterService.getDeviceCategory(d) == 'known').toList();
+    final printerDevices = _usbDevices.where((d) => UsbThermalPrinterService.getDeviceCategory(d) == 'printer').toList();
+    final otherDevices = _usbDevices.where((d) => UsbThermalPrinterService.getDeviceCategory(d) == 'other').toList();
+
+    // Known thermal printer brands
+    if (knownPrinters.isNotEmpty) {
+      widgets.add(
+        const Padding(
+          padding: EdgeInsets.only(top: 8, bottom: 4, left: 8),
+          child: Text(
+            '⭐ Known Thermal Printer Brands',
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
+          ),
+        ),
+      );
+      widgets.addAll(knownPrinters.map((device) => _buildUsbDeviceCard(device, Colors.green)));
+    }
+
+    // Devices with "printer" in name
+    if (printerDevices.isNotEmpty) {
+      widgets.add(
+        const Padding(
+          padding: EdgeInsets.only(top: 8, bottom: 4, left: 8),
+          child: Text(
+            '✅ Printer Devices',
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue),
+          ),
+        ),
+      );
+      widgets.addAll(printerDevices.map((device) => _buildUsbDeviceCard(device, Colors.blue)));
+    }
+
+    // Other USB devices
+    if (otherDevices.isNotEmpty) {
+      widgets.add(
+        const Padding(
+          padding: EdgeInsets.only(top: 8, bottom: 4, left: 8),
+          child: Text(
+            '⚠️ Other USB Devices (May work - try at your own risk)',
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange),
+          ),
+        ),
+      );
+      widgets.addAll(otherDevices.map((device) => _buildUsbDeviceCard(device, Colors.orange)));
+    }
+
+    return widgets;
+  }
+
+  /// Build individual USB device card
+  Widget _buildUsbDeviceCard(UsbDevice device, Color accentColor) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: accentColor,
+          child: const Icon(Icons.usb, color: Colors.white, size: 20),
+        ),
+        title: Text(
+          device.productName ?? 'Unknown Device',
+          style: const TextStyle(fontWeight: FontWeight.w500),
+        ),
+        subtitle: Text(
+          'VID: ${device.vid?.toRadixString(16).toUpperCase().padLeft(4, '0') ?? '????'}, '
+          'PID: ${device.pid?.toRadixString(16).toUpperCase().padLeft(4, '0') ?? '????'}',
+          style: const TextStyle(fontSize: 12),
+        ),
+        trailing: ElevatedButton(
+          onPressed: () => _connectToUsbPrinter(device),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.green,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          ),
+          child: const Text(
+            'Connect',
+            style: TextStyle(color: Colors.white),
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _testPrint() async {
-    if (!SimpleBluetoothService.isConnected) {
+    // Check platform-specific connection status
+    final isConnected = Platform.isAndroid || Platform.isIOS
+        ? SimpleBluetoothService.isConnected
+        : (_selectedDesktopPrinter != null && _selectedDesktopPrinter!.isNotEmpty);
+
+    if (!isConnected) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('No printer connected'),
@@ -185,7 +419,7 @@ class _SimplePrinterSettingsScreenState
 
     try {
       final receipt = ReceiptService.generateTestReceipt();
-      final success = await SimpleBluetoothService.printReceipt(receipt);
+      final success = await PlatformPrinterService.printText(receipt);
 
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -319,6 +553,214 @@ class _SimplePrinterSettingsScreenState
               ),
             ),
             const SizedBox(height: 16),
+
+            // Printer Type Selector (Android only - Choose between Bluetooth and USB)
+            if (Platform.isAndroid) ...[
+              Card(
+                elevation: 2,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.settings_input_composite, color: AppColors.primary, size: 28),
+                          SizedBox(width: 12),
+                          Text(
+                            'Printer Connection Type',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: RadioListTile<String>(
+                              title: const Row(
+                                children: [
+                                  Icon(Icons.bluetooth, size: 20),
+                                  SizedBox(width: 8),
+                                  Text('Bluetooth'),
+                                ],
+                              ),
+                              value: 'bluetooth',
+                              groupValue: _printerConnectionType,
+                              activeColor: AppColors.primary,
+                              onChanged: (value) {
+                                if (value != null) {
+                                  _savePrinterConnectionType(value);
+                                }
+                              },
+                            ),
+                          ),
+                          Expanded(
+                            child: RadioListTile<String>(
+                              title: const Row(
+                                children: [
+                                  Icon(Icons.usb, size: 20),
+                                  SizedBox(width: 8),
+                                  Text('USB'),
+                                ],
+                              ),
+                              value: 'usb',
+                              groupValue: _printerConnectionType,
+                              activeColor: AppColors.primary,
+                              onChanged: (value) {
+                                if (value != null) {
+                                  _savePrinterConnectionType(value);
+                                }
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // USB Printer Section (Android only - when USB is selected)
+            if (Platform.isAndroid && _printerConnectionType == 'usb') ...[
+              Card(
+                elevation: 2,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.usb, color: AppColors.primary, size: 28),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Text(
+                              'USB Thermal Printers',
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          ElevatedButton.icon(
+                            onPressed: _isScanningUsb ? null : _scanForUsbPrinters,
+                            icon: _isScanningUsb
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  )
+                                : const Icon(Icons.search, color: Colors.white),
+                            label: Text(
+                              _isScanningUsb ? 'Scanning...' : 'Scan',
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      if (_usbDevices.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.all(8.0),
+                          child: Text('No USB devices found. Connect your printer via USB OTG cable and tap Scan.'),
+                        )
+                      else
+                        Column(
+                          children: _buildCategorizedUsbDeviceList(),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // Desktop Printer Selection (Windows/Mac/Linux only)
+            if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) ...[
+              Card(
+                elevation: 2,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.print, color: AppColors.primary, size: 28),
+                          const SizedBox(width: 12),
+                          const Text(
+                            'Desktop Printer',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      if (_desktopPrinters.isEmpty)
+                        const Text('No printers found. Please check your system printers.')
+                      else
+                        DropdownButtonFormField<String>(
+                          decoration: const InputDecoration(
+                            labelText: 'Select Printer',
+                            border: OutlineInputBorder(),
+                          ),
+                          value: _selectedDesktopPrinter,
+                          items: _desktopPrinters.map((printer) {
+                            return DropdownMenuItem(
+                              value: printer.name,
+                              child: Text(printer.name),
+                            );
+                          }).toList(),
+                          onChanged: (value) async {
+                            if (value != null) {
+                              final printer = _desktopPrinters.firstWhere((p) => p.name == value);
+                              await DesktopPrinterService.selectPrinter(printer);
+                              final prefs = await SharedPreferences.getInstance();
+                              await prefs.setString('desktop_printer_name', value);
+                              setState(() {
+                                _selectedDesktopPrinter = value;
+                              });
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Selected printer: $value'),
+                                    backgroundColor: Colors.green,
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                        ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: _loadDesktopPrinters,
+                              icon: const Icon(Icons.refresh, color: Colors.white),
+                              label: const Text('Refresh', style: TextStyle(color: Colors.white)),
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: _selectedDesktopPrinter != null ? _testPrint : null,
+                              icon: const Icon(Icons.print, color: Colors.white),
+                              label: const Text('Test Print', style: TextStyle(color: Colors.white)),
+                              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
 
             // Settings Card
             Card(
@@ -549,6 +991,22 @@ class _SimplePrinterSettingsScreenState
         ),
         ),
       ),
+      floatingActionButton: Platform.isAndroid
+          ? FloatingActionButton.extended(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const UsbDebugLogScreen(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.bug_report),
+              label: const Text('USB Debug'),
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            )
+          : null,
     );
   }
 }

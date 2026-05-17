@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Generic USB printer devices -->
+    <usb-device class="7" subclass="1" protocol="1" />
+    <usb-device class="7" subclass="1" protocol="2" />
+    <usb-device class="7" subclass="1" protocol="3" />
+
+    <!-- Common thermal printer vendor IDs -->
+    <!-- SEWOO -->
+    <usb-device vendor-id="1046" />
+    <!-- Star Micronics -->
+    <usb-device vendor-id="1305" />
+    <!-- Epson / Udyama (uses Epson chipset) -->
+    <usb-device vendor-id="1208" />
+    <!-- Udyama 710 Printer - VID: 04B8 (1208), PID: 0E20 (3616) -->
+    <usb-device vendor-id="1208" product-id="3616" />
+    <!-- GOOJPRT -->
+    <usb-device vendor-id="5455" />
+    <!-- XPrinter -->
+    <usb-device vendor-id="8401" />
+    <!-- Generic USB CDC -->
+    <usb-device vendor-id="1155" />
+</resources>

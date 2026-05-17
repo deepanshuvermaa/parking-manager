@@ -86,9 +86,6 @@ class ReceiptService {
     final travelToBold = prefs.getBool('receipt_travel_to_bold') ?? false;
     final travelToSize = prefs.getDouble('receipt_travel_to_size') ?? 1.0;
 
-    final amountBold = prefs.getBool('receipt_amount_bold') ?? true;
-    final amountSize = prefs.getDouble('receipt_amount_size') ?? 1.5;
-
     // Get rate info
     final hourlyRate = vehicle.hourlyRate ?? 0;
     final minimumRate = vehicle.minimumRate ?? 0;
@@ -225,7 +222,6 @@ class ReceiptService {
     final showBusinessPhone = prefs.getBool('bill_show_business_phone') ?? true;
     final showGstNumber = prefs.getBool('bill_show_gst_number') ?? true;
     final showReceiptFooter = prefs.getBool('bill_show_receipt_footer') ?? true;
-    final showNotes = prefs.getBool('bill_show_notes') ?? true;
 
     // Get receipt customization settings
     final businessNameBold = prefs.getBool('receipt_business_name_bold') ?? true;
@@ -407,82 +403,155 @@ class ReceiptService {
     final prefs = await SharedPreferences.getInstance();
 
     // Get business details
-    final businessName = prefs.getString('business_name') ?? 'Go2 Parking';
+    final businessName = prefs.getString('business_name') ?? 'ParkEase Parking';
+    final businessAddress = prefs.getString('business_address') ?? '';
     final businessPhone = prefs.getString('business_phone') ?? '';
+    final receiptFooter = prefs.getString('receipt_footer') ?? 'Have a safe journey!';
     final paperWidth = prefs.getInt('paper_width') ?? 32;
 
-    final receipt = StringBuffer();
-    final divider = '=' * paperWidth;
+    // Get taxi receipt customization settings (use same as parking for now)
+    final businessNameBold = prefs.getBool('receipt_business_name_bold') ?? true;
+    final businessNameSize = prefs.getDouble('receipt_business_name_size') ?? 1.5;
+    final ticketIdBold = prefs.getBool('receipt_ticket_id_bold') ?? true;
+    final ticketIdSize = prefs.getDouble('receipt_ticket_id_size') ?? 1.5;
+    final vehicleNumberBold = prefs.getBool('receipt_vehicle_number_bold') ?? true;
+    final vehicleNumberSize = prefs.getDouble('receipt_vehicle_number_size') ?? 1.5;
+    final amountBold = prefs.getBool('receipt_amount_bold') ?? true;
+    final amountSize = prefs.getDouble('receipt_amount_size') ?? 2.0;
 
-    // Header
-    receipt.writeln(divider);
-    receipt.writeln(centerText(ESC_SIZE_1_5X_BOLD + businessName + ESC_NORMAL, paperWidth));
+    final receipt = StringBuffer();
+    final divider = '-' * paperWidth;
+    final doubleDivider = '=' * paperWidth;
+
+    // Header - apply size AFTER centering, with adjusted width
+    receipt.writeln(doubleDivider);
+    receipt.write(getSizeCommand(businessNameSize, businessNameBold));
+    // Adjust centering width based on size multiplier
+    final businessNameWidth = businessNameSize > 1.0 ? (paperWidth / businessNameSize).round() : paperWidth;
+    receipt.writeln(centerText(businessName, businessNameWidth));
+    receipt.write(ESC_NORMAL);
+    if (businessAddress.isNotEmpty) {
+      receipt.writeln(centerText(businessAddress, paperWidth));
+    }
     if (businessPhone.isNotEmpty) {
       receipt.writeln(centerText('Tel: $businessPhone', paperWidth));
     }
-    receipt.writeln(centerText('${ESC_SIZE_1_2X_BOLD}TAXI BOOKING$ESC_NORMAL', paperWidth));
-    receipt.writeln(divider);
+    receipt.writeln('');
+    receipt.write(getSizeCommand(1.2, true));
+    // Adjust centering width for 1.2x text size
+    final taxiBookingWidth = (paperWidth / 1.2).round();
+    receipt.writeln(centerText('TAXI BOOKING', taxiBookingWidth));
+    receipt.write(ESC_NORMAL);
+    receipt.writeln(doubleDivider);
 
     // Ticket number
-    receipt.writeln('${ESC_SIZE_1_5X_BOLD}Ticket: ${booking.ticketNumber}$ESC_NORMAL');
-    receipt.writeln('Date: ${Helpers.formatDateTime(booking.bookingDate)}');
+    receipt.writeln('');
+    receipt.write(getSizeCommand(ticketIdSize, ticketIdBold));
+    receipt.writeln('Ticket: ${booking.ticketNumber}');
+    receipt.write(ESC_NORMAL);
+    receipt.writeln('Booking: ${Helpers.formatDateTime(booking.bookingDate)}');
     receipt.writeln(divider);
 
     // Customer info
-    receipt.writeln('${ESC_BOLD_ON}CUSTOMER:$ESC_BOLD_OFF');
-    receipt.writeln('Name: ${booking.customerName}');
-    receipt.writeln('Phone: ${booking.customerMobile}');
     receipt.writeln('');
+    receipt.writeln('${ESC_BOLD_ON}CUSTOMER DETAILS$ESC_BOLD_OFF');
+    receipt.writeln('Name  : ${booking.customerName}');
+    receipt.writeln('Phone : ${booking.customerMobile}');
+    receipt.writeln(divider);
 
     // Trip details
-    receipt.writeln('${ESC_BOLD_ON}TRIP DETAILS:$ESC_BOLD_OFF');
-    receipt.writeln('From: ${booking.fromLocation}');
-    receipt.writeln('To: ${booking.toLocation}');
     receipt.writeln('');
+    receipt.writeln('${ESC_BOLD_ON}TRIP DETAILS$ESC_BOLD_OFF');
+    receipt.writeln('From: ${booking.fromLocation}');
+    receipt.writeln('To  : ${booking.toLocation}');
+    receipt.writeln(divider);
 
     // Vehicle info
-    receipt.writeln('${ESC_BOLD_ON}VEHICLE:$ESC_BOLD_OFF');
-    receipt.writeln('${booking.vehicleName}');
-    receipt.writeln('${ESC_SIZE_1_5X_BOLD}${booking.vehicleNumber}$ESC_NORMAL');
     receipt.writeln('');
+    receipt.writeln('${ESC_BOLD_ON}VEHICLE$ESC_BOLD_OFF');
+    receipt.writeln('${ESC_BOLD_ON}${booking.vehicleName}$ESC_BOLD_OFF');
+    receipt.write(getSizeCommand(vehicleNumberSize, vehicleNumberBold));
+    receipt.writeln(booking.vehicleNumber);
+    receipt.write(ESC_NORMAL);
+    receipt.writeln(divider);
 
     // Driver info
-    receipt.writeln('${ESC_BOLD_ON}DRIVER:$ESC_BOLD_OFF');
-    receipt.writeln('Name: ${booking.driverName}');
-    receipt.writeln('Phone: ${booking.driverMobile}');
     receipt.writeln('');
-
-    // Fare
+    receipt.writeln('${ESC_BOLD_ON}DRIVER$ESC_BOLD_OFF');
+    receipt.writeln('Name  : ${booking.driverName}');
+    receipt.writeln('Phone : ${booking.driverMobile}');
     receipt.writeln(divider);
-    receipt.writeln('${ESC_SIZE_2X_BOLD}FARE: ${Helpers.formatCurrency(booking.fareAmount)}$ESC_NORMAL');
-    receipt.writeln(divider);
 
-    // Status and time
+    // Time details and status
+    receipt.writeln('');
+    receipt.writeln('${ESC_BOLD_ON}TRIP STATUS$ESC_BOLD_OFF');
+    receipt.writeln('Status: ${booking.statusDisplay.toUpperCase()}');
+
     if (booking.startTime != null) {
-      receipt.writeln('Start: ${Helpers.formatDateTime(booking.startTime)}');
+      receipt.writeln('Start : ${Helpers.formatDateTime(booking.startTime)}');
     }
-    if (booking.endTime != null) {
-      receipt.writeln('End: ${Helpers.formatDateTime(booking.endTime)}');
-    }
-    receipt.writeln('Status: ${booking.statusDisplay}');
 
-    // Remarks if any
-    if (booking.remarks1?.isNotEmpty == true ||
-        booking.remarks2?.isNotEmpty == true ||
-        booking.remarks3?.isNotEmpty == true) {
+    if (booking.endTime != null) {
+      receipt.writeln('End   : ${Helpers.formatDateTime(booking.endTime)}');
+
+      // Show duration for completed trips
+      if (booking.startTime != null) {
+        final duration = booking.endTime!.difference(booking.startTime!);
+        final hours = duration.inHours;
+        final minutes = duration.inMinutes % 60;
+        String durationStr = '';
+        if (hours > 0) {
+          durationStr = '$hours hr ${minutes} min';
+        } else {
+          durationStr = '$minutes min';
+        }
+        receipt.writeln('${ESC_BOLD_ON}Duration: $durationStr$ESC_BOLD_OFF');
+      }
+    }
+    receipt.writeln(divider);
+
+    // Fare - prominent display
+    receipt.writeln('');
+    receipt.writeln(doubleDivider);
+    receipt.write(getSizeCommand(amountSize, amountBold));
+    final fareText = 'FARE: ${Helpers.formatCurrency(booking.fareAmount)}';
+    // Adjust centering width based on size multiplier
+    final fareWidth = amountSize > 1.0 ? (paperWidth / amountSize).round() : paperWidth;
+    receipt.writeln(centerText(fareText, fareWidth));
+    receipt.write(ESC_NORMAL);
+    receipt.writeln(doubleDivider);
+
+    // Remarks - always show section if any remark exists
+    bool hasRemarks = false;
+    if (booking.remarks1 != null && booking.remarks1.toString().trim().isNotEmpty) hasRemarks = true;
+    if (booking.remarks2 != null && booking.remarks2.toString().trim().isNotEmpty) hasRemarks = true;
+    if (booking.remarks3 != null && booking.remarks3.toString().trim().isNotEmpty) hasRemarks = true;
+
+    if (hasRemarks) {
       receipt.writeln('');
-      receipt.writeln('${ESC_BOLD_ON}REMARKS:$ESC_BOLD_OFF');
-      if (booking.remarks1?.isNotEmpty == true) receipt.writeln(booking.remarks1);
-      if (booking.remarks2?.isNotEmpty == true) receipt.writeln(booking.remarks2);
-      if (booking.remarks3?.isNotEmpty == true) receipt.writeln(booking.remarks3);
+      receipt.writeln('${ESC_BOLD_ON}REMARKS$ESC_BOLD_OFF');
+      if (booking.remarks1 != null && booking.remarks1.toString().trim().isNotEmpty) {
+        receipt.writeln('${booking.remarks1}');
+      }
+      if (booking.remarks2 != null && booking.remarks2.toString().trim().isNotEmpty) {
+        receipt.writeln('${booking.remarks2}');
+      }
+      if (booking.remarks3 != null && booking.remarks3.toString().trim().isNotEmpty) {
+        receipt.writeln('${booking.remarks3}');
+      }
+      receipt.writeln(divider);
     }
 
     // Footer
-    receipt.writeln(divider);
-    receipt.writeln(centerText('Thank you!', paperWidth));
-    receipt.writeln(centerText('Have a safe journey', paperWidth));
-    receipt.writeln(divider);
-    receipt.writeln('\n\n\n');
+    receipt.writeln('');
+    if (receiptFooter.isNotEmpty) {
+      receipt.writeln(centerText(receiptFooter, paperWidth));
+    }
+    receipt.writeln(centerText('Thank You!', paperWidth));
+    receipt.writeln(doubleDivider);
+    receipt.writeln('');
+    receipt.writeln('');
+    receipt.writeln('');
 
     return receipt.toString();
   }

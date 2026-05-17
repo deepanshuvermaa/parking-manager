@@ -4,7 +4,9 @@ import 'package:permission_handler/permission_handler.dart';
 import '../utils/constants.dart';
 import '../services/simple_bluetooth_service.dart';
 import '../services/export_import_service.dart';
+import '../services/auto_backup_service.dart';
 import 'vehicle_rates_management_screen.dart';
+import 'receipt_customization_screen.dart';
 
 class SimpleSettingsScreen extends StatefulWidget {
   final String token;
@@ -44,10 +46,15 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
   bool _showRateInfo = true;
   bool _showNotes = true;
 
+  // Auto-backup settings
+  bool _autoBackupEnabled = true;
+  Map<String, dynamic>? _lastBackupInfo;
+
   @override
   void initState() {
     super.initState();
     _loadSettings();
+    _loadBackupInfo();
   }
 
   @override
@@ -86,6 +93,221 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
       _showRateInfo = prefs.getBool('bill_show_rate_info') ?? true;
       _showNotes = prefs.getBool('bill_show_notes') ?? true;
     });
+
+    // Load auto-backup setting
+    _autoBackupEnabled = await ExportImportService.isAutoBackupEnabled();
+  }
+
+  Future<void> _loadBackupInfo() async {
+    final info = await ExportImportService.getLastBackupInfo();
+    setState(() {
+      _lastBackupInfo = info;
+    });
+  }
+
+  Future<void> _toggleAutoBackup(bool enabled) async {
+    await ExportImportService.setAutoBackupEnabled(enabled);
+    setState(() {
+      _autoBackupEnabled = enabled;
+    });
+
+    if (enabled) {
+      // Start the auto-backup service
+      await AutoBackupService.start(userToken: widget.token);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Auto-backup enabled! Backing up hourly.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } else {
+      // Stop the auto-backup service
+      AutoBackupService.stop();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Auto-backup disabled'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _forceBackupNow() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Creating backup...'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final success = await AutoBackupService.forceBackup(userToken: widget.token);
+      Navigator.pop(context); // Close loading dialog
+
+      await _loadBackupInfo(); // Refresh backup info
+
+      if (success && mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.green),
+                SizedBox(width: 8),
+                Text('Backup Complete'),
+              ],
+            ),
+            content: const Text('Your data has been backed up successfully!'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      Navigator.pop(context);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Backup failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _restoreFromBackup() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('Restore Backup'),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('This will restore all data from your last auto-backup.'),
+            SizedBox(height: 12),
+            Text(
+              'Warning: This will overwrite your current data!',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+            child: const Text('Restore', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Restoring backup...'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final result = await ExportImportService.restoreFromAutoBackup();
+      Navigator.pop(context); // Close loading dialog
+
+      if (result['success'] == true && mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.green),
+                SizedBox(width: 8),
+                Text('Restore Successful'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('✅ Settings restored: ${result['imported_count']}'),
+                Text('✅ Vehicles restored: ${result['vehicles_restored']}'),
+                const SizedBox(height: 12),
+                const Text(
+                  'Please restart the app to see all changes.',
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      } else {
+        throw Exception(result['error'] ?? 'Unknown error');
+      }
+    } catch (e) {
+      Navigator.pop(context);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Restore failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _saveSettings() async {
@@ -392,7 +614,7 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
     );
 
     try {
-      final success = await ExportImportService.exportToFile();
+      final success = await ExportImportService.exportToFile(userToken: widget.token);
       Navigator.pop(context); // Close loading dialog
 
       if (success && mounted) {
@@ -965,6 +1187,54 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
               ),
               const SizedBox(height: 16),
 
+              // Receipt Customization - Navigate to customization screen
+              Card(
+                elevation: 2,
+                child: InkWell(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ReceiptCustomizationScreen(),
+                      ),
+                    );
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        const CircleAvatar(
+                          backgroundColor: AppColors.primary,
+                          child: Icon(Icons.receipt_long, color: Colors.white),
+                        ),
+                        const SizedBox(width: 16),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Receipt Customization',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Customize receipt formatting and styling',
+                                style: TextStyle(fontSize: 12, color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.arrow_forward_ios, size: 16),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
               // Backup & Restore
               Card(
                 elevation: 2,
@@ -988,38 +1258,152 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        'Export all your settings and data as a backup file, or restore from a previous backup.',
+                        'Your data is automatically backed up hourly and stored locally on your device.',
                         style: TextStyle(fontSize: 12, color: Colors.grey),
                       ),
                       const SizedBox(height: 16),
+
+                      // Auto-backup toggle
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.schedule, color: Colors.blue),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Auto-Backup (Hourly)',
+                                    style: TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                  Text(
+                                    'Automatic backup every hour',
+                                    style: TextStyle(fontSize: 11, color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Switch(
+                              value: _autoBackupEnabled,
+                              onChanged: _toggleAutoBackup,
+                              activeColor: Colors.green,
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      if (_lastBackupInfo != null) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.green.withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.check_circle, color: Colors.green, size: 20),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Last Auto-Backup',
+                                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                    ),
+                                    Text(
+                                      DateTime.parse(_lastBackupInfo!['last_backup_time']).toString().split('.')[0],
+                                      style: const TextStyle(fontSize: 10, color: Colors.grey),
+                                    ),
+                                    Text(
+                                      '${_lastBackupInfo!['last_record_count']} records backed up',
+                                      style: const TextStyle(fontSize: 10, color: Colors.green),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+
+                      const SizedBox(height: 16),
+
+                      // Backup Now & Restore buttons
                       Row(
                         children: [
                           Expanded(
                             child: ElevatedButton.icon(
-                              onPressed: _exportData,
-                              icon: const Icon(Icons.download, color: Colors.white),
-                              label: const Text(
-                                'Export Backup',
-                                style: TextStyle(color: Colors.white),
-                              ),
+                              onPressed: _forceBackupNow,
+                              icon: const Icon(Icons.backup, size: 18),
+                              label: const Text('Backup Now', style: TextStyle(fontSize: 13)),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
-                                padding: const EdgeInsets.all(14),
+                                backgroundColor: Colors.blue,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
                               ),
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 10),
                           Expanded(
                             child: ElevatedButton.icon(
-                              onPressed: _importData,
-                              icon: const Icon(Icons.upload, color: Colors.white),
-                              label: const Text(
-                                'Import Backup',
-                                style: TextStyle(color: Colors.white),
-                              ),
+                              onPressed: _lastBackupInfo != null && _lastBackupInfo!['backup_exists'] == true
+                                  ? _restoreFromBackup
+                                  : null,
+                              icon: const Icon(Icons.restore, size: 18),
+                              label: const Text('Restore', style: TextStyle(fontSize: 13)),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.orange,
-                                padding: const EdgeInsets.all(14),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 10),
+                      const Divider(),
+                      const SizedBox(height: 10),
+
+                      // Manual Export/Import
+                      const Text(
+                        'Manual Backup',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _exportData,
+                              icon: const Icon(Icons.download, size: 18),
+                              label: const Text('Export', style: TextStyle(fontSize: 13)),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.green,
+                                side: const BorderSide(color: Colors.green),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _importData,
+                              icon: const Icon(Icons.upload, size: 18),
+                              label: const Text('Import', style: TextStyle(fontSize: 13)),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.orange,
+                                side: const BorderSide(color: Colors.orange),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
                               ),
                             ),
                           ),
