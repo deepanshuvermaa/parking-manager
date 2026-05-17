@@ -111,7 +111,7 @@ function App() {
         <div className="max-w-6xl mx-auto px-6">
           <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-center mb-16">
             <p className="text-green-600 font-bold text-sm uppercase tracking-widest mb-3">Features</p>
-            <h2 className="text-4xl md:text-5xl font-black text-gray-900 tracking-tight">Not a toy. Production-grade.</h2>
+            <h2 className="text-4xl md:text-5xl font-black text-gray-900 tracking-tight">Everything you need, built in.</h2>
           </motion.div>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[
