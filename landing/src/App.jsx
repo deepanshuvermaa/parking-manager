@@ -1,6 +1,6 @@
 import React, { useRef } from 'react'
 import { motion, useScroll, useTransform } from 'motion/react'
-import { Download, Smartphone, Monitor, Shield, Printer, Zap, BarChart3, Wifi, Car, Clock, CreditCard, QrCode, Users, CloudOff } from 'lucide-react'
+import { Download, Smartphone, Monitor, Shield, Printer, Zap, BarChart3, Car, Clock, CreditCard, QrCode, Users, CloudOff } from 'lucide-react'
 
 const BG_IMAGE = "https://images.higgs.ai/?default=1&output=webp&url=https%3A%2F%2Fd8j0ntlcm91z4.cloudfront.net%2Fuser_38xzZboKViGWJOttwIXH07lWA1P%2Fhf_20260430_115327_3f256636-9e63-4885-8d0b-09317dc2b0a5.png&w=1280&q=85"
 const TRUCK_IMAGE = "https://roof-wish-40038865.figma.site/_components/v2/f31fd17907ce60745d45e83a61d44fd3810d5f25/truck_1.8c4bff83.png"
@@ -11,72 +11,95 @@ function App() {
   const truckY = useTransform(scrollYProgress, [0, 1], [-50, 150])
 
   return (
-    <div className="font-sans antialiased">
-      {/* Hero with Parallax */}
+    <div className="antialiased" style={{ fontFamily: "'Inter', sans-serif" }}>
+      {/* Hero */}
       <section
         ref={containerRef}
         className="min-h-screen relative overflow-hidden bg-cover bg-center flex items-center"
         style={{ backgroundImage: `url(${BG_IMAGE})` }}
       >
-        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/70 z-10" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-black/80 z-10" />
 
-        {/* Hero Content */}
-        <div className="relative z-20 w-full px-6 py-20">
+        <div className="relative z-20 w-full px-6 py-24">
           <div className="max-w-5xl mx-auto text-center">
-            <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
-              {/* Logo */}
-              <div className="flex items-center justify-center gap-3 mb-10">
-                <img src="/logo.png" alt="Go2" className="w-12 h-12 rounded-xl shadow-lg" />
-                <span className="text-white text-3xl font-bold tracking-tight">Go2-Parking</span>
+            <motion.div initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.9, ease: "easeOut" }}>
+              {/* Logo - proper aspect ratio */}
+              <div className="flex items-center justify-center gap-4 mb-12">
+                <img src="/logo.png" alt="Go2" className="h-14 w-auto rounded-2xl shadow-2xl shadow-green-500/20 border-2 border-white/10" />
+                <div className="text-left">
+                  <span className="text-white text-3xl md:text-4xl font-extrabold tracking-tight block leading-none">Go2-Parking</span>
+                  <span className="text-green-400 text-xs md:text-sm font-medium tracking-widest uppercase">Smart Parking System</span>
+                </div>
               </div>
 
-              <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-white mb-6 leading-tight">
-                Your Parking Lot,<br/>
-                <span className="text-green-400">Fully Managed.</span>
+              <h1 className="text-5xl md:text-7xl lg:text-8xl font-black text-white mb-6 leading-[0.9] tracking-tight">
+                Park Smarter.<br/>
+                <span className="bg-gradient-to-r from-green-400 via-emerald-300 to-teal-400 bg-clip-text text-transparent">Earn Faster.</span>
               </h1>
-              <p className="text-lg md:text-xl text-white/80 max-w-2xl mx-auto mb-10">
-                Vehicle entry → Auto receipt print → Easy exit with fee calculation. Works offline. Built for Indian parking businesses.
+
+              <p className="text-base md:text-lg text-white/70 max-w-xl mx-auto mb-12 leading-relaxed font-medium">
+                Auto-print receipts. Track every vehicle. Calculate fees instantly. 
+                <span className="text-white/90 font-semibold"> Works even without internet.</span>
               </p>
 
-              {/* Download Buttons */}
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <a href="/downloads/ParkEase-v5.apk" className="inline-flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-8 py-4 rounded-xl font-semibold transition shadow-lg shadow-green-500/30 text-lg">
-                  <Smartphone className="w-5 h-5" /> Download Android
-                </a>
-                <a href="/downloads/ParkEase-Windows.zip" className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur text-white border border-white/30 px-8 py-4 rounded-xl font-semibold transition text-lg">
-                  <Monitor className="w-5 h-5" /> Windows Desktop
-                </a>
+              {/* Buttons */}
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <motion.a
+                  href="/downloads/ParkEase-v5.apk"
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  className="inline-flex items-center gap-2.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white px-8 py-4 rounded-2xl font-bold transition shadow-xl shadow-green-500/25 text-base"
+                >
+                  <Smartphone className="w-5 h-5" /> Download for Android
+                </motion.a>
+                <motion.a
+                  href="/downloads/ParkEase-Windows.zip"
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  className="inline-flex items-center gap-2.5 bg-white/5 hover:bg-white/10 backdrop-blur-md text-white border border-white/20 px-8 py-4 rounded-2xl font-bold transition text-base"
+                >
+                  <Monitor className="w-5 h-5" /> Get Windows App
+                </motion.a>
+              </div>
+
+              {/* Trust badges */}
+              <div className="mt-10 flex flex-wrap items-center justify-center gap-6 text-white/40 text-xs font-semibold uppercase tracking-wider">
+                <span className="flex items-center gap-1.5"><CloudOff className="w-3.5 h-3.5" /> Offline Ready</span>
+                <span className="flex items-center gap-1.5"><Printer className="w-3.5 h-3.5" /> Auto Print</span>
+                <span className="flex items-center gap-1.5"><Shield className="w-3.5 h-3.5" /> Secure</span>
+                <span className="flex items-center gap-1.5"><Zap className="w-3.5 h-3.5" /> 3-Tap Entry</span>
               </div>
             </motion.div>
           </div>
         </div>
 
-        {/* Truck Parallax Layer */}
+        {/* Truck */}
         <motion.div style={{ y: truckY }} className="absolute inset-x-0 bottom-0 h-full pointer-events-none z-[5]">
           <img src={TRUCK_IMAGE} alt="" className="w-full h-full object-contain object-bottom origin-bottom scale-[1.5] sm:scale-110 md:scale-[2.0] lg:scale-105" />
         </motion.div>
       </section>
 
       {/* How It Works */}
-      <section className="py-20 bg-white">
-        <div className="max-w-6xl mx-auto px-6">
-          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-center mb-14">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">3 Taps. That's It.</h2>
-            <p className="text-gray-500 max-w-lg mx-auto">Vehicle enters → Select type → Enter plate → Receipt prints automatically.</p>
+      <section className="py-24 bg-white relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-72 h-72 bg-green-50 rounded-full -translate-x-1/2 -translate-y-1/2 blur-3xl" />
+        <div className="max-w-5xl mx-auto px-6 relative">
+          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-center mb-16">
+            <p className="text-green-600 font-bold text-sm uppercase tracking-widest mb-3">How it works</p>
+            <h2 className="text-4xl md:text-5xl font-black text-gray-900 tracking-tight">Three taps. Done.</h2>
           </motion.div>
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-3 gap-10">
             {[
-              { step: "1", icon: Car, title: "Vehicle Arrives", desc: "Select from 13 Indian vehicle types — Bike, Car, SUV, Auto, Bus, Truck & more" },
-              { step: "2", icon: QrCode, title: "Auto Receipt Print", desc: "Thermal receipt prints instantly with QR code, ticket ID, rates & entry time" },
-              { step: "3", icon: CreditCard, title: "Easy Exit & Payment", desc: "Search plate, auto-calculate fee based on duration, collect & done" },
+              { step: "01", icon: Car, title: "Vehicle In", desc: "Pick type from 13 categories. Enter plate number. That's it." },
+              { step: "02", icon: QrCode, title: "Receipt Prints", desc: "Thermal printer fires automatically. QR code, rates, time — all on it." },
+              { step: "03", icon: CreditCard, title: "Collect & Exit", desc: "Search plate, see fee calculated. Collect cash. Vehicle out." },
             ].map(({ step, icon: Icon, title, desc }, i) => (
-              <motion.div key={step} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.15 }} className="text-center">
-                <div className="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <Icon className="w-7 h-7 text-green-600" />
+              <motion.div key={step} initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.15 }}>
+                <span className="text-5xl font-black text-green-100">{step}</span>
+                <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center mt-2 mb-4 shadow-lg shadow-green-500/20">
+                  <Icon className="w-6 h-6 text-white" />
                 </div>
-                <div className="text-xs font-bold text-green-600 uppercase tracking-wider mb-1">Step {step}</div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">{title}</h3>
-                <p className="text-gray-500 text-sm">{desc}</p>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">{title}</h3>
+                <p className="text-gray-500 leading-relaxed">{desc}</p>
               </motion.div>
             ))}
           </div>
@@ -84,27 +107,27 @@ function App() {
       </section>
 
       {/* Features */}
-      <section className="py-20 bg-gray-50">
+      <section className="py-24 bg-gray-50">
         <div className="max-w-6xl mx-auto px-6">
-          <motion.h2 initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-3xl md:text-4xl font-bold text-center text-gray-900 mb-4">
-            Built for Real Parking Businesses
-          </motion.h2>
-          <p className="text-center text-gray-500 mb-14 max-w-xl mx-auto">Production-grade features used by parking lots across India.</p>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-center mb-16">
+            <p className="text-green-600 font-bold text-sm uppercase tracking-widest mb-3">Features</p>
+            <h2 className="text-4xl md:text-5xl font-black text-gray-900 tracking-tight">Not a toy. Production-grade.</h2>
+          </motion.div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[
-              { icon: Printer, title: "Thermal Printing", desc: "Bluetooth & USB. 2-inch and 3-inch paper. Auto-print on entry." },
-              { icon: CloudOff, title: "Works Offline", desc: "No internet? No problem. Everything saves locally, syncs later." },
-              { icon: BarChart3, title: "Revenue Reports", desc: "Daily/weekly/monthly. Vehicle type breakdown. Export & share." },
-              { icon: Shield, title: "Secure Login", desc: "JWT auth, multi-device management, auto-logout on new device." },
-              { icon: Clock, title: "Auto Fee Calculation", desc: "Hourly rates, minimum charges, free minutes — all configurable." },
-              { icon: Users, title: "13 Vehicle Types", desc: "Car, Bike, Scooter, SUV, Bus, Truck, Auto, E-Rickshaw & more." },
+              { icon: Printer, title: "Thermal Printing", desc: "Bluetooth & USB. 2\" and 3\" paper. Prints the moment vehicle enters." },
+              { icon: CloudOff, title: "Offline First", desc: "No WiFi? Works perfectly. Syncs when you're back online." },
+              { icon: BarChart3, title: "Revenue Reports", desc: "See daily earnings, vehicle counts, peak hours. Export anytime." },
+              { icon: Shield, title: "Multi-Device Auth", desc: "Login from phone or PC. Auto-logout keeps your data safe." },
+              { icon: Clock, title: "Smart Billing", desc: "Hourly rates, minimum charge, free minutes — fully configurable." },
+              { icon: Users, title: "All Vehicle Types", desc: "Bike, Car, SUV, Auto, Bus, Truck, E-Rickshaw — 13 types covered." },
             ].map(({ icon: Icon, title, desc }, i) => (
-              <motion.div key={title} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.08 }}
-                className="bg-white p-5 rounded-xl border border-gray-100 hover:border-green-200 hover:shadow-md transition-all">
-                <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center mb-3">
-                  <Icon className="w-5 h-5 text-green-600" />
+              <motion.div key={title} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.07 }}
+                className="bg-white p-6 rounded-2xl border border-gray-100 hover:border-green-300 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+                <div className="w-11 h-11 bg-green-50 group-hover:bg-green-500 rounded-xl flex items-center justify-center mb-4 transition-colors duration-300">
+                  <Icon className="w-5 h-5 text-green-600 group-hover:text-white transition-colors duration-300" />
                 </div>
-                <h3 className="font-semibold text-gray-900 mb-1">{title}</h3>
+                <h3 className="font-bold text-gray-900 mb-1.5 text-lg">{title}</h3>
                 <p className="text-gray-500 text-sm leading-relaxed">{desc}</p>
               </motion.div>
             ))}
@@ -113,29 +136,34 @@ function App() {
       </section>
 
       {/* CTA */}
-      <section className="py-20 bg-green-600">
-        <div className="max-w-4xl mx-auto px-6 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Start Today. Free Forever.</h2>
-          <p className="text-green-100 text-lg mb-8">No subscription. No hidden fees. Download and manage your parking in 2 minutes.</p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <a href="/downloads/ParkEase-v5.apk" className="inline-flex items-center gap-2 bg-white text-green-700 px-8 py-3.5 rounded-xl font-semibold hover:bg-green-50 transition">
-              <Download className="w-5 h-5" /> Download APK
-            </a>
-            <a href="/downloads/ParkEase-Windows.zip" className="inline-flex items-center gap-2 bg-green-700 text-white px-8 py-3.5 rounded-xl font-semibold hover:bg-green-800 transition border border-green-500">
-              <Monitor className="w-5 h-5" /> Windows App
-            </a>
-          </div>
+      <section className="py-24 bg-gradient-to-br from-green-600 via-emerald-600 to-teal-700 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMSIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjA1KSIvPjwvc3ZnPg==')] opacity-50" />
+        <div className="max-w-4xl mx-auto px-6 text-center relative">
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }}>
+            <h2 className="text-4xl md:text-5xl font-black text-white mb-4 tracking-tight">Ready to go?</h2>
+            <p className="text-green-100 text-lg mb-10 font-medium">Free forever. No signup needed. Just download and start.</p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <motion.a href="/downloads/ParkEase-v5.apk" whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+                className="inline-flex items-center gap-2 bg-white text-green-700 px-8 py-4 rounded-2xl font-bold hover:bg-green-50 transition shadow-xl text-base">
+                <Download className="w-5 h-5" /> Android APK
+              </motion.a>
+              <motion.a href="/downloads/ParkEase-Windows.zip" whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+                className="inline-flex items-center gap-2 bg-white/10 text-white px-8 py-4 rounded-2xl font-bold hover:bg-white/20 transition border border-white/20 text-base">
+                <Monitor className="w-5 h-5" /> Windows .exe
+              </motion.a>
+            </div>
+          </motion.div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="py-8 bg-gray-900">
+      <footer className="py-8 bg-gray-950">
         <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <img src="/logo.png" alt="Go2" className="w-7 h-7 rounded" />
-            <span className="text-white font-semibold">Go2-Parking</span>
+          <div className="flex items-center gap-3">
+            <img src="/logo.png" alt="Go2" className="h-8 w-auto rounded-lg" />
+            <span className="text-white font-bold text-lg">Go2-Parking</span>
           </div>
-          <p className="text-gray-400 text-sm">© 2026 Go2 Billing Softwares by Deepanshu Verma</p>
+          <p className="text-gray-500 text-sm">© 2026 Go2 Billing Softwares by Deepanshu Verma</p>
         </div>
       </footer>
     </div>
