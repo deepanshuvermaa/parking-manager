@@ -826,13 +826,13 @@ app.use((error, req, res, next) => {
   res.status(500).json({ success: false, error: 'Internal server error' });
 });
 
-// Catch-all: serve landing page for non-API routes
-app.get('*', (req, res) => {
+// Catch-all: serve landing page for non-API, non-file routes
+app.use((req, res, next) => {
   if (req.path.startsWith('/api/')) {
-    res.status(404).json({ success: false, error: 'Endpoint not found' });
-  } else {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    return res.status(404).json({ success: false, error: 'Endpoint not found' });
   }
+  // If no static file matched, serve index.html for SPA routing
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Run database migrations on startup
