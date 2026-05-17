@@ -1,9 +1,37 @@
 import React, { useRef } from 'react'
 import { motion, useScroll, useTransform } from 'motion/react'
-import { Facebook, Twitter, Instagram, Linkedin, Download, Smartphone, Monitor, Shield, Printer, Zap, BarChart3, Wifi } from 'lucide-react'
+import { Download, Smartphone, Monitor, Shield, Printer, Zap, BarChart3, Wifi, Car, Clock, CreditCard, QrCode, Users, CloudOff } from 'lucide-react'
 
 const BG_IMAGE = "https://images.higgs.ai/?default=1&output=webp&url=https%3A%2F%2Fd8j0ntlcm91z4.cloudfront.net%2Fuser_38xzZboKViGWJOttwIXH07lWA1P%2Fhf_20260430_115327_3f256636-9e63-4885-8d0b-09317dc2b0a5.png&w=1280&q=85"
 const TRUCK_IMAGE = "https://roof-wish-40038865.figma.site/_components/v2/f31fd17907ce60745d45e83a61d44fd3810d5f25/truck_1.8c4bff83.png"
+
+function ParkingLotSVG() {
+  return (
+    <svg viewBox="0 0 400 300" className="w-full max-w-md mx-auto" fill="none">
+      {/* Parking lot ground */}
+      <rect x="20" y="180" width="360" height="100" rx="8" fill="#E8F5E9" stroke="#4CAF50" strokeWidth="1.5"/>
+      {/* Parking lines */}
+      {[60, 120, 180, 240, 300].map(x => (
+        <line key={x} x1={x} y1="185" x2={x} y2="275" stroke="#4CAF50" strokeWidth="2" strokeDasharray="4 3"/>
+      ))}
+      {/* Cars */}
+      <rect x="68" y="210" width="44" height="55" rx="6" fill="#2E7D32" opacity="0.9"/>
+      <rect x="128" y="210" width="44" height="55" rx="6" fill="#66BB6A" opacity="0.9"/>
+      <rect x="248" y="210" width="44" height="55" rx="6" fill="#388E3C" opacity="0.9"/>
+      {/* Empty slot indicator */}
+      <rect x="188" y="210" width="44" height="55" rx="6" fill="none" stroke="#4CAF50" strokeWidth="1.5" strokeDasharray="5 3"/>
+      <text x="210" y="242" textAnchor="middle" fill="#4CAF50" fontSize="10" fontWeight="600">FREE</text>
+      {/* Roof/Shelter */}
+      <path d="M10 175 L200 130 L390 175" stroke="#2E7D32" strokeWidth="3" fill="none"/>
+      <rect x="10" y="175" width="380" height="5" rx="2" fill="#2E7D32"/>
+      {/* P Sign */}
+      <circle cx="200" cy="90" r="35" fill="#2E7D32"/>
+      <text x="200" y="103" textAnchor="middle" fill="white" fontSize="36" fontWeight="700">P</text>
+      {/* Entry arrow */}
+      <path d="M340 280 L370 280 L370 270 L390 285 L370 300 L370 290 L340 290 Z" fill="#F9A825"/>
+    </svg>
+  )
+}
 
 function App() {
   const containerRef = useRef(null)
@@ -11,151 +39,129 @@ function App() {
   const truckY = useTransform(scrollYProgress, [0, 1], [-50, 150])
 
   return (
-    <div className="font-sans">
-      {/* Top Spacer */}
-      <section className="h-[50vh] md:h-[30vh] bg-[#FDFDFD] flex items-center justify-center">
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1.2 }}
-          className="text-gray-300 text-sm font-bold uppercase tracking-[0.5em]"
-        >
-          View Below
-        </motion.p>
-      </section>
-
-      {/* Parallax Hero */}
+    <div className="font-sans antialiased">
+      {/* Hero Section with Parallax Background */}
       <section
         ref={containerRef}
-        className="h-screen relative overflow-hidden bg-cover bg-center"
+        className="min-h-screen relative overflow-hidden bg-cover bg-center flex items-center"
         style={{ backgroundImage: `url(${BG_IMAGE})` }}
       >
-        {/* Card */}
-        <div className="absolute top-0 w-full pt-12 lg:pt-12 md:pt-24 z-30">
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
-            className="max-w-7xl mx-auto bg-white/95 backdrop-blur-sm shadow-xl rounded-2xl md:rounded-3xl overflow-hidden mx-4 md:mx-auto"
-          >
-            {/* Footer Top */}
-            <div className="p-6 md:p-10 flex flex-col md:flex-row justify-between gap-8">
-              {/* Logo */}
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 md:w-12 md:h-12 bg-orange-500 rounded-lg shadow-inner p-2 flex items-center justify-center">
-                  <svg viewBox="0 0 256 256" className="w-full h-full">
-                    <path fill="white" d="M 228 0 C 172.772 0 128 44.772 128 100 L 128 0 L 0 0 L 0 28 C 0 83.228 44.772 128 100 128 L 0 128 L 0 256 L 28 256 C 83.228 256 128 211.228 128 156 L 128 256 L 256 256 L 256 228 C 256 172.772 211.228 128 156 128 L 256 128 L 256 0 Z" />
-                  </svg>
+        {/* Dark overlay */}
+        <div className="absolute inset-0 bg-black/40 z-10" />
+
+        {/* Hero Content */}
+        <div className="relative z-20 w-full px-6 py-20">
+          <div className="max-w-5xl mx-auto text-center">
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8 }}
+            >
+              {/* Brand */}
+              <div className="inline-flex items-center gap-3 bg-white/10 backdrop-blur-md border border-white/20 px-5 py-2.5 rounded-full mb-8">
+                <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center">
+                  <span className="text-white font-bold text-sm">P</span>
                 </div>
-                <span className="text-gray-900 text-2xl md:text-3xl font-bold tracking-tighter">HAUL!</span>
+                <span className="text-white font-semibold tracking-wide">Go2-Parking</span>
               </div>
 
-              {/* Links */}
-              <div className="flex flex-wrap gap-8 md:gap-12">
-                <div>
-                  <h4 className="uppercase tracking-widest text-sm font-bold text-gray-900 mb-3">Company</h4>
-                  {['Founding', 'Platform', 'Testify'].map(l => (
-                    <a key={l} href="#" className="block text-gray-500 font-medium hover:text-orange-600 transition mb-1.5">{l}</a>
-                  ))}
-                </div>
-                <div>
-                  <h4 className="uppercase tracking-widest text-sm font-bold text-gray-900 mb-3">Mobile</h4>
-                  {['Get Apple App', 'Get Google App'].map(l => (
-                    <a key={l} href="#" className="block text-gray-500 font-medium hover:text-orange-600 transition mb-1.5">{l}</a>
-                  ))}
-                </div>
-                <div>
-                  <h4 className="uppercase tracking-widest text-sm font-bold text-gray-900 mb-3">Contracts</h4>
-                  {['Private Data', 'User Consent'].map(l => (
-                    <a key={l} href="#" className="block text-gray-500 font-medium hover:text-orange-600 transition mb-1.5">{l}</a>
-                  ))}
-                </div>
-              </div>
-            </div>
+              <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-white mb-6 leading-tight">
+                Your Parking Lot,<br/>
+                <span className="text-green-400">Fully Managed.</span>
+              </h1>
+              <p className="text-lg md:text-xl text-white/80 max-w-2xl mx-auto mb-10">
+                Entry. Receipt. Exit. Payment. All automated. Works offline. Prints instantly. Built for Indian parking businesses.
+              </p>
 
-            {/* Footer Bottom */}
-            <div className="border-t border-gray-100 bg-white px-6 md:px-10 py-4 flex items-center justify-between">
-              <p className="text-sm text-gray-500 font-medium">© 2026 HAUL! All Rights Reserved</p>
-              <div className="flex gap-2">
-                {[Facebook, Twitter, Instagram, Linkedin].map((Icon, i) => (
-                  <a key={i} href="#" className="w-10 h-10 rounded-full border border-gray-100 flex items-center justify-center text-gray-400 hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all duration-300">
-                    <Icon className="w-5 h-5" />
-                  </a>
-                ))}
+              {/* Download Buttons */}
+              <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
+                <a href="/downloads/ParkEase-v5.apk" className="inline-flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-8 py-4 rounded-xl font-semibold transition shadow-lg shadow-green-500/30 text-lg">
+                  <Smartphone className="w-5 h-5" /> Download Android APK
+                </a>
+                <a href="/downloads/ParkEase-Windows.zip" className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur text-white border border-white/30 px-8 py-4 rounded-xl font-semibold transition text-lg">
+                  <Monitor className="w-5 h-5" /> Windows Desktop
+                </a>
               </div>
-            </div>
-          </motion.div>
+
+              {/* Parking Lot SVG */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.4, duration: 0.6 }}
+                className="bg-white/95 backdrop-blur rounded-2xl p-6 max-w-lg mx-auto shadow-2xl"
+              >
+                <ParkingLotSVG />
+                <p className="text-sm text-gray-500 mt-3 font-medium">Real-time slot tracking • Auto receipt printing</p>
+              </motion.div>
+            </motion.div>
+          </div>
         </div>
 
         {/* Truck Parallax */}
         <motion.div
           style={{ y: truckY }}
-          className="absolute inset-x-0 bottom-0 h-full pointer-events-none z-20"
+          className="absolute inset-x-0 bottom-0 h-full pointer-events-none z-[5]"
         >
-          <img
-            src={TRUCK_IMAGE}
-            alt=""
-            className="w-full h-full object-contain object-bottom origin-bottom scale-[1.5] sm:scale-110 md:scale-[2.0] lg:scale-105"
-          />
+          <img src={TRUCK_IMAGE} alt="" className="w-full h-full object-contain object-bottom origin-bottom scale-[1.5] sm:scale-110 md:scale-[2.0] lg:scale-105" />
         </motion.div>
       </section>
 
-      {/* ===== PARKEASE LANDING CONTENT ===== */}
-
-      {/* Hero Section */}
-      <section className="py-20 md:py-32 bg-gradient-to-b from-green-50 to-white">
-        <div className="max-w-6xl mx-auto px-6 text-center">
-          <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6 }}>
-            <div className="inline-flex items-center gap-2 bg-green-100 text-green-800 px-4 py-1.5 rounded-full text-sm font-medium mb-6">
-              <Zap className="w-4 h-4" /> Now Available for Android & Windows
-            </div>
-            <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6 leading-tight">
-              Smart Parking<br />Management System
-            </h1>
-            <p className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto mb-10">
-              Complete parking solution with thermal printing, offline-first architecture, and real-time analytics. Built for Indian parking businesses.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <a href="/downloads/ParkEase-v5.apk" className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-8 py-3.5 rounded-xl font-semibold transition shadow-lg shadow-green-200">
-                <Smartphone className="w-5 h-5" /> Download APK
-              </a>
-              <a href="/downloads/ParkEase-Windows.zip" className="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white px-8 py-3.5 rounded-xl font-semibold transition shadow-lg shadow-gray-200">
-                <Monitor className="w-5 h-5" /> Windows Desktop
-              </a>
-            </div>
+      {/* How It Works */}
+      <section className="py-20 bg-white">
+        <div className="max-w-6xl mx-auto px-6">
+          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-center mb-14">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">3 Taps. That's It.</h2>
+            <p className="text-gray-500 max-w-lg mx-auto">Vehicle enters → Select type → Enter plate → Receipt prints automatically. Done in under 5 seconds.</p>
           </motion.div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              { step: "1", icon: Car, title: "Vehicle Arrives", desc: "Select vehicle type from 13 Indian vehicle categories" },
+              { step: "2", icon: QrCode, title: "Auto Receipt", desc: "Ticket prints instantly with QR code, rates, and entry time" },
+              { step: "3", icon: CreditCard, title: "Easy Exit", desc: "Scan or search plate, auto-calculate fee, collect payment" },
+            ].map(({ step, icon: Icon, title, desc }, i) => (
+              <motion.div key={step} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.15 }} className="text-center">
+                <div className="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <Icon className="w-7 h-7 text-green-600" />
+                </div>
+                <div className="text-xs font-bold text-green-600 uppercase tracking-wider mb-1">Step {step}</div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">{title}</h3>
+                <p className="text-gray-500 text-sm">{desc}</p>
+              </motion.div>
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* Features Grid */}
-      <section className="py-20 bg-white">
+      {/* Features */}
+      <section className="py-20 bg-gray-50">
         <div className="max-w-6xl mx-auto px-6">
           <motion.h2 initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-3xl md:text-4xl font-bold text-center text-gray-900 mb-4">
-            Everything You Need
+            Built for Real Parking Businesses
           </motion.h2>
-          <p className="text-center text-gray-500 mb-14 max-w-xl mx-auto">One app to manage your entire parking business — from entry to exit, billing to reports.</p>
+          <p className="text-center text-gray-500 mb-14 max-w-xl mx-auto">Not a toy app. Production-grade features used by parking lots across India.</p>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
             {[
-              { icon: Printer, title: "Auto Thermal Printing", desc: "Bluetooth & USB printer support. 2-inch and 3-inch receipts auto-print on vehicle entry." },
-              { icon: Wifi, title: "Offline-First", desc: "Works without internet. All data saved locally, syncs when connection is available." },
-              { icon: BarChart3, title: "Real-Time Analytics", desc: "Daily, weekly, monthly reports. Revenue tracking, vehicle type breakdown, peak hours." },
-              { icon: Shield, title: "Secure & Private", desc: "JWT authentication, encrypted data, multi-device management with auto-logout." },
-              { icon: Smartphone, title: "Android + Windows", desc: "Same app runs on your phone and desktop. Seamless experience across devices." },
-              { icon: Zap, title: "Fast Entry/Exit", desc: "3-tap vehicle entry. Auto-calculated fees. QR code on receipts for quick exit." },
+              { icon: Printer, title: "Thermal Printing", desc: "Bluetooth & USB. 2-inch and 3-inch paper. Auto-print on entry." },
+              { icon: CloudOff, title: "Works Offline", desc: "No internet? No problem. Everything saves locally, syncs later." },
+              { icon: BarChart3, title: "Revenue Reports", desc: "Daily/weekly/monthly. Vehicle type breakdown. Export to share." },
+              { icon: Shield, title: "Secure Login", desc: "JWT auth, multi-device management, auto-logout on new device." },
+              { icon: Clock, title: "Auto Fee Calculation", desc: "Hourly rates, minimum charges, free minutes — all configurable." },
+              { icon: Users, title: "13 Vehicle Types", desc: "Car, Bike, Scooter, SUV, Bus, Truck, Auto, E-Rickshaw & more." },
             ].map(({ icon: Icon, title, desc }, i) => (
               <motion.div
                 key={title}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
-                className="p-6 rounded-2xl border border-gray-100 hover:border-green-200 hover:shadow-lg transition-all duration-300"
+                transition={{ delay: i * 0.08 }}
+                className="bg-white p-5 rounded-xl border border-gray-100 hover:border-green-200 hover:shadow-md transition-all"
               >
-                <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center mb-4">
-                  <Icon className="w-6 h-6 text-green-600" />
+                <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center mb-3">
+                  <Icon className="w-5 h-5 text-green-600" />
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">{title}</h3>
+                <h3 className="font-semibold text-gray-900 mb-1">{title}</h3>
                 <p className="text-gray-500 text-sm leading-relaxed">{desc}</p>
               </motion.div>
             ))}
@@ -166,19 +172,30 @@ function App() {
       {/* CTA */}
       <section className="py-20 bg-green-600">
         <div className="max-w-4xl mx-auto px-6 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Start Managing Your Parking Today</h2>
-          <p className="text-green-100 text-lg mb-8">Free to use. No credit card required. Works offline from day one.</p>
+          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Start Today. Free Forever.</h2>
+          <p className="text-green-100 text-lg mb-8">No subscription. No hidden fees. Download and start managing your parking lot in 2 minutes.</p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a href="/downloads/ParkEase-v5.apk" className="inline-flex items-center gap-2 bg-white text-green-700 px-8 py-3.5 rounded-xl font-semibold hover:bg-green-50 transition">
-              <Download className="w-5 h-5" /> Download Free
+              <Download className="w-5 h-5" /> Download APK
+            </a>
+            <a href="/downloads/ParkEase-Windows.zip" className="inline-flex items-center gap-2 bg-green-700 text-white px-8 py-3.5 rounded-xl font-semibold hover:bg-green-800 transition border border-green-500">
+              <Monitor className="w-5 h-5" /> Windows App
             </a>
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="py-10 bg-gray-900 text-center">
-        <p className="text-gray-400 text-sm">© 2026 Go2-Parking by Deepanshu Verma. All rights reserved.</p>
+      <footer className="py-8 bg-gray-900">
+        <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 bg-green-500 rounded flex items-center justify-center">
+              <span className="text-white font-bold text-xs">P</span>
+            </div>
+            <span className="text-white font-semibold">Go2-Parking</span>
+          </div>
+          <p className="text-gray-400 text-sm">© 2026 Go2-Parking by Deepanshu Verma. All rights reserved.</p>
+        </div>
       </footer>
     </div>
   )

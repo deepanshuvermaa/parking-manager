@@ -828,10 +828,10 @@ app.use((error, req, res, next) => {
 
 // Catch-all: serve landing page for non-API routes
 app.get('*', (req, res) => {
-  if (!req.path.startsWith('/api/')) {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-  } else {
+  if (req.path.startsWith('/api/')) {
     res.status(404).json({ success: false, error: 'Endpoint not found' });
+  } else {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
   }
 });
 
