@@ -90,6 +90,12 @@ const logAudit = async (userId, action, entityType, entityId, oldValues, newValu
   }
 };
 
+const path = require('path');
+
+// Serve landing page static files
+app.use(express.static(path.join(__dirname, 'public')));
+app.use('/downloads', express.static(path.join(__dirname, 'downloads')));
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'healthy', timestamp: new Date().toISOString() });
@@ -818,6 +824,15 @@ app.use('*', (req, res) => {
 app.use((error, req, res, next) => {
   console.error('Unhandled error:', error);
   res.status(500).json({ success: false, error: 'Internal server error' });
+});
+
+// Catch-all: serve landing page for non-API routes
+app.get('*', (req, res) => {
+  if (!req.path.startsWith('/api/')) {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  } else {
+    res.status(404).json({ success: false, error: 'Endpoint not found' });
+  }
 });
 
 // Run database migrations on startup
