@@ -82,7 +82,7 @@ class AuthProvider extends ChangeNotifier {
       final response = await http.get(
         Uri.parse('${ApiConfig.baseUrl}/auth/validate'),
         headers: {'Authorization': 'Bearer $_token'},
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -90,6 +90,7 @@ class AuthProvider extends ChangeNotifier {
           if (trialExpired) {
             _status = AuthStatus.unauthenticated;
           } else {
+            _isOffline = false;
             await SimpleVehicleService.initialize(_token!);
             _status = AuthStatus.authenticated;
           }
@@ -102,10 +103,19 @@ class AuthProvider extends ChangeNotifier {
         await _clearCredentials();
       }
     } catch (e) {
-      // Network error — allow offline access
-      _isOffline = true;
-      await SimpleVehicleService.loadFromLocalDatabase();
-      _status = AuthStatus.authenticated;
+      // Network error — allow offline access with existing credentials
+      if (e.toString().contains('SocketException') || 
+          e.toString().contains('TimeoutException') ||
+          e.toString().contains('Failed host lookup')) {
+        _isOffline = true;
+        await SimpleVehicleService.loadFromLocalDatabase();
+        _status = AuthStatus.authenticated;
+      } else {
+        // Other errors (parsing, etc) - still allow offline
+        _isOffline = true;
+        await SimpleVehicleService.loadFromLocalDatabase();
+        _status = AuthStatus.authenticated;
+      }
     }
 
     notifyListeners();
