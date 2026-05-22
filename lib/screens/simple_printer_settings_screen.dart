@@ -267,15 +267,18 @@ class _SimplePrinterSettingsScreenState extends State<SimplePrinterSettingsScree
           Row(children: [
             const Text('Connection type:', style: TextStyle(fontSize: 14)),
             const Spacer(),
-            SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'bluetooth', label: Text('Bluetooth')),
-                ButtonSegment(value: 'usb', label: Text('USB')),
-              ],
-              selected: {_connectionType},
-              onSelectionChanged: (v) => _saveConnectionType(v.first),
-              style: const ButtonStyle(
-                textStyle: WidgetStatePropertyAll(TextStyle(fontSize: 12)),
+            Flexible(
+              child: SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(value: 'bluetooth', label: Text('BT', style: TextStyle(fontSize: 11))),
+                  ButtonSegment(value: 'usb', label: Text('USB', style: TextStyle(fontSize: 11))),
+                ],
+                selected: {_connectionType},
+                onSelectionChanged: (v) => _saveConnectionType(v.first),
+                style: const ButtonStyle(
+                  visualDensity: VisualDensity.compact,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
               ),
             ),
           ]),

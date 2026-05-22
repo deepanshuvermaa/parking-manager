@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import '../providers/auth_provider.dart';
 import '../providers/parking_provider.dart';
 import '../services/simple_vehicle_service.dart';
@@ -52,36 +53,42 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
       status = await Permission.camera.request();
       if (!status.isGranted) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Camera permission required to scan plates'),
-            backgroundColor: Go2Colors.error,
-          ));
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Camera permission required'), backgroundColor: Go2Colors.error));
           if (status.isPermanentlyDenied) openAppSettings();
         }
         return;
       }
     }
 
-    // Capture image
     final picker = ImagePicker();
-    final image = await picker.pickImage(source: ImageSource.camera, maxWidth: 1280);
+    final image = await picker.pickImage(source: ImageSource.camera, maxWidth: 1920);
     if (image == null) return;
 
-    // Show processing indicator
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Processing plate image...'),
-        duration: Duration(seconds: 1),
-      ));
-    }
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reading plate number...'), duration: Duration(seconds: 1)));
 
-    // Basic OCR placeholder - in production, integrate Google ML Kit or similar
-    // For now, prompt user that image was captured and they can type the plate
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Photo captured. Please type the plate number.'),
-        backgroundColor: Go2Colors.primary,
-      ));
+    // OCR with Google ML Kit
+    final inputImage = InputImage.fromFilePath(image.path);
+    final textRecognizer = TextRecognizer();
+    try {
+      final recognized = await textRecognizer.processImage(inputImage);
+      final plateRegex = RegExp(r'[A-Z]{2}\s*\d{1,2}\s*[A-Z]{1,3}\s*\d{1,4}');
+      String? plate;
+      for (final block in recognized.blocks) {
+        final match = plateRegex.firstMatch(block.text.toUpperCase().replaceAll('\n', ' '));
+        if (match != null) {
+          plate = match.group(0)?.replaceAll(RegExp(r'\s+'), ' ').trim();
+          break;
+        }
+      }
+      if (plate != null && mounted) {
+        _plateController.text = plate;
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Detected: $plate'), backgroundColor: Go2Colors.success));
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not detect plate. Please type manually.'), backgroundColor: Go2Colors.warning));
+      }
+    } finally {
+      textRecognizer.close();
     }
   }
 

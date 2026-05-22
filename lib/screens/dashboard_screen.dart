@@ -42,7 +42,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             const Text('Go2-Parking'),
             if (auth.parkingName.isNotEmpty)
-              Text(auth.parkingName, style: const TextStyle(fontSize: 11, color: Colors.white70)),
+              Text(auth.parkingName, style: const TextStyle(fontSize: 11, color: Go2Colors.textSecondary)),
           ],
         ),
         actions: [
@@ -51,19 +51,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
               margin: const EdgeInsets.only(right: 8),
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
+                color: Go2Colors.warning.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(Go2Radius.full),
               ),
               child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.cloud_off_rounded, size: 12, color: Colors.white70),
+                Icon(Icons.cloud_off_rounded, size: 12, color: Go2Colors.warning),
                 SizedBox(width: 4),
-                Text('Offline', style: TextStyle(fontSize: 10, color: Colors.white70, fontWeight: FontWeight.w500)),
+                Text('Offline', style: TextStyle(fontSize: 10, color: Go2Colors.warning, fontWeight: FontWeight.w500)),
               ]),
             ),
           FutureBuilder<bool>(
             future: PlatformPrinterService.isConnected(),
             builder: (_, snap) => snap.data == true
-                ? const Padding(padding: EdgeInsets.only(right: 8), child: Icon(Icons.print_rounded, size: 18, color: Colors.white70))
+                ? const Padding(padding: EdgeInsets.only(right: 8), child: Icon(Icons.print_rounded, size: 18, color: Go2Colors.success))
                 : const SizedBox.shrink(),
           ),
           IconButton(icon: const Icon(Icons.settings_outlined, size: 20), onPressed: () => Navigator.pushNamed(context, '/settings')),

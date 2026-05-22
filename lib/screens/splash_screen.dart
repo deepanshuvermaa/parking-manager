@@ -33,7 +33,7 @@ class _SplashScreenState extends State<SplashScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Go2Colors.primary, Color(0xFF0D47A1)],
+            colors: [Color(0xFFE3F2FD), Color(0xFFBBDEFB)],
           ),
         ),
         child: Center(
@@ -44,7 +44,7 @@ class _SplashScreenState extends State<SplashScreen> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(18),
-                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 20, offset: const Offset(0, 8))],
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 20, offset: const Offset(0, 8))],
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(18),
@@ -52,11 +52,11 @@ class _SplashScreenState extends State<SplashScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            const Text('Go2-Parking', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: -0.5)),
+            const Text('Go2-Parking', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: Go2Colors.textPrimary, letterSpacing: -0.5)),
             const SizedBox(height: 6),
-            Text('Smart Parking Management', style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.7))),
+            const Text('Smart Parking Management', style: TextStyle(fontSize: 12, color: Go2Colors.textSecondary)),
             const SizedBox(height: 32),
-            SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white.withValues(alpha: 0.6))),
+            const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Go2Colors.primary)),
           ]),
         ),
       ),

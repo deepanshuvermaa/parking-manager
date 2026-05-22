@@ -110,9 +110,9 @@ class _ReportsScreenState extends State<ReportsScreen>
         title: const Text('Reports'),
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: Colors.white,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
+          indicatorColor: Go2Colors.primary,
+          labelColor: Go2Colors.primary,
+          unselectedLabelColor: Go2Colors.textHint,
           tabs: const [
             Tab(text: 'Today'),
             Tab(text: 'Week'),

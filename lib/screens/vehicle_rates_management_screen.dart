@@ -116,11 +116,59 @@ class _VehicleRatesManagementScreenState extends State<VehicleRatesManagementScr
     }
   }
 
+  Future<void> _addNewType() async {
+    final nameCtrl = TextEditingController();
+    final hourlyCtrl = TextEditingController(text: '20');
+    final minCtrl = TextEditingController(text: '20');
+    final formKey = GlobalKey<FormState>();
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Add Vehicle Type'),
+        content: Form(
+          key: formKey,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            TextFormField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(labelText: 'Type Name (e.g. Tractor)'),
+              validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(controller: hourlyCtrl, decoration: const InputDecoration(labelText: 'Hourly Rate (₹)'), keyboardType: TextInputType.number),
+            const SizedBox(height: 12),
+            TextFormField(controller: minCtrl, decoration: const InputDecoration(labelText: 'Minimum Rate (₹)'), keyboardType: TextInputType.number),
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(onPressed: () { if (formKey.currentState!.validate()) Navigator.pop(ctx, true); }, child: const Text('Add')),
+        ],
+      ),
+    );
+
+    if (saved == true && nameCtrl.text.trim().isNotEmpty) {
+      final rates = await VehicleRateService.loadRates();
+      rates.add(VehicleRate(
+        vehicleType: nameCtrl.text.trim(),
+        hourlyRate: double.tryParse(hourlyCtrl.text) ?? 20,
+        minimumCharge: double.tryParse(minCtrl.text) ?? 20,
+        freeMinutes: 15,
+      ));
+      await VehicleRateService.saveRates(rates);
+      _loadRates();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Go2Colors.canvas,
       appBar: AppBar(title: const Text('Vehicle Rates')),
+      floatingActionButton: FloatingActionButton.small(
+        onPressed: _addNewType,
+        child: const Icon(Icons.add),
+      ),
       body: _rates.isEmpty
           ? const Center(child: CircularProgressIndicator())
           : ListView.separated(

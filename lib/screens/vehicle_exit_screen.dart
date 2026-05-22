@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import '../providers/auth_provider.dart';
 import '../providers/parking_provider.dart';
 import '../services/simple_vehicle_service.dart';
@@ -380,24 +383,49 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
     );
   }
 
-  void _scanQR() {
-    // QR scanning placeholder — requires camera permission and qr_code_scanner package
-    // For now, show a dialog explaining the feature
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('QR Scanner'),
-        content: const Text(
-          'Point camera at the QR code on the parking ticket to instantly find the vehicle.\n\n'
-          'This feature requires camera access.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
+  Future<void> _scanQR() async {
+    // Request camera permission
+    var status = await Permission.camera.status;
+    if (!status.isGranted) {
+      status = await Permission.camera.request();
+      if (!status.isGranted) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Camera permission required'), backgroundColor: Go2Colors.error));
+          if (status.isPermanentlyDenied) openAppSettings();
+        }
+        return;
+      }
+    }
+
+    final picker = ImagePicker();
+    final image = await picker.pickImage(source: ImageSource.camera);
+    if (image == null) return;
+
+    // Use ML Kit to read ticket ID from QR/text
+    final inputImage = InputImage.fromFilePath(image.path);
+    final textRecognizer = TextRecognizer();
+    try {
+      final result = await textRecognizer.processImage(inputImage);
+      // Look for ticket ID pattern (PT + digits) or plate number
+      final ticketRegex = RegExp(r'PT\d{7,}');
+      final plateRegex = RegExp(r'[A-Z]{2}\s*\d{1,2}\s*[A-Z]{1,3}\s*\d{1,4}');
+      String? searchTerm;
+      for (final block in result.blocks) {
+        final text = block.text.toUpperCase();
+        final ticketMatch = ticketRegex.firstMatch(text);
+        if (ticketMatch != null) { searchTerm = ticketMatch.group(0); break; }
+        final plateMatch = plateRegex.firstMatch(text);
+        if (plateMatch != null) { searchTerm = plateMatch.group(0); break; }
+      }
+      if (searchTerm != null && mounted) {
+        _searchController.text = searchTerm;
+        _filter(searchTerm);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Found: $searchTerm'), backgroundColor: Go2Colors.success));
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not read ticket. Try again.'), backgroundColor: Go2Colors.warning));
+      }
+    } finally {
+      textRecognizer.close();
+    }
   }
 }

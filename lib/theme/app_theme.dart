@@ -9,7 +9,7 @@ import 'package:google_fonts/google_fonts.dart';
 class Go2Colors {
   // Surfaces
   static const Color canvas = Color(0xFFFCFCFC);        // Linen canvas
-  static const Color skyWash = Color(0xFFF0F4FE);       // Subtle blue tint sections
+  static const Color skyWash = Color(0xFFE3F2FD);       // Sky blue tint
   static const Color surface = Color(0xFFFFFFFF);       // Card surface
   static const Color background = Color(0xFFFCFCFC);    // Page background
 
@@ -20,9 +20,9 @@ class Go2Colors {
   static const Color textOnPrimary = Color(0xFFFFFFFF);
 
   // Brand
-  static const Color primary = Color(0xFF145AFF);       // Signal blue
-  static const Color primaryLight = Color(0xFF3B82F6);  // Hero blue
-  static const Color primaryDark = Color(0xFF0F1F3D);   // Primary action accent
+  static const Color primary = Color(0xFF1976D2);       // Medium blue
+  static const Color primaryLight = Color(0xFF42A5F5);  // Light blue
+  static const Color primaryDark = Color(0xFF0D47A1);   // Deep blue
 
   // Accent (used sparingly)
   static const Color accent = Color(0xFF145AFF);
@@ -85,20 +85,20 @@ class Go2Theme {
       ),
       scaffoldBackgroundColor: Go2Colors.canvas,
       appBarTheme: AppBarTheme(
-        backgroundColor: Go2Colors.primary,
-        foregroundColor: Colors.white,
+        backgroundColor: const Color(0xFFE3F2FD),  // Sky blue blend
+        foregroundColor: Go2Colors.textPrimary,
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
         titleTextStyle: GoogleFonts.inter(
           fontSize: 18,
           fontWeight: FontWeight.w600,
-          color: Colors.white,
+          color: Go2Colors.textPrimary,
           letterSpacing: -0.3,
         ),
-        systemOverlayStyle: SystemUiOverlayStyle.light,
+        systemOverlayStyle: SystemUiOverlayStyle.dark,
         surfaceTintColor: Colors.transparent,
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(color: Go2Colors.textPrimary),
       ),
       cardTheme: CardThemeData(
         color: Go2Colors.surface,

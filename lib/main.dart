@@ -52,17 +52,7 @@ class Go2ParkingApp extends StatelessWidget {
             theme: Go2Theme.light(),
             darkTheme: Go2Theme.dark(),
             themeMode: ThemeMode.light,
-            builder: (context, child) {
-              // Ensure bottom system nav never overlaps content
-              final bottomPadding = MediaQuery.of(context).viewPadding.bottom;
-              return MediaQuery(
-                data: MediaQuery.of(context),
-                child: Padding(
-                  padding: EdgeInsets.only(bottom: bottomPadding),
-                  child: child,
-                ),
-              );
-            },
+            builder: (context, child) => child ?? const SizedBox.shrink(),
             initialRoute: '/',
             routes: {
               '/': (context) => const SplashScreen(),
