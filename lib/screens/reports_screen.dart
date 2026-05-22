@@ -399,9 +399,26 @@ class _ReportsScreenState extends State<ReportsScreen>
 
   Widget _buildHourlyChart(List<SimpleVehicle> vehicles) {
     final byHour = _revenueByHour(vehicles);
-    if (byHour.isEmpty) return const Center(child: Text('No data'));
+    if (byHour.isEmpty) return const Center(child: Text('No peak hour data', style: TextStyle(color: Go2Colors.textHint)));
 
-    final maxVal = byHour.values.reduce((a, b) => a > b ? a : b);
+    final maxVal = byHour.values.isEmpty ? 1.0 : byHour.values.reduce((a, b) => a > b ? a : b);
+
+    // Show hours 6 AM to 10 PM (6-22)
+    final groups = <BarChartGroupData>[];
+    for (int h = 6; h <= 22; h++) {
+      final val = byHour[h] ?? 0;
+      groups.add(BarChartGroupData(
+        x: h,
+        barRods: [
+          BarChartRodData(
+            toY: val > 0 ? val : 0.5, // minimum height for visibility
+            color: val == maxVal && val > 0 ? Go2Colors.primary : Go2Colors.primary.withValues(alpha: val > 0 ? 0.6 : 0.1),
+            width: 10,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
+          ),
+        ],
+      ));
+    }
 
     return BarChart(
       BarChartData(
@@ -413,27 +430,18 @@ class _ReportsScreenState extends State<ReportsScreen>
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
+              interval: 2,
               getTitlesWidget: (value, _) {
-                return Text('${value.toInt()}', style: const TextStyle(fontSize: 9));
+                final h = value.toInt();
+                if (h % 2 == 0) return Text('${h > 12 ? h - 12 : h}${h >= 12 ? 'p' : 'a'}', style: const TextStyle(fontSize: 8, color: Go2Colors.textHint));
+                return const SizedBox.shrink();
               },
             ),
           ),
         ),
         borderData: FlBorderData(show: false),
-        barGroups: byHour.entries.map((e) {
-          return BarChartGroupData(
-            x: e.key,
-            barRods: [
-              BarChartRodData(
-                toY: e.value,
-                color: e.value == maxVal ? Go2Colors.accent : Go2Colors.primary,
-                width: 12,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
-              ),
-            ],
-          );
-        }).toList()
-          ..sort((a, b) => a.x.compareTo(b.x)),
+        maxY: maxVal * 1.2,
+        barGroups: groups,
       ),
     );
   }

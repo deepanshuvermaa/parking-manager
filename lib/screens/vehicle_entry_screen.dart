@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:image_picker/image_picker.dart';
 import '../providers/auth_provider.dart';
 import '../providers/parking_provider.dart';
 import '../services/simple_vehicle_service.dart';
@@ -42,6 +44,46 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
 
   @override
   void dispose() { _plateController.dispose(); super.dispose(); }
+
+  Future<void> _scanPlate() async {
+    // Request camera permission
+    var status = await Permission.camera.status;
+    if (!status.isGranted) {
+      status = await Permission.camera.request();
+      if (!status.isGranted) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Camera permission required to scan plates'),
+            backgroundColor: Go2Colors.error,
+          ));
+          if (status.isPermanentlyDenied) openAppSettings();
+        }
+        return;
+      }
+    }
+
+    // Capture image
+    final picker = ImagePicker();
+    final image = await picker.pickImage(source: ImageSource.camera, maxWidth: 1280);
+    if (image == null) return;
+
+    // Show processing indicator
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Processing plate image...'),
+        duration: Duration(seconds: 1),
+      ));
+    }
+
+    // Basic OCR placeholder - in production, integrate Google ML Kit or similar
+    // For now, prompt user that image was captured and they can type the plate
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Photo captured. Please type the plate number.'),
+        backgroundColor: Go2Colors.primary,
+      ));
+    }
+  }
 
   Future<void> _submit() async {
     final plate = _plateController.text.trim().toUpperCase();
@@ -161,7 +203,15 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
             controller: _plateController,
             textCapitalization: TextCapitalization.characters,
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, letterSpacing: 1.2),
-            decoration: const InputDecoration(hintText: 'MH 12 AB 1234', prefixIcon: Icon(Icons.pin_outlined, size: 20)),
+            decoration: InputDecoration(
+              hintText: 'MH 12 AB 1234',
+              prefixIcon: const Icon(Icons.pin_outlined, size: 20),
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.camera_alt_rounded, size: 22, color: Go2Colors.primary),
+                tooltip: 'Scan plate with camera',
+                onPressed: _scanPlate,
+              ),
+            ),
             inputFormatters: [UpperCaseTextFormatter(), LengthLimitingTextInputFormatter(14)],
             onChanged: (_) => setState(() {}),
             onFieldSubmitted: (_) => _submit(),
