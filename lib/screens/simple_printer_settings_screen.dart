@@ -10,6 +10,7 @@ import '../services/platform_printer_service.dart';
 import '../services/usb_thermal_printer_service.dart';
 import '../services/receipt_service.dart';
 import '../utils/constants.dart';
+import '../theme/app_theme.dart';
 import 'usb_debug_log_screen.dart';
 
 class SimplePrinterSettingsScreen extends StatefulWidget {
@@ -94,7 +95,7 @@ class _SimplePrinterSettingsScreenState
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Bluetooth permissions required: ${errors.values.join(', ')}'),
-              backgroundColor: Colors.red,
+              backgroundColor: Go2Colors.error,
             ),
           );
         }
@@ -108,7 +109,7 @@ class _SimplePrinterSettingsScreenState
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Please turn on Bluetooth'),
-              backgroundColor: Colors.orange,
+              backgroundColor: Go2Colors.warning,
             ),
           );
         }
@@ -133,7 +134,7 @@ class _SimplePrinterSettingsScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error scanning: ${e.toString()}'),
-            backgroundColor: Colors.red,
+            backgroundColor: Go2Colors.error,
           ),
         );
       }
@@ -177,7 +178,7 @@ class _SimplePrinterSettingsScreenState
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Connected to ${device.name}'),
-              backgroundColor: Colors.green,
+              backgroundColor: Go2Colors.success,
             ),
           );
         }
@@ -190,7 +191,7 @@ class _SimplePrinterSettingsScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Connection failed: ${e.toString()}'),
-            backgroundColor: Colors.red,
+            backgroundColor: Go2Colors.error,
           ),
         );
       }
@@ -219,7 +220,7 @@ class _SimplePrinterSettingsScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('USB printing is only available on Android'),
-          backgroundColor: Colors.orange,
+          backgroundColor: Go2Colors.warning,
         ),
       );
       return;
@@ -248,7 +249,7 @@ class _SimplePrinterSettingsScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error scanning USB devices: ${e.toString()}'),
-            backgroundColor: Colors.red,
+            backgroundColor: Go2Colors.error,
           ),
         );
       }
@@ -294,7 +295,7 @@ class _SimplePrinterSettingsScreenState
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Connected to ${device.productName ?? "USB Printer"}'),
-              backgroundColor: Colors.green,
+              backgroundColor: Go2Colors.success,
             ),
           );
         }
@@ -307,7 +308,7 @@ class _SimplePrinterSettingsScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('USB connection failed: ${e.toString()}'),
-            backgroundColor: Colors.red,
+            backgroundColor: Go2Colors.error,
           ),
         );
       }
@@ -330,11 +331,11 @@ class _SimplePrinterSettingsScreenState
           padding: EdgeInsets.only(top: 8, bottom: 4, left: 8),
           child: Text(
             '⭐ Known Thermal Printer Brands',
-            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
+            style: TextStyle(fontWeight: FontWeight.bold, color: Go2Colors.success),
           ),
         ),
       );
-      widgets.addAll(knownPrinters.map((device) => _buildUsbDeviceCard(device, Colors.green)));
+      widgets.addAll(knownPrinters.map((device) => _buildUsbDeviceCard(device, Go2Colors.success)));
     }
 
     // Devices with "printer" in name
@@ -344,11 +345,11 @@ class _SimplePrinterSettingsScreenState
           padding: EdgeInsets.only(top: 8, bottom: 4, left: 8),
           child: Text(
             '✅ Printer Devices',
-            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue),
+            style: TextStyle(fontWeight: FontWeight.bold, color: Go2Colors.primary),
           ),
         ),
       );
-      widgets.addAll(printerDevices.map((device) => _buildUsbDeviceCard(device, Colors.blue)));
+      widgets.addAll(printerDevices.map((device) => _buildUsbDeviceCard(device, Go2Colors.primary)));
     }
 
     // Other USB devices
@@ -358,11 +359,11 @@ class _SimplePrinterSettingsScreenState
           padding: EdgeInsets.only(top: 8, bottom: 4, left: 8),
           child: Text(
             '⚠️ Other USB Devices (May work - try at your own risk)',
-            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange),
+            style: TextStyle(fontWeight: FontWeight.bold, color: Go2Colors.warning),
           ),
         ),
       );
-      widgets.addAll(otherDevices.map((device) => _buildUsbDeviceCard(device, Colors.orange)));
+      widgets.addAll(otherDevices.map((device) => _buildUsbDeviceCard(device, Go2Colors.warning)));
     }
 
     return widgets;
@@ -389,7 +390,7 @@ class _SimplePrinterSettingsScreenState
         trailing: ElevatedButton(
           onPressed: () => _connectToUsbPrinter(device),
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.green,
+            backgroundColor: Go2Colors.success,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           ),
           child: const Text(
@@ -411,7 +412,7 @@ class _SimplePrinterSettingsScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('No printer connected'),
-          backgroundColor: Colors.orange,
+          backgroundColor: Go2Colors.warning,
         ),
       );
       return;
@@ -425,7 +426,7 @@ class _SimplePrinterSettingsScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Test receipt printed successfully'),
-            backgroundColor: Colors.green,
+            backgroundColor: Go2Colors.success,
           ),
         );
       }
@@ -434,7 +435,7 @@ class _SimplePrinterSettingsScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Print failed: ${e.toString()}'),
-            backgroundColor: Colors.red,
+            backgroundColor: Go2Colors.error,
           ),
         );
       }
@@ -449,7 +450,7 @@ class _SimplePrinterSettingsScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Settings saved'),
-          backgroundColor: Colors.green,
+          backgroundColor: Go2Colors.success,
         ),
       );
     }
@@ -479,7 +480,7 @@ class _SimplePrinterSettingsScreenState
             // Connection Status Card
             Card(
               elevation: 2,
-              color: _connectedDeviceName != null ? Colors.green[50] : null,
+              color: _connectedDeviceName != null ? Go2Colors.success.withValues(alpha: 0.1) : null,
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -492,8 +493,8 @@ class _SimplePrinterSettingsScreenState
                               ? Icons.bluetooth_connected
                               : Icons.bluetooth_disabled,
                           color: _connectedDeviceName != null
-                              ? Colors.green
-                              : Colors.grey,
+                              ? Go2Colors.success
+                              : Go2Colors.textHint,
                           size: 28,
                         ),
                         const SizedBox(width: 12),
@@ -522,7 +523,7 @@ class _SimplePrinterSettingsScreenState
                           ElevatedButton(
                             onPressed: _disconnectPrinter,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red,
+                              backgroundColor: Go2Colors.error,
                             ),
                             child: const Text(
                               'Disconnect',
@@ -726,7 +727,7 @@ class _SimplePrinterSettingsScreenState
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text('Selected printer: $value'),
-                                    backgroundColor: Colors.green,
+                                    backgroundColor: Go2Colors.success,
                                   ),
                                 );
                               }
@@ -741,7 +742,7 @@ class _SimplePrinterSettingsScreenState
                               onPressed: _loadDesktopPrinters,
                               icon: const Icon(Icons.refresh, color: Colors.white),
                               label: const Text('Refresh', style: TextStyle(color: Colors.white)),
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+                              style: ElevatedButton.styleFrom(backgroundColor: Go2Colors.primary),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -838,13 +839,13 @@ class _SimplePrinterSettingsScreenState
                             Icon(
                               Icons.print_disabled,
                               size: 48,
-                              color: Colors.grey[400],
+                              color: Go2Colors.textHint,
                             ),
                             const SizedBox(height: 8),
                             Text(
                               'No printers found',
-                              style: TextStyle(
-                                color: Colors.grey[600],
+                              style: const TextStyle(
+                                color: Go2Colors.textSecondary,
                               ),
                             ),
                             const SizedBox(height: 16),
@@ -871,7 +872,7 @@ class _SimplePrinterSettingsScreenState
                           color: isConnected
                               ? AppColors.primary.withOpacity(0.1)
                               : isPrinter
-                                  ? Colors.blue.shade50
+                                  ? Go2Colors.skyWash
                                   : null,
                           child: ListTile(
                             leading: Icon(
@@ -879,8 +880,8 @@ class _SimplePrinterSettingsScreenState
                               color: isConnected
                                   ? AppColors.primary
                                   : isPrinter
-                                      ? Colors.blue
-                                      : Colors.grey,
+                                      ? Go2Colors.primary
+                                      : Go2Colors.textHint,
                               size: isPrinter ? 32 : 24,
                             ),
                             title: Row(
@@ -899,7 +900,7 @@ class _SimplePrinterSettingsScreenState
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: Colors.blue,
+                                      color: Go2Colors.primary,
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: const Text(
@@ -915,12 +916,12 @@ class _SimplePrinterSettingsScreenState
                             ),
                             subtitle: Text(
                               device.address.toString(),
-                              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                              style: TextStyle(fontSize: 11, color: Go2Colors.textSecondary),
                             ),
                             trailing: isConnected
                                 ? const Chip(
                                     label: Text('Connected'),
-                                    backgroundColor: Colors.green,
+                                    backgroundColor: Go2Colors.success,
                                     labelStyle: TextStyle(color: Colors.white),
                                   )
                                 : ElevatedButton(
@@ -951,7 +952,7 @@ class _SimplePrinterSettingsScreenState
             const SizedBox(height: 16),
             Card(
               elevation: 2,
-              color: Colors.blue[50],
+              color: Go2Colors.skyWash,
               child: const Padding(
                 padding: EdgeInsets.all(16),
                 child: Column(
@@ -959,14 +960,14 @@ class _SimplePrinterSettingsScreenState
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.info_outline, color: Colors.blue),
+                        Icon(Icons.info_outline, color: Go2Colors.primary),
                         SizedBox(width: 8),
                         Text(
                           'Instructions',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: Colors.blue,
+                            color: Go2Colors.primary,
                           ),
                         ),
                       ],

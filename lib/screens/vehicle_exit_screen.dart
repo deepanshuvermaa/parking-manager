@@ -307,15 +307,20 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.search_off,
-                                size: 48, color: Go2Colors.textHint),
-                            const SizedBox(height: Go2Spacing.md),
+                            Icon(Icons.local_parking_rounded, size: 56, color: Go2Colors.textHint.withValues(alpha: 0.3)),
+                            const SizedBox(height: 12),
                             Text(
                               _searchController.text.isNotEmpty
                                   ? 'No matching vehicles'
                                   : 'No vehicles parked',
-                              style: theme.textTheme.bodyMedium
-                                  ?.copyWith(color: Go2Colors.textSecondary),
+                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: Go2Colors.textSecondary),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _searchController.text.isNotEmpty
+                                  ? 'Try a different search term'
+                                  : 'Vehicles will appear here after entry',
+                              style: const TextStyle(fontSize: 12, color: Go2Colors.textHint),
                             ),
                           ],
                         ),

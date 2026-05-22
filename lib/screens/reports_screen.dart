@@ -234,7 +234,13 @@ class _ReportsScreenState extends State<ReportsScreen>
 
   Widget _buildRevenueChart(List<SimpleVehicle> vehicles, String period) {
     if (vehicles.isEmpty) {
-      return const Center(child: Text('No data'));
+      return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Icon(Icons.bar_chart_rounded, size: 48, color: Go2Colors.textHint.withValues(alpha: 0.3)),
+        const SizedBox(height: 12),
+        const Text('No data yet', style: TextStyle(fontSize: 14, color: Go2Colors.textSecondary)),
+        const SizedBox(height: 4),
+        const Text('Park vehicles to see reports', style: TextStyle(fontSize: 12, color: Go2Colors.textHint)),
+      ]));
     }
 
     if (period == 'week') {
