@@ -78,33 +78,32 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Go2Colors.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(Go2Spacing.xl),
+        padding: const EdgeInsets.all(Go2Spacing.xxl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             // Vehicle info
             Row(
               children: [
-                CircleAvatar(
-                  radius: 28,
-                  backgroundColor: Go2Colors.primary.withOpacity(0.1),
-                  child: Icon(_vehicleIcon(vehicle.vehicleType),
-                      color: Go2Colors.primary, size: 28),
+                Container(
+                  width: 48, height: 48,
+                  decoration: BoxDecoration(
+                    color: Go2Colors.skyWash,
+                    borderRadius: BorderRadius.circular(Go2Radius.md),
+                  ),
+                  child: Icon(_vehicleIcon(vehicle.vehicleType), color: Go2Colors.primary, size: 24),
                 ),
                 const SizedBox(width: Go2Spacing.lg),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(vehicle.vehicleNumber,
-                          style: const TextStyle(
-                              fontSize: 20, fontWeight: FontWeight.w700)),
-                      Text(vehicle.vehicleType,
-                          style: Theme.of(ctx).textTheme.bodySmall),
-                    ],
-                  ),
-                ),
+                Expanded(child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(vehicle.vehicleNumber, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Go2Colors.textPrimary)),
+                    Text(vehicle.vehicleType, style: const TextStyle(fontSize: 13, color: Go2Colors.textHint)),
+                  ],
+                )),
               ],
             ),
             const SizedBox(height: Go2Spacing.xl),
@@ -113,47 +112,30 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
             Container(
               padding: const EdgeInsets.all(Go2Spacing.lg),
               decoration: BoxDecoration(
-                color: Go2Colors.background,
+                color: Go2Colors.skyWash,
                 borderRadius: BorderRadius.circular(Go2Radius.md),
               ),
               child: Row(
                 children: [
-                  Expanded(
-                    child: Column(
-                      children: [
-                        const Icon(Icons.timer_outlined,
-                            color: Go2Colors.textSecondary),
-                        const SizedBox(height: 4),
-                        Text(
-                          hours > 0 ? '${hours}h ${mins}m' : '${mins}m',
-                          style: const TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.w700),
-                        ),
-                        Text('Duration',
-                            style: Theme.of(ctx).textTheme.labelSmall),
-                      ],
+                  Expanded(child: Column(children: [
+                    const Icon(Icons.timer_outlined, color: Go2Colors.textSecondary, size: 20),
+                    const SizedBox(height: 4),
+                    Text(
+                      hours > 0 ? '${hours}h ${mins}m' : '${mins}m',
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Go2Colors.textPrimary),
                     ),
-                  ),
-                  Container(width: 1, height: 40, color: Go2Colors.divider),
-                  Expanded(
-                    child: Column(
-                      children: [
-                        const Icon(Icons.currency_rupee,
-                            color: Go2Colors.success),
-                        const SizedBox(height: 4),
-                        Text(
-                          '₹${amount.toStringAsFixed(0)}',
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w800,
-                            color: Go2Colors.success,
-                          ),
-                        ),
-                        Text('Amount',
-                            style: Theme.of(ctx).textTheme.labelSmall),
-                      ],
+                    const Text('Duration', style: TextStyle(fontSize: 11, color: Go2Colors.textHint)),
+                  ])),
+                  Container(width: 0.5, height: 40, color: Go2Colors.divider),
+                  Expanded(child: Column(children: [
+                    const Icon(Icons.currency_rupee_rounded, color: Go2Colors.primary, size: 20),
+                    const SizedBox(height: 4),
+                    Text(
+                      '₹${amount.toStringAsFixed(0)}',
+                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Go2Colors.primary),
                     ),
-                  ),
+                    const Text('Amount', style: TextStyle(fontSize: 11, color: Go2Colors.textHint)),
+                  ])),
                 ],
               ),
             ),
@@ -166,18 +148,16 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
                 if (snapshot.hasData &&
                     snapshot.data!['vpa'] != null &&
                     snapshot.data!['vpa']!.isNotEmpty) {
-                  return Column(
-                    children: [
-                      UpiQrService.buildPaymentQR(
-                        vpa: snapshot.data!['vpa']!,
-                        merchantName: snapshot.data!['name'] ?? 'Go2-Parking',
-                        amount: amount,
-                        vehicleNumber: vehicle.vehicleNumber,
-                        size: 140,
-                      ),
-                      const SizedBox(height: Go2Spacing.xl),
-                    ],
-                  );
+                  return Column(children: [
+                    UpiQrService.buildPaymentQR(
+                      vpa: snapshot.data!['vpa']!,
+                      merchantName: snapshot.data!['name'] ?? 'Go2-Parking',
+                      amount: amount,
+                      vehicleNumber: vehicle.vehicleNumber,
+                      size: 120,
+                    ),
+                    const SizedBox(height: Go2Spacing.lg),
+                  ]);
                 }
                 return const SizedBox.shrink();
               },
@@ -186,24 +166,15 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
             // Exit button
             SizedBox(
               width: double.infinity,
-              height: 52,
               child: ElevatedButton.icon(
                 onPressed: () => _processExit(ctx, vehicle, amount),
-                icon: const Icon(Icons.exit_to_app_rounded),
+                icon: const Icon(Icons.check_circle_rounded, size: 18),
                 label: const Text('Confirm Exit'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Go2Colors.accent,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(Go2Radius.md)),
-                ),
               ),
             ),
+            const SizedBox(height: Go2Spacing.sm),
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
             const SizedBox(height: Go2Spacing.md),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
-            ),
-            const SizedBox(height: Go2Spacing.lg),
           ],
         ),
       ),
@@ -367,7 +338,7 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
                               onTap: () => _showExitConfirmation(v),
                               leading: CircleAvatar(
                                 backgroundColor:
-                                    Go2Colors.primary.withOpacity(0.1),
+                                    Go2Colors.skyWash,
                                 child: Icon(_vehicleIcon(v.vehicleType),
                                     color: Go2Colors.primary, size: 20),
                               ),

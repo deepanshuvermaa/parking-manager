@@ -28,7 +28,7 @@ void main() {
 
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.light,
+    statusBarIconBrightness: Brightness.dark,
   ));
 
   runApp(const Go2ParkingApp());
@@ -51,19 +51,7 @@ class Go2ParkingApp extends StatelessWidget {
             debugShowCheckedModeBanner: false,
             theme: Go2Theme.light(),
             darkTheme: Go2Theme.dark(),
-            themeMode: ThemeMode.system,
-            builder: (context, child) {
-              return MediaQuery(
-                data: MediaQuery.of(context).copyWith(
-                  padding: MediaQuery.of(context).padding,
-                ),
-                child: SafeArea(
-                  top: false,
-                  bottom: true,
-                  child: child ?? const SizedBox.shrink(),
-                ),
-              );
-            },
+            themeMode: ThemeMode.light, // Force light mode
             initialRoute: '/',
             routes: {
               '/': (context) => const SplashScreen(),
@@ -71,8 +59,7 @@ class Go2ParkingApp extends StatelessWidget {
               '/home': (context) => const MainNavScreen(),
               '/slots': (context) => const SlotManagementScreen(),
               '/subscribe': (context) => const SubscriptionScreen(),
-              '/settings': (context) => SimpleSettingsScreen(
-                    token: auth.token ?? ''),
+              '/settings': (context) => SimpleSettingsScreen(token: auth.token ?? ''),
               '/printer': (context) => const SimplePrinterSettingsScreen(),
             },
           );
@@ -86,66 +73,39 @@ class MainNavScreen extends StatefulWidget {
   const MainNavScreen({super.key});
 
   @override
-  State<MainNavScreen> createState() => _MainNavScreenState();
+  State<MainNavScreen> createState() => MainNavScreenState();
 }
 
-class _MainNavScreenState extends State<MainNavScreen> {
+class MainNavScreenState extends State<MainNavScreen> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = const [
-    DashboardScreen(),
-    VehicleEntryScreen(),
-    VehicleExitScreen(),
-    ReportsScreen(),
-  ];
+  void switchToTab(int index) {
+    setState(() => _currentIndex = index);
+  }
 
   @override
   Widget build(BuildContext context) {
+    final screens = [
+      DashboardScreen(onTabSwitch: switchToTab),
+      const VehicleEntryScreen(),
+      const VehicleExitScreen(),
+      const ReportsScreen(),
+    ];
+
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
-      ),
+      body: IndexedStack(index: _currentIndex, children: screens),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(
-            top: BorderSide(color: Color(0xFFE0E0E0), width: 0.5),
-          ),
+          border: Border(top: BorderSide(color: Go2Colors.divider, width: 0.5)),
         ),
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
-          onTap: (index) => setState(() => _currentIndex = index),
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: Colors.white,
-          selectedItemColor: Go2Colors.primary,
-          unselectedItemColor: Go2Colors.textHint,
-          elevation: 0,
-          selectedFontSize: 12,
-          unselectedFontSize: 12,
-          items: [
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.home_rounded),
-              label: 'Home',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(
-                Icons.add_circle_rounded,
-                size: 32,
-                color: _currentIndex == 1
-                    ? Go2Colors.primary
-                    : Go2Colors.textHint,
-              ),
-              label: 'Entry',
-            ),
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.exit_to_app_rounded),
-              label: 'Exit',
-            ),
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.bar_chart_rounded),
-              label: 'Reports',
-            ),
+          onTap: switchToTab,
+          items: const [
+            BottomNavigationBarItem(icon: Icon(Icons.home_rounded, size: 22), label: 'Home'),
+            BottomNavigationBarItem(icon: Icon(Icons.add_circle_rounded, size: 28), label: 'Entry'),
+            BottomNavigationBarItem(icon: Icon(Icons.exit_to_app_rounded, size: 22), label: 'Exit'),
+            BottomNavigationBarItem(icon: Icon(Icons.bar_chart_rounded, size: 22), label: 'Reports'),
           ],
         ),
       ),

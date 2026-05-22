@@ -2,42 +2,53 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Go2-Parking — Meadow Green Professional Theme
-/// Fresh, approachable, tier 2/3 India friendly
+/// Go2-Parking — Relate-inspired Design System
+/// Linen canvas #fcfcfc, Signal Blue #145aff accent, Inter font
+/// Quiet, paper-like, professional — blue as highlighter not paint
 
 class Go2Colors {
-  // Brand - Meadow Green
-  static const Color primary = Color(0xFF2E7D32);       // Forest green
-  static const Color primaryLight = Color(0xFF4CAF50);  // Bright green
-  static const Color primaryDark = Color(0xFF1B5E20);   // Deep green
-  
-  // Accent - Warm amber
-  static const Color accent = Color(0xFFF9A825);        // Golden yellow
-  static const Color accentLight = Color(0xFFFDD835);
-  static const Color accentDark = Color(0xFFF57F17);
-
-  // Semantic
-  static const Color success = Color(0xFF43A047);
-  static const Color warning = Color(0xFFFFA726);
-  static const Color warningLight = Color(0xFFFFF8E1);
-  static const Color error = Color(0xFFE53935);
-  static const Color errorLight = Color(0xFFFFEBEE);
-  static const Color info = Color(0xFF1E88E5);
-  static const Color infoLight = Color(0xFFE3F2FD);
-
   // Surfaces
-  static const Color background = Color(0xFFF5F9F5);    // Very light green tint
-  static const Color surface = Color(0xFFFFFFFF);
-  static const Color card = Color(0xFFFFFFFF);
-  static const Color divider = Color(0xFFE0E0E0);
-  static const Color disabled = Color(0xFFBDBDBD);
+  static const Color canvas = Color(0xFFFCFCFC);        // Linen canvas
+  static const Color skyWash = Color(0xFFF0F4FE);       // Subtle blue tint sections
+  static const Color surface = Color(0xFFFFFFFF);       // Card surface
+  static const Color background = Color(0xFFFCFCFC);    // Page background
 
   // Text
-  static const Color textPrimary = Color(0xFF212121);
-  static const Color textSecondary = Color(0xFF616161);
-  static const Color textHint = Color(0xFF9E9E9E);
+  static const Color textPrimary = Color(0xFF020520);   // Midnight ink
+  static const Color textSecondary = Color(0xFF696A72); // Ash
+  static const Color textHint = Color(0xFF95959B);      // Fog
   static const Color textOnPrimary = Color(0xFFFFFFFF);
-  static const Color textOnAccent = Color(0xFF212121);
+
+  // Brand
+  static const Color primary = Color(0xFF145AFF);       // Signal blue
+  static const Color primaryLight = Color(0xFF3B82F6);  // Hero blue
+  static const Color primaryDark = Color(0xFF0F1F3D);   // Primary action accent
+
+  // Accent (used sparingly)
+  static const Color accent = Color(0xFF145AFF);
+  static const Color accentLight = Color(0xFFB6CBFD);   // Periwinkle glow
+  static const Color accentDark = Color(0xFF0F1F3D);
+
+  // Semantic
+  static const Color success = Color(0xFF16CA2E);       // Emerald status
+  static const Color warning = Color(0xFFFFA64D);       // Amber tag
+  static const Color warningLight = Color(0xFFFFF8E1);
+  static const Color error = Color(0xFFF26052);         // Coral alert
+  static const Color errorLight = Color(0xFFFEF2F2);
+  static const Color info = Color(0xFF0099FF);          // Azure info
+  static const Color infoLight = Color(0xFFE3F2FD);
+
+  // Structure
+  static const Color divider = Color(0xFFE5E7EB);
+  static const Color border = Color(0xFFCFCFCF);
+  static const Color disabled = Color(0xFFBDBDBD);
+
+  // Dark mode
+  static const Color darkBg = Color(0xFF0F1219);
+  static const Color darkSurface = Color(0xFF1A1F2E);
+  static const Color darkCard = Color(0xFF232836);
+  static const Color darkText = Color(0xFFF1F5F9);
+  static const Color darkTextSecondary = Color(0xFF94A3B8);
 }
 
 class Go2Spacing {
@@ -51,76 +62,75 @@ class Go2Spacing {
 }
 
 class Go2Radius {
-  static const double sm = 6;
-  static const double md = 10;
-  static const double lg = 14;
-  static const double xl = 18;
-  static const double xxl = 22;
-  static const double full = 999;
+  static const double sm = 4;    // badges
+  static const double md = 8;    // cards
+  static const double lg = 12;   // buttons, inputs
+  static const double xl = 16;   // images
+  static const double xxl = 32;  // modals
+  static const double full = 100; // pills
 }
 
 class Go2Theme {
   static ThemeData light() {
-    final base = ThemeData.light(useMaterial3: true);
-    return base.copyWith(
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: Go2Colors.primary,
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.light,
+      colorScheme: const ColorScheme.light(
         primary: Go2Colors.primary,
-        secondary: Go2Colors.accent,
+        secondary: Go2Colors.primary,
         surface: Go2Colors.surface,
         error: Go2Colors.error,
+        onPrimary: Colors.white,
+        onSurface: Go2Colors.textPrimary,
       ),
-      scaffoldBackgroundColor: Go2Colors.background,
+      scaffoldBackgroundColor: Go2Colors.canvas,
       appBarTheme: AppBarTheme(
-        backgroundColor: Go2Colors.primary,
-        foregroundColor: Colors.white,
+        backgroundColor: Go2Colors.canvas,
+        foregroundColor: Go2Colors.textPrimary,
         elevation: 0,
+        scrolledUnderElevation: 0.5,
         centerTitle: false,
         titleTextStyle: GoogleFonts.inter(
-          fontSize: 17,
+          fontSize: 18,
           fontWeight: FontWeight.w600,
-          color: Colors.white,
+          color: Go2Colors.textPrimary,
+          letterSpacing: -0.3,
         ),
-        systemOverlayStyle: SystemUiOverlayStyle.light,
+        systemOverlayStyle: SystemUiOverlayStyle.dark,
+        surfaceTintColor: Colors.transparent,
       ),
       cardTheme: CardThemeData(
-        color: Go2Colors.card,
-        elevation: 1,
-        shadowColor: Colors.black.withValues(alpha: 0.08),
+        color: Go2Colors.surface,
+        elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(Go2Radius.md),
+          side: const BorderSide(color: Color(0xFFEEEEEE), width: 0.5),
         ),
-        margin: const EdgeInsets.symmetric(vertical: 4),
+        margin: EdgeInsets.zero,
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: Go2Colors.primary,
+          backgroundColor: Go2Colors.primaryDark,
           foregroundColor: Colors.white,
-          elevation: 1,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          minimumSize: const Size(0, 42),
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          minimumSize: const Size(0, 44),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(Go2Radius.sm),
+            borderRadius: BorderRadius.circular(Go2Radius.lg),
           ),
-          textStyle: GoogleFonts.inter(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
+          textStyle: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w500),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: Go2Colors.primary,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          minimumSize: const Size(0, 42),
-          side: const BorderSide(color: Go2Colors.primary, width: 1.2),
+          foregroundColor: Go2Colors.primaryDark,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          minimumSize: const Size(0, 44),
+          side: const BorderSide(color: Go2Colors.primaryDark, width: 1),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(Go2Radius.sm),
+            borderRadius: BorderRadius.circular(Go2Radius.lg),
           ),
-          textStyle: GoogleFonts.inter(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
+          textStyle: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w500),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -128,81 +138,133 @@ class Go2Theme {
           foregroundColor: Go2Colors.primary,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           minimumSize: const Size(0, 36),
-          textStyle: GoogleFonts.inter(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          ),
+          textStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500),
         ),
       ),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: Go2Colors.primary,
         foregroundColor: Colors.white,
-        elevation: 3,
+        elevation: 2,
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        fillColor: Go2Colors.surface,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(Go2Radius.sm),
-          borderSide: const BorderSide(color: Go2Colors.divider),
+          borderRadius: BorderRadius.circular(Go2Radius.lg),
+          borderSide: const BorderSide(color: Go2Colors.border),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(Go2Radius.sm),
-          borderSide: const BorderSide(color: Go2Colors.divider),
+          borderRadius: BorderRadius.circular(Go2Radius.lg),
+          borderSide: const BorderSide(color: Go2Colors.border),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(Go2Radius.sm),
+          borderRadius: BorderRadius.circular(Go2Radius.lg),
           borderSide: const BorderSide(color: Go2Colors.primary, width: 1.5),
         ),
         hintStyle: GoogleFonts.inter(color: Go2Colors.textHint, fontSize: 14),
         labelStyle: GoogleFonts.inter(color: Go2Colors.textSecondary, fontSize: 14),
       ),
-      textTheme: GoogleFonts.interTextTheme(base.textTheme).copyWith(
-        displaySmall: GoogleFonts.inter(fontSize: 24, fontWeight: FontWeight.w700, color: Go2Colors.textPrimary),
-        headlineMedium: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w700, color: Go2Colors.textPrimary),
-        titleLarge: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w600, color: Go2Colors.textPrimary),
-        titleMedium: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600, color: Go2Colors.textPrimary),
-        bodyLarge: GoogleFonts.inter(fontSize: 15, color: Go2Colors.textPrimary),
-        bodyMedium: GoogleFonts.inter(fontSize: 13, color: Go2Colors.textSecondary),
-        bodySmall: GoogleFonts.inter(fontSize: 12, color: Go2Colors.textHint),
-        labelSmall: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w500, color: Go2Colors.textHint),
+      textTheme: TextTheme(
+        displaySmall: GoogleFonts.inter(fontSize: 28, fontWeight: FontWeight.w600, color: Go2Colors.textPrimary, letterSpacing: -0.76),
+        headlineMedium: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w600, color: Go2Colors.textPrimary, letterSpacing: -0.22),
+        titleLarge: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w600, color: Go2Colors.textPrimary, letterSpacing: -0.16),
+        titleMedium: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w500, color: Go2Colors.textPrimary),
+        bodyLarge: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w400, color: Go2Colors.textPrimary),
+        bodyMedium: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w400, color: Go2Colors.textSecondary),
+        bodySmall: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w400, color: Go2Colors.textHint),
+        labelSmall: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w500, color: Go2Colors.textHint, letterSpacing: 0.13),
       ),
-      dividerTheme: const DividerThemeData(color: Go2Colors.divider, thickness: 0.8),
+      dividerTheme: const DividerThemeData(color: Go2Colors.divider, thickness: 0.5),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-        backgroundColor: Colors.white,
+        backgroundColor: Go2Colors.surface,
         selectedItemColor: Go2Colors.primary,
         unselectedItemColor: Go2Colors.textHint,
+        elevation: 0,
+        type: BottomNavigationBarType.fixed,
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Go2Radius.sm)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Go2Radius.md)),
+        backgroundColor: Go2Colors.primaryDark,
       ),
     );
   }
 
   static ThemeData dark() {
-    final base = ThemeData.dark(useMaterial3: true);
-    return base.copyWith(
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: Go2Colors.primaryLight,
-        brightness: Brightness.dark,
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      colorScheme: const ColorScheme.dark(
         primary: Go2Colors.primaryLight,
-        secondary: Go2Colors.accent,
+        secondary: Go2Colors.primaryLight,
+        surface: Go2Colors.darkSurface,
+        error: Go2Colors.error,
+        onPrimary: Colors.white,
+        onSurface: Go2Colors.darkText,
       ),
-      scaffoldBackgroundColor: const Color(0xFF1A1A1A),
+      scaffoldBackgroundColor: Go2Colors.darkBg,
       appBarTheme: AppBarTheme(
-        backgroundColor: const Color(0xFF222222),
-        foregroundColor: Colors.white,
+        backgroundColor: Go2Colors.darkBg,
+        foregroundColor: Go2Colors.darkText,
         elevation: 0,
-        titleTextStyle: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w600, color: Colors.white),
+        titleTextStyle: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w600, color: Go2Colors.darkText, letterSpacing: -0.3),
+        systemOverlayStyle: SystemUiOverlayStyle.light,
       ),
       cardTheme: CardThemeData(
-        color: const Color(0xFF2A2A2A),
+        color: Go2Colors.darkCard,
         elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Go2Radius.md)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(Go2Radius.md),
+          side: const BorderSide(color: Color(0xFF2D3348), width: 0.5),
+        ),
       ),
-      textTheme: GoogleFonts.interTextTheme(base.textTheme),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Go2Colors.primaryLight,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          minimumSize: const Size(0, 44),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Go2Radius.lg)),
+          textStyle: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w500),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: Go2Colors.darkSurface,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(Go2Radius.lg),
+          borderSide: const BorderSide(color: Color(0xFF2D3348)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(Go2Radius.lg),
+          borderSide: const BorderSide(color: Color(0xFF2D3348)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(Go2Radius.lg),
+          borderSide: const BorderSide(color: Go2Colors.primaryLight, width: 1.5),
+        ),
+        hintStyle: GoogleFonts.inter(color: Go2Colors.darkTextSecondary, fontSize: 14),
+      ),
+      textTheme: TextTheme(
+        displaySmall: GoogleFonts.inter(fontSize: 28, fontWeight: FontWeight.w600, color: Go2Colors.darkText, letterSpacing: -0.76),
+        headlineMedium: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w600, color: Go2Colors.darkText, letterSpacing: -0.22),
+        titleLarge: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w600, color: Go2Colors.darkText, letterSpacing: -0.16),
+        titleMedium: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w500, color: Go2Colors.darkText),
+        bodyLarge: GoogleFonts.inter(fontSize: 15, color: Go2Colors.darkText),
+        bodyMedium: GoogleFonts.inter(fontSize: 14, color: Go2Colors.darkTextSecondary),
+        bodySmall: GoogleFonts.inter(fontSize: 12, color: Go2Colors.darkTextSecondary),
+        labelSmall: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w500, color: Go2Colors.darkTextSecondary),
+      ),
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        backgroundColor: Go2Colors.darkSurface,
+        selectedItemColor: Go2Colors.primaryLight,
+        unselectedItemColor: Go2Colors.darkTextSecondary,
+        elevation: 0,
+      ),
+      dividerTheme: const DividerThemeData(color: Color(0xFF2D3348), thickness: 0.5),
     );
   }
 }
