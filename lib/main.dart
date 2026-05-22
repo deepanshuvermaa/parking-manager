@@ -51,7 +51,18 @@ class Go2ParkingApp extends StatelessWidget {
             debugShowCheckedModeBanner: false,
             theme: Go2Theme.light(),
             darkTheme: Go2Theme.dark(),
-            themeMode: ThemeMode.light, // Force light mode
+            themeMode: ThemeMode.light,
+            builder: (context, child) {
+              // Ensure bottom system nav never overlaps content
+              final bottomPadding = MediaQuery.of(context).viewPadding.bottom;
+              return MediaQuery(
+                data: MediaQuery.of(context),
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: bottomPadding),
+                  child: child,
+                ),
+              );
+            },
             initialRoute: '/',
             routes: {
               '/': (context) => const SplashScreen(),
@@ -96,6 +107,7 @@ class MainNavScreenState extends State<MainNavScreen> {
       body: IndexedStack(index: _currentIndex, children: screens),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
+          color: Go2Colors.surface,
           border: Border(top: BorderSide(color: Go2Colors.divider, width: 0.5)),
         ),
         child: BottomNavigationBar(

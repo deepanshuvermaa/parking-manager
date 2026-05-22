@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/parking_provider.dart';
 import '../services/simple_bluetooth_service.dart';
+import '../services/simple_vehicle_service.dart';
 import '../services/platform_printer_service.dart';
 import '../models/simple_vehicle.dart';
 import '../theme/app_theme.dart';
@@ -40,7 +42,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             const Text('Go2-Parking'),
             if (auth.parkingName.isNotEmpty)
-              Text(auth.parkingName, style: TextStyle(fontSize: 11, color: Go2Colors.textHint)),
+              Text(auth.parkingName, style: const TextStyle(fontSize: 11, color: Colors.white70)),
           ],
         ),
         actions: [
@@ -49,19 +51,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
               margin: const EdgeInsets.only(right: 8),
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: Go2Colors.warning.withValues(alpha: 0.1),
+                color: Colors.white.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(Go2Radius.full),
               ),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.cloud_off_rounded, size: 12, color: Go2Colors.warning),
-                const SizedBox(width: 4),
-                Text('Offline', style: TextStyle(fontSize: 10, color: Go2Colors.warning, fontWeight: FontWeight.w500)),
+              child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.cloud_off_rounded, size: 12, color: Colors.white70),
+                SizedBox(width: 4),
+                Text('Offline', style: TextStyle(fontSize: 10, color: Colors.white70, fontWeight: FontWeight.w500)),
               ]),
             ),
           FutureBuilder<bool>(
             future: PlatformPrinterService.isConnected(),
             builder: (_, snap) => snap.data == true
-                ? const Padding(padding: EdgeInsets.only(right: 8), child: Icon(Icons.print_rounded, size: 18, color: Go2Colors.success))
+                ? const Padding(padding: EdgeInsets.only(right: 8), child: Icon(Icons.print_rounded, size: 18, color: Colors.white70))
                 : const SizedBox.shrink(),
           ),
           IconButton(icon: const Icon(Icons.settings_outlined, size: 20), onPressed: () => Navigator.pushNamed(context, '/settings')),
@@ -211,9 +213,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ]),
           const SizedBox(height: 20),
           SizedBox(width: double.infinity, child: ElevatedButton(
-            onPressed: () { Navigator.pop(ctx); widget.onTabSwitch?.call(2); },
-            child: const Text('Process Exit'),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final token = context.read<AuthProvider>().token ?? '';
+              await SimpleVehicleService.exitVehicle(token: token, vehicleId: v.id, amount: amount);
+              if (mounted) {
+                context.read<ParkingProvider>().recordExit(amount);
+                HapticFeedback.mediumImpact();
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text('✓ ${v.vehicleNumber} exited • ₹${amount.toStringAsFixed(0)}'),
+                  backgroundColor: Go2Colors.success,
+                ));
+                _loadData();
+              }
+            },
+            child: const Text('Confirm Exit'),
           )),
+          const SizedBox(height: 12),
         ]),
       ),
     );
