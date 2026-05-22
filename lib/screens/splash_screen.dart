@@ -43,7 +43,7 @@ class _SplashScreenState extends State<SplashScreen>
     if (!mounted) return;
 
     if (auth.status == AuthStatus.authenticated) {
-      Navigator.pushReplacementNamed(context, '/dashboard');
+      Navigator.pushReplacementNamed(context, '/home');
     } else {
       Navigator.pushReplacementNamed(context, '/login');
     }

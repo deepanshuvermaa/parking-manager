@@ -37,7 +37,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
 
     if (result == null) {
-      Navigator.pushReplacementNamed(context, '/dashboard');
+      Navigator.pushReplacementNamed(context, '/home');
     } else if (result == 'DEVICE_LIMIT') {
       _showDeviceLimitDialog();
     } else {
@@ -49,7 +49,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final auth = context.read<AuthProvider>();
     await auth.loginOffline();
     if (mounted) {
-      Navigator.pushReplacementNamed(context, '/dashboard');
+      Navigator.pushReplacementNamed(context, '/home');
     }
   }
 
@@ -159,7 +159,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     );
                     if (!mounted) return;
                     if (result == null) {
-                      Navigator.pushReplacementNamed(context, '/dashboard');
+                      Navigator.pushReplacementNamed(context, '/home');
                     } else {
                       setState(() => _error = result);
                     }
@@ -255,17 +255,16 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: Go2Spacing.xl),
                     ],
 
-                    // Email
+                    // Username
                     TextFormField(
                       controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
                       decoration: const InputDecoration(
-                        labelText: 'Email',
-                        prefixIcon: Icon(Icons.email_outlined),
+                        labelText: 'Username',
+                        prefixIcon: Icon(Icons.person_outline),
                       ),
                       validator: (v) =>
-                          v == null || v.isEmpty ? 'Enter your email' : null,
+                          v == null || v.isEmpty ? 'Enter your username' : null,
                     ),
                     const SizedBox(height: Go2Spacing.lg),
 

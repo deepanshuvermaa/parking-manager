@@ -58,7 +58,7 @@ class Go2ParkingApp extends StatelessWidget {
                   padding: MediaQuery.of(context).padding,
                 ),
                 child: SafeArea(
-                  top: false, // AppBar handles top
+                  top: false,
                   bottom: true,
                   child: child ?? const SizedBox.shrink(),
                 ),
@@ -68,11 +68,8 @@ class Go2ParkingApp extends StatelessWidget {
             routes: {
               '/': (context) => const SplashScreen(),
               '/login': (context) => const LoginScreen(),
-              '/dashboard': (context) => const DashboardScreen(),
-              '/entry': (context) => const VehicleEntryScreen(),
-              '/exit': (context) => const VehicleExitScreen(),
+              '/home': (context) => const MainNavScreen(),
               '/slots': (context) => const SlotManagementScreen(),
-              '/reports': (context) => const ReportsScreen(),
               '/subscribe': (context) => const SubscriptionScreen(),
               '/settings': (context) => SimpleSettingsScreen(
                     token: auth.token ?? ''),
@@ -80,6 +77,77 @@ class Go2ParkingApp extends StatelessWidget {
             },
           );
         },
+      ),
+    );
+  }
+}
+
+class MainNavScreen extends StatefulWidget {
+  const MainNavScreen({super.key});
+
+  @override
+  State<MainNavScreen> createState() => _MainNavScreenState();
+}
+
+class _MainNavScreenState extends State<MainNavScreen> {
+  int _currentIndex = 0;
+
+  final List<Widget> _screens = const [
+    DashboardScreen(),
+    VehicleEntryScreen(),
+    VehicleExitScreen(),
+    ReportsScreen(),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _screens,
+      ),
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(
+            top: BorderSide(color: Color(0xFFE0E0E0), width: 0.5),
+          ),
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _currentIndex,
+          onTap: (index) => setState(() => _currentIndex = index),
+          type: BottomNavigationBarType.fixed,
+          backgroundColor: Colors.white,
+          selectedItemColor: Go2Colors.primary,
+          unselectedItemColor: Go2Colors.textHint,
+          elevation: 0,
+          selectedFontSize: 12,
+          unselectedFontSize: 12,
+          items: [
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.home_rounded),
+              label: 'Home',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(
+                Icons.add_circle_rounded,
+                size: 32,
+                color: _currentIndex == 1
+                    ? Go2Colors.primary
+                    : Go2Colors.textHint,
+              ),
+              label: 'Entry',
+            ),
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.exit_to_app_rounded),
+              label: 'Exit',
+            ),
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.bar_chart_rounded),
+              label: 'Reports',
+            ),
+          ],
+        ),
       ),
     );
   }

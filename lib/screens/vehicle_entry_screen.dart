@@ -5,7 +5,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/auth_provider.dart';
 import '../providers/parking_provider.dart';
 import '../services/simple_vehicle_service.dart';
-import '../services/simple_bluetooth_service.dart';
 import '../services/platform_printer_service.dart';
 import '../services/receipt_service.dart';
 import '../theme/app_theme.dart';
@@ -19,7 +18,6 @@ class VehicleEntryScreen extends StatefulWidget {
 
 class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
   final _plateController = TextEditingController();
-  final _plateFocus = FocusNode();
   String _selectedType = 'Car';
   bool _isSubmitting = false;
 
@@ -32,30 +30,22 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
     {'type': 'Bus', 'icon': Icons.directions_bus},
     {'type': 'Truck', 'icon': Icons.local_shipping},
     {'type': 'Auto Rickshaw', 'icon': Icons.electric_rickshaw},
+    {'type': 'E-Rickshaw', 'icon': Icons.electric_rickshaw},
+    {'type': 'Cycle', 'icon': Icons.pedal_bike},
+    {'type': 'E-Cycle', 'icon': Icons.pedal_bike},
+    {'type': 'Tempo', 'icon': Icons.fire_truck},
+    {'type': 'Mini Truck', 'icon': Icons.fire_truck},
   ];
-
-  @override
-  void initState() {
-    super.initState();
-    // Auto-focus plate input for speed
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _plateFocus.requestFocus();
-    });
-  }
 
   @override
   void dispose() {
     _plateController.dispose();
-    _plateFocus.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
     final plate = _plateController.text.trim().toUpperCase();
-    if (plate.isEmpty) {
-      _plateFocus.requestFocus();
-      return;
-    }
+    if (plate.isEmpty) return;
 
     setState(() => _isSubmitting = true);
 
@@ -68,25 +58,35 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
       );
 
       if (vehicle != null && mounted) {
-        // Record in parking provider
         context.read<ParkingProvider>().recordEntry();
+        HapticFeedback.mediumImpact();
 
-        // Auto-print if enabled
         final prefs = await SharedPreferences.getInstance();
         final autoPrint = prefs.getBool('auto_print') ?? true;
         final printerConnected = await PlatformPrinterService.isConnected();
-        if (autoPrint && printerConnected) {
+
+        String message;
+        if (printerConnected && autoPrint) {
           try {
             final receipt = await ReceiptService.generateEntryReceipt(vehicle);
             await PlatformPrinterService.printText(receipt);
           } catch (_) {}
+          message = '✓ $plate parked • Receipt printed';
+        } else {
+          message = '✓ $plate parked • Printer not connected';
         }
 
-        // Haptic feedback for success
-        HapticFeedback.mediumImpact();
-
-        // Show success and offer next action
-        if (mounted) _showSuccess(vehicle.vehicleNumber, vehicle.ticketId ?? '');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(message),
+              backgroundColor: Go2Colors.success,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+          _plateController.clear();
+          setState(() {});
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -99,173 +99,101 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
     }
   }
 
-  void _showSuccess(String plate, String ticketId) {
-    showModalBottomSheet(
-      context: context,
-      isDismissible: false,
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(Go2Spacing.xl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.check_circle_rounded,
-                color: Go2Colors.success, size: 56),
-            const SizedBox(height: Go2Spacing.lg),
-            Text('Vehicle Parked',
-                style: Theme.of(ctx).textTheme.headlineMedium),
-            const SizedBox(height: Go2Spacing.sm),
-            Text(plate,
-                style: const TextStyle(
-                    fontSize: 20, fontWeight: FontWeight.w700)),
-            if (ticketId.isNotEmpty)
-              Text('Ticket: $ticketId',
-                  style: Theme.of(ctx).textTheme.bodySmall),
-            const SizedBox(height: Go2Spacing.xl),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      Navigator.pop(context); // Back to dashboard
-                    },
-                    child: const Text('Done'),
-                  ),
-                ),
-                const SizedBox(width: Go2Spacing.md),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      _resetForNext();
-                    },
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('Next'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: Go2Spacing.lg),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _resetForNext() {
-    _plateController.clear();
-    _plateFocus.requestFocus();
-  }
-
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final parking = context.watch<ParkingProvider>();
+    final rates = SimpleVehicleService.getDefaultRate(_selectedType);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Vehicle Entry'),
-        actions: [
-          if (parking.totalCapacity > 0)
-            Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: parking.isFull
-                        ? Go2Colors.error.withOpacity(0.2)
-                        : Go2Colors.success.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(Go2Radius.full),
-                  ),
-                  child: Text(
-                    '${parking.totalAvailable} slots free',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: parking.isFull ? Go2Colors.error : Go2Colors.success,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('Vehicle Entry')),
       body: Padding(
         padding: const EdgeInsets.all(Go2Spacing.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Vehicle type selector — tap 1
-            Text('Vehicle Type', style: theme.textTheme.titleMedium),
-            const SizedBox(height: Go2Spacing.md),
-            SizedBox(
-              height: 64,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: _vehicleTypes.length,
-                separatorBuilder: (_, __) => const SizedBox(width: Go2Spacing.sm),
-                itemBuilder: (ctx, i) {
-                  final vt = _vehicleTypes[i];
-                  final isSelected = _selectedType == vt['type'];
-                  return GestureDetector(
-                    onTap: () => setState(() => _selectedType = vt['type'] as String),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      width: 62,
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? Go2Colors.primary
-                            : theme.cardTheme.color,
-                        borderRadius: BorderRadius.circular(Go2Radius.md),
-                        border: Border.all(
-                          color: isSelected
-                              ? Go2Colors.primary
-                              : Go2Colors.divider,
-                          width: isSelected ? 2 : 1,
-                        ),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            vt['icon'] as IconData,
-                            color: isSelected ? Colors.white : Go2Colors.textSecondary,
-                            size: 24,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            (vt['type'] as String).length > 6
-                                ? (vt['type'] as String).substring(0, 6)
-                                : vt['type'] as String,
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: isSelected ? Colors.white : Go2Colors.textSecondary,
-                            ),
-                          ),
-                        ],
+            // Vehicle type grid — 2 rows, 4 columns
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4,
+                mainAxisSpacing: Go2Spacing.sm,
+                crossAxisSpacing: Go2Spacing.sm,
+                childAspectRatio: 1.1,
+              ),
+              itemCount: _vehicleTypes.length,
+              itemBuilder: (ctx, i) {
+                final vt = _vehicleTypes[i];
+                final isSelected = _selectedType == vt['type'];
+                return GestureDetector(
+                  onTap: () => setState(() => _selectedType = vt['type'] as String),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: isSelected ? Go2Colors.success : Go2Colors.surface,
+                      borderRadius: BorderRadius.circular(Go2Radius.md),
+                      border: Border.all(
+                        color: isSelected ? Go2Colors.success : Go2Colors.divider,
                       ),
                     ),
-                  );
-                },
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          vt['icon'] as IconData,
+                          color: isSelected ? Colors.white : Go2Colors.textSecondary,
+                          size: 22,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          vt['type'] as String,
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w600,
+                            color: isSelected ? Colors.white : Go2Colors.textSecondary,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+
+            const SizedBox(height: Go2Spacing.md),
+
+            // Rate chip
+            Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Go2Colors.primaryLight.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(Go2Radius.full),
+                ),
+                child: Text(
+                  '₹${rates['hourly']?.toStringAsFixed(0)}/hr • Min ₹${rates['minimum']?.toStringAsFixed(0)}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Go2Colors.primary,
+                  ),
+                ),
               ),
             ),
+
             const SizedBox(height: Go2Spacing.xl),
 
-            // Plate number — tap 2
-            Text('Number Plate', style: theme.textTheme.titleMedium),
-            const SizedBox(height: Go2Spacing.md),
+            // Plate number input
             TextFormField(
               controller: _plateController,
-              focusNode: _plateFocus,
               textCapitalization: TextCapitalization.characters,
               style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 1.5,
               ),
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 hintText: 'MH 12 AB 1234',
                 hintStyle: TextStyle(
                   fontSize: 18,
@@ -273,16 +201,7 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
                   color: Go2Colors.textHint,
                   letterSpacing: 1.5,
                 ),
-                prefixIcon: const Icon(Icons.pin_outlined),
-                suffixIcon: _plateController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _plateController.clear();
-                          setState(() {});
-                        },
-                      )
-                    : null,
+                prefixIcon: Icon(Icons.pin_outlined),
               ),
               inputFormatters: [
                 UpperCaseTextFormatter(),
@@ -291,35 +210,34 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
               onChanged: (_) => setState(() {}),
               onFieldSubmitted: (_) => _submit(),
             ),
-            const Spacer(),
 
-            // Submit — tap 3
+            const SizedBox(height: Go2Spacing.xl),
+
+            // Park Vehicle button
             SizedBox(
               height: 46,
-              child: ElevatedButton.icon(
+              child: ElevatedButton(
                 onPressed: _isSubmitting || _plateController.text.trim().isEmpty
                     ? null
                     : _submit,
-                icon: _isSubmitting
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Icon(Icons.check_rounded, size: 24),
-                label: Text(
-                  _isSubmitting ? 'Saving...' : 'Park Vehicle',
-                  style: const TextStyle(fontSize: 18),
-                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Go2Colors.success,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(Go2Radius.md)),
+                    borderRadius: BorderRadius.circular(Go2Radius.md),
+                  ),
                 ),
+                child: _isSubmitting
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text(
+                        'Park Vehicle',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                      ),
               ),
             ),
-            const SizedBox(height: Go2Spacing.lg),
           ],
         ),
       ),
@@ -327,7 +245,6 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
   }
 }
 
-/// Formats text to uppercase
 class UpperCaseTextFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
