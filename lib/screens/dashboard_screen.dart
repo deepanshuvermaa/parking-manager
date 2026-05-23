@@ -3,9 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/parking_provider.dart';
-import '../services/simple_bluetooth_service.dart';
 import '../services/simple_vehicle_service.dart';
 import '../services/platform_printer_service.dart';
+import '../services/receipt_service.dart';
 import '../models/simple_vehicle.dart';
 import '../theme/app_theme.dart';
 
@@ -215,24 +215,55 @@ class _DashboardScreenState extends State<DashboardScreen> {
           SizedBox(width: double.infinity, child: ElevatedButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              final token = context.read<AuthProvider>().token ?? '';
-              await SimpleVehicleService.exitVehicle(token: token, vehicleId: v.id, amount: amount);
-              if (mounted) {
-                context.read<ParkingProvider>().recordExit(amount);
-                HapticFeedback.mediumImpact();
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text('✓ ${v.vehicleNumber} exited • ₹${amount.toStringAsFixed(0)}'),
-                  backgroundColor: Go2Colors.success,
-                ));
-                _loadData();
-              }
+              // Show confirmation before exit
+              _confirmAndExit(v, amount);
             },
-            child: const Text('Confirm Exit'),
+            child: const Text('Process Exit'),
           )),
           const SizedBox(height: 12),
         ]),
       ),
     );
+  }
+
+  Future<void> _confirmAndExit(SimpleVehicle v, double amount) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Exit ${v.vehicleNumber}?'),
+        content: Text('Duration: ${DateTime.now().difference(v.entryTime).inHours}h ${DateTime.now().difference(v.entryTime).inMinutes.remainder(60)}m\nAmount: ₹${amount.toStringAsFixed(0)}\n\nReceipt will be printed automatically.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Confirm & Print')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final token = context.read<AuthProvider>().token ?? '';
+    await SimpleVehicleService.exitVehicle(token: token, vehicleId: v.id, amount: amount);
+    if (!mounted) return;
+
+    context.read<ParkingProvider>().recordExit(amount);
+    HapticFeedback.mediumImpact();
+
+    // Print exit receipt
+    final connected = await PlatformPrinterService.isConnected();
+    if (connected) {
+      v.exitTime = DateTime.now();
+      v.amount = amount;
+      final duration = v.exitTime!.difference(v.entryTime);
+      final receipt = await ReceiptService.generateExitReceipt(v, amount, duration);
+      await PlatformPrinterService.printText(receipt);
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('✓ ${v.vehicleNumber} exited • ₹${amount.toStringAsFixed(0)}${connected ? ' • Printed' : ''}'),
+        backgroundColor: Go2Colors.success,
+      ));
+      _loadData();
+    }
   }
 
   String _formatTime(DateTime dt) => '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';

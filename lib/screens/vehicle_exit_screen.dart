@@ -166,18 +166,18 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
               },
             ),
 
-            // Exit button
+            // Exit button + Print
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: () => _processExit(ctx, vehicle, amount),
                 icon: const Icon(Icons.check_circle_rounded, size: 18),
-                label: const Text('Confirm Exit'),
+                label: const Text('Confirm Exit & Print'),
               ),
             ),
             const SizedBox(height: Go2Spacing.sm),
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-            const SizedBox(height: Go2Spacing.md),
+            const SizedBox(height: Go2Spacing.lg),
           ],
         ),
       ),
@@ -200,10 +200,9 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
         context.read<ParkingProvider>().recordExit(amount);
         HapticFeedback.mediumImpact();
 
-        // Auto-print exit receipt
-        final prefs = await SharedPreferences.getInstance();
-        final autoPrint = prefs.getBool('auto_print_exit') ?? true;
-        if (autoPrint && SimpleBluetoothService.isConnected) {
+        // Auto-print exit receipt using global printer
+        final printerConnected = await PlatformPrinterService.isConnected();
+        if (printerConnected) {
           try {
             vehicle.exitTime = DateTime.now();
             vehicle.amount = amount;
@@ -216,7 +215,7 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-                '${vehicle.vehicleNumber} exited • ₹${amount.toStringAsFixed(0)}'),
+                '✓ ${vehicle.vehicleNumber} exited • ₹${amount.toStringAsFixed(0)}${printerConnected ? ' • Receipt printed' : ''}'),
             backgroundColor: Go2Colors.success,
           ),
         );
