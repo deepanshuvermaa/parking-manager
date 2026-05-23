@@ -18,185 +18,173 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
   final _nameCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
-  bool _is3Inch = false;
-  bool _autoPrint = false;
+  final _gstCtrl = TextEditingController();
+  final _upiCtrl = TextEditingController();
+  bool _autoPrint = true;
+  bool _autoPrintExit = true;
+  bool _showQr = true;
+  int _paperWidth = 32;
+  bool _saved = false;
 
   @override
   void initState() {
     super.initState();
-    _loadPrefs();
+    _load();
   }
 
-  Future<void> _loadPrefs() async {
-    final prefs = await SharedPreferences.getInstance();
+  Future<void> _load() async {
+    final p = await SharedPreferences.getInstance();
     setState(() {
-      _nameCtrl.text = prefs.getString('business_name') ?? '';
-      _addressCtrl.text = prefs.getString('business_address') ?? '';
-      _phoneCtrl.text = prefs.getString('business_phone') ?? '';
-      _is3Inch = prefs.getBool('paper_3inch') ?? false;
-      _autoPrint = prefs.getBool('auto_print') ?? false;
+      _nameCtrl.text = p.getString('business_name') ?? '';
+      _addressCtrl.text = p.getString('business_address') ?? '';
+      _phoneCtrl.text = p.getString('business_phone') ?? '';
+      _gstCtrl.text = p.getString('gst_number') ?? '';
+      _upiCtrl.text = p.getString('upi_vpa') ?? '';
+      _autoPrint = p.getBool('auto_print') ?? true;
+      _autoPrintExit = p.getBool('auto_print_exit') ?? true;
+      _showQr = p.getBool('bill_show_qr_code') ?? true;
+      _paperWidth = p.getInt('paper_width') ?? 32;
     });
   }
 
-  Future<void> _saveField(String key, String value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(key, value);
-  }
-
-  Future<void> _saveBool(String key, bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(key, value);
-  }
-
-  Widget _sectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4, top: Go2Spacing.xl, bottom: 6),
-      child: Text(
-        title.toUpperCase(),
-        style: const TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
-          color: Go2Colors.textHint,
-          letterSpacing: 0.5,
-        ),
-      ),
-    );
-  }
-
-  Widget _card(List<Widget> children) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Go2Colors.surface,
-        border: Border.all(color: Go2Colors.divider, width: 0.5),
-        borderRadius: BorderRadius.circular(Go2Radius.md),
-      ),
-      child: Column(children: children),
-    );
-  }
-
-  Widget _field(String label, TextEditingController ctrl, String prefKey) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: TextFormField(
-        controller: ctrl,
-        onEditingComplete: () => _saveField(prefKey, ctrl.text),
-        decoration: InputDecoration(
-          labelText: label,
-          isDense: true,
-          border: const OutlineInputBorder(),
-        ),
-      ),
-    );
-  }
-
-  Widget _navTile(String title, IconData icon, VoidCallback onTap) {
-    return ListTile(
-      dense: true,
-      leading: Icon(icon, size: 20, color: Go2Colors.textSecondary),
-      title: Text(title, style: const TextStyle(color: Go2Colors.textPrimary)),
-      trailing: const Icon(Icons.chevron_right, size: 20, color: Go2Colors.textHint),
-      onTap: onTap,
-    );
+  Future<void> _save() async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString('business_name', _nameCtrl.text.trim());
+    await p.setString('business_address', _addressCtrl.text.trim());
+    await p.setString('business_phone', _phoneCtrl.text.trim());
+    await p.setString('gst_number', _gstCtrl.text.trim());
+    await p.setString('upi_vpa', _upiCtrl.text.trim());
+    await p.setBool('auto_print', _autoPrint);
+    await p.setBool('auto_print_exit', _autoPrintExit);
+    await p.setBool('bill_show_qr_code', _showQr);
+    await p.setInt('paper_width', _paperWidth);
+    setState(() => _saved = true);
+    Future.delayed(const Duration(seconds: 2), () { if (mounted) setState(() => _saved = false); });
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✓ Settings saved'), backgroundColor: Go2Colors.success, duration: Duration(seconds: 1)));
   }
 
   @override
   Widget build(BuildContext context) {
     final auth = context.read<AuthProvider>();
     return Scaffold(
-      backgroundColor: Go2Colors.canvas,
-      appBar: AppBar(title: const Text('Settings'), backgroundColor: Go2Colors.surface),
+      appBar: AppBar(
+        title: const Text('Settings'),
+        actions: [
+          TextButton.icon(
+            onPressed: _save,
+            icon: Icon(_saved ? Icons.check : Icons.save_rounded, size: 18, color: _saved ? Go2Colors.success : Go2Colors.primary),
+            label: Text(_saved ? 'Saved' : 'Save', style: TextStyle(color: _saved ? Go2Colors.success : Go2Colors.primary)),
+          ),
+        ],
+      ),
       body: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: Go2Spacing.lg),
+        padding: const EdgeInsets.all(16),
         children: [
           // Business Info
-          _sectionTitle('Business Info'),
+          _section('Business Info'),
           _card([
-            const SizedBox(height: 8),
-            _field('Business Name', _nameCtrl, 'business_name'),
-            _field('Address', _addressCtrl, 'business_address'),
-            _field('Phone', _phoneCtrl, 'business_phone'),
-            const SizedBox(height: 8),
+            _input('Business Name', _nameCtrl, Icons.store_rounded),
+            _input('Address', _addressCtrl, Icons.location_on_outlined),
+            _input('Phone', _phoneCtrl, Icons.phone_outlined, keyboard: TextInputType.phone),
+            _input('GST Number', _gstCtrl, Icons.receipt_outlined),
+            _input('UPI ID (for QR payments)', _upiCtrl, Icons.qr_code_rounded),
           ]),
 
-          // Parking Rates
-          _sectionTitle('Parking Rates'),
-          _card([
-            _navTile('Manage Vehicle Rates', Icons.two_wheeler, () {
-              Navigator.push(context, MaterialPageRoute(
-                builder: (_) => const VehicleRatesManagementScreen(),
-              ));
-            }),
-          ]),
-
-          // Receipt Settings
-          _sectionTitle('Receipt Settings'),
+          // Printing
+          _section('Printing'),
           _card([
             SwitchListTile(
-              dense: true,
-              activeColor: Go2Colors.primary,
-              title: const Text('3-inch Paper', style: TextStyle(color: Go2Colors.textPrimary)),
-              subtitle: Text(_is3Inch ? '3-inch' : '2-inch', style: const TextStyle(color: Go2Colors.textSecondary)),
-              value: _is3Inch,
-              onChanged: (v) {
-                setState(() => _is3Inch = v);
-                _saveBool('paper_3inch', v);
-              },
-            ),
-            SwitchListTile(
-              dense: true,
-              activeColor: Go2Colors.primary,
-              title: const Text('Auto Print', style: TextStyle(color: Go2Colors.textPrimary)),
+              dense: true, activeColor: Go2Colors.primary,
+              title: const Text('Auto-print on Entry'),
+              subtitle: const Text('Print receipt when vehicle is parked'),
               value: _autoPrint,
-              onChanged: (v) {
-                setState(() => _autoPrint = v);
-                _saveBool('auto_print', v);
-              },
+              onChanged: (v) => setState(() => _autoPrint = v),
             ),
-            _navTile('Customize Receipt', Icons.receipt_long, () {
-              Navigator.push(context, MaterialPageRoute(
-                builder: (_) => const ReceiptCustomizationScreen(),
-              ));
-            }),
+            const Divider(height: 1),
+            SwitchListTile(
+              dense: true, activeColor: Go2Colors.primary,
+              title: const Text('Auto-print on Exit'),
+              subtitle: const Text('Print receipt when vehicle exits'),
+              value: _autoPrintExit,
+              onChanged: (v) => setState(() => _autoPrintExit = v),
+            ),
+            const Divider(height: 1),
+            SwitchListTile(
+              dense: true, activeColor: Go2Colors.primary,
+              title: const Text('Show QR/Ticket on Receipt'),
+              subtitle: const Text('Ticket ID for scanning at exit'),
+              value: _showQr,
+              onChanged: (v) => setState(() => _showQr = v),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              dense: true,
+              title: const Text('Paper Width'),
+              subtitle: Text(_paperWidth == 32 ? '2-inch (58mm)' : '3-inch (80mm)'),
+              trailing: SegmentedButton<int>(
+                segments: const [
+                  ButtonSegment(value: 32, label: Text('2"', style: TextStyle(fontSize: 12))),
+                  ButtonSegment(value: 48, label: Text('3"', style: TextStyle(fontSize: 12))),
+                ],
+                selected: {_paperWidth},
+                onSelectionChanged: (v) => setState(() => _paperWidth = v.first),
+                style: const ButtonStyle(visualDensity: VisualDensity.compact),
+              ),
+            ),
+            const Divider(height: 1),
+            _nav('Printer Connection', Icons.print_rounded, () => Navigator.pushNamed(context, '/printer')),
+            _nav('Customize Receipt', Icons.receipt_long_rounded, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReceiptCustomizationScreen()))),
           ]),
 
-          // Printer
-          _sectionTitle('Printer'),
+          // Rates
+          _section('Vehicle Rates'),
           _card([
-            _navTile('Printer Settings', Icons.print, () {
-              Navigator.pushNamed(context, '/printer');
-            }),
+            _nav('Manage Rates', Icons.currency_rupee_rounded, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VehicleRatesManagementScreen()))),
           ]),
 
           // Account
-          _sectionTitle('Account'),
+          _section('Account'),
           _card([
             ListTile(
               dense: true,
-              leading: const Icon(Icons.person, size: 20, color: Go2Colors.textSecondary),
-              title: Text(auth.userName.isNotEmpty ? auth.userName : 'User', style: const TextStyle(color: Go2Colors.textPrimary)),
-              subtitle: Text(auth.userRole, style: const TextStyle(color: Go2Colors.textSecondary)),
+              leading: const Icon(Icons.person_rounded, size: 20),
+              title: Text(auth.userName.isNotEmpty ? auth.userName : 'Admin'),
+              subtitle: Text('${auth.userRole} • ${auth.userEmail}'),
             ),
+            const Divider(height: 1),
             ListTile(
               dense: true,
-              leading: const Icon(Icons.logout, size: 20, color: Go2Colors.error),
+              leading: const Icon(Icons.logout_rounded, size: 20, color: Go2Colors.error),
               title: const Text('Logout', style: TextStyle(color: Go2Colors.error)),
-              onTap: () {
-                auth.logout();
-                Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
-              },
+              onTap: () { auth.logout(); Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false); },
             ),
           ]),
-          const SizedBox(height: 80), // Extra space so logout isn't hidden behind system nav
+          const SizedBox(height: 80),
         ],
       ),
     );
   }
 
+  Widget _section(String t) => Padding(
+    padding: const EdgeInsets.only(top: 20, bottom: 8, left: 4),
+    child: Text(t.toUpperCase(), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Go2Colors.textHint, letterSpacing: 0.8)),
+  );
+
+  Widget _card(List<Widget> children) => Container(
+    decoration: BoxDecoration(color: Go2Colors.surface, borderRadius: BorderRadius.circular(10), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))]),
+    child: Column(children: children),
+  );
+
+  Widget _input(String label, TextEditingController ctrl, IconData icon, {TextInputType? keyboard}) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+    child: TextField(controller: ctrl, keyboardType: keyboard, decoration: InputDecoration(labelText: label, prefixIcon: Icon(icon, size: 18), isDense: true, border: InputBorder.none, enabledBorder: InputBorder.none, focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Go2Colors.primary.withValues(alpha: 0.3))))),
+  );
+
+  Widget _nav(String title, IconData icon, VoidCallback onTap) => ListTile(
+    dense: true, leading: Icon(icon, size: 20, color: Go2Colors.primary),
+    title: Text(title), trailing: const Icon(Icons.chevron_right_rounded, size: 18, color: Go2Colors.textHint), onTap: onTap,
+  );
+
   @override
-  void dispose() {
-    _nameCtrl.dispose();
-    _addressCtrl.dispose();
-    _phoneCtrl.dispose();
-    super.dispose();
-  }
+  void dispose() { _nameCtrl.dispose(); _addressCtrl.dispose(); _phoneCtrl.dispose(); _gstCtrl.dispose(); _upiCtrl.dispose(); super.dispose(); }
 }

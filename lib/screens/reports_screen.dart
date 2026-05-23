@@ -3,6 +3,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/simple_vehicle_service.dart';
+import '../services/platform_printer_service.dart';
 import '../models/simple_vehicle.dart';
 import '../theme/app_theme.dart';
 
@@ -39,6 +40,40 @@ class _ReportsScreenState extends State<ReportsScreen>
       _vehicles = await SimpleVehicleService.getVehicles(token);
     } catch (_) {}
     if (mounted) setState(() => _isLoading = false);
+  }
+
+  Future<void> _printReport() async {
+    final period = ['Today', 'This Week', 'This Month'][_tabController.index];
+    final vehicles = [_getExitedToday(), _getExitedThisWeek(), _getExitedThisMonth()][_tabController.index];
+    final revenue = vehicles.fold<double>(0, (sum, v) => sum + (v.amount ?? 0));
+    final count = vehicles.length;
+
+    final report = StringBuffer();
+    report.writeln('================================');
+    report.writeln('       PARKING REPORT');
+    report.writeln('================================');
+    report.writeln('Period: $period');
+    report.writeln('Date: ${DateTime.now().toString().substring(0, 16)}');
+    report.writeln('--------------------------------');
+    report.writeln('Total Vehicles: $count');
+    report.writeln('Total Revenue: Rs. ${revenue.toStringAsFixed(0)}');
+    report.writeln('--------------------------------');
+    if (vehicles.isNotEmpty) {
+      report.writeln('Breakdown:');
+      final types = <String, int>{};
+      for (final v in vehicles) { types[v.vehicleType] = (types[v.vehicleType] ?? 0) + 1; }
+      types.forEach((type, c) => report.writeln('  $type: $c'));
+    }
+    report.writeln('================================');
+    report.writeln('');
+
+    final connected = await PlatformPrinterService.isConnected();
+    if (connected) {
+      await PlatformPrinterService.printText(report.toString());
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✓ Report printed'), backgroundColor: Go2Colors.success));
+    } else {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Printer not connected'), backgroundColor: Go2Colors.error));
+    }
   }
 
   // Helpers
@@ -108,6 +143,13 @@ class _ReportsScreenState extends State<ReportsScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Reports'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.print_rounded, size: 20),
+            tooltip: 'Print Report',
+            onPressed: _printReport,
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: Go2Colors.primary,
