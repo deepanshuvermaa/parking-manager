@@ -98,7 +98,7 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
               title: const Text('Auto-print on Entry'),
               subtitle: const Text('Print receipt when vehicle is parked'),
               value: _autoPrint,
-              onChanged: (v) => setState(() => _autoPrint = v),
+              onChanged: (v) { setState(() => _autoPrint = v); _save(); },
             ),
             const Divider(height: 1),
             SwitchListTile(
@@ -106,7 +106,7 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
               title: const Text('Auto-print on Exit'),
               subtitle: const Text('Print receipt when vehicle exits'),
               value: _autoPrintExit,
-              onChanged: (v) => setState(() => _autoPrintExit = v),
+              onChanged: (v) { setState(() => _autoPrintExit = v); _save(); },
             ),
             const Divider(height: 1),
             SwitchListTile(
@@ -114,7 +114,7 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
               title: const Text('Show QR/Ticket on Receipt'),
               subtitle: const Text('Ticket ID for scanning at exit'),
               value: _showQr,
-              onChanged: (v) => setState(() => _showQr = v),
+              onChanged: (v) { setState(() => _showQr = v); _save(); },
             ),
             const Divider(height: 1),
             ListTile(
@@ -127,7 +127,7 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
                   ButtonSegment(value: 48, label: Text('3"', style: TextStyle(fontSize: 12))),
                 ],
                 selected: {_paperWidth},
-                onSelectionChanged: (v) => setState(() => _paperWidth = v.first),
+                onSelectionChanged: (v) { setState(() => _paperWidth = v.first); _save(); },
                 style: const ButtonStyle(visualDensity: VisualDensity.compact),
               ),
             ),
@@ -159,6 +159,18 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
               onTap: () { auth.logout(); Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false); },
             ),
           ]),
+          const SizedBox(height: 24),
+
+          // Save button - prominent
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              onPressed: _save,
+              icon: const Icon(Icons.save_rounded, size: 18),
+              label: const Text('Save All Settings', style: TextStyle(fontSize: 15)),
+            ),
+          ),
           const SizedBox(height: 80),
         ],
       ),
