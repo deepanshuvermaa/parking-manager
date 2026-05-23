@@ -70,7 +70,7 @@ class _SimplePrinterSettingsScreenState extends State<SimplePrinterSettingsScree
   Future<void> _scanUsb() async {
     setState(() => _isScanning = true);
     try {
-      final devices = await NativeUsbPrinterService.listDevices();
+      final devices = await NativeUsbPrinterService.getDevices();
       setState(() => _usbDevices = devices);
     } catch (e) {
       _showSnack('USB scan failed: $e', isError: true);
@@ -86,7 +86,7 @@ class _SimplePrinterSettingsScreenState extends State<SimplePrinterSettingsScree
   }
 
   Future<void> _connectUsb(Map<String, dynamic> device) async {
-    final success = await NativeUsbPrinterService.connectToDevice(device);
+    final success = await NativeUsbPrinterService.connect(device['deviceId'] as int, deviceName: device['productName'] as String?);
     _showSnack(success ? 'Connected to ${device['productName']}' : 'Connection failed', isError: !success);
     setState(() {});
   }
