@@ -121,22 +121,26 @@ class ReceiptService {
       receipt.writeln('-' * paperWidth);
     }
 
-    // Ticket details - Ticket ID on separate line
+    // Ticket details - LARGE AND BOLD
+    receipt.write(ESC_BOLD_ON);
     receipt.writeln('Ticket ID:');
-    receipt.write(getSizeCommand(ticketIdSize, ticketIdBold));
+    receipt.write(ESC_SIZE_2X_BOLD);
     receipt.writeln(vehicle.ticketId ?? 'N/A');
     receipt.write(ESC_NORMAL);
+    receipt.write(ESC_SIZE_1_5X_BOLD);
     receipt.writeln('Date: ${Helpers.formatDate(vehicle.entryTime)}');
-    receipt.writeln('Entry Time: ${Helpers.formatTime(vehicle.entryTime)}');
+    receipt.writeln('Time: ${Helpers.formatTime(vehicle.entryTime)}');
+    receipt.write(ESC_NORMAL);
     receipt.writeln('-' * paperWidth);
 
-    // Vehicle details - Vehicle Number on separate line
+    // Vehicle details - LARGE AND BOLD
+    receipt.write(ESC_BOLD_ON);
     receipt.writeln('Vehicle No:');
-    receipt.write(getSizeCommand(vehicleNumberSize, vehicleNumberBold));
+    receipt.write(ESC_SIZE_2X_BOLD);
     receipt.writeln(vehicle.vehicleNumber);
     receipt.write(ESC_NORMAL);
-    receipt.write(getSizeCommand(vehicleTypeSize, vehicleTypeBold));
-    receipt.writeln('Vehicle Type: ${vehicle.vehicleType}');
+    receipt.write(ESC_SIZE_1_5X_BOLD);
+    receipt.writeln('Type: ${vehicle.vehicleType}');
     receipt.write(ESC_NORMAL);
     receipt.writeln('-' * paperWidth);
 
@@ -194,12 +198,18 @@ class ReceiptService {
       receipt.writeln('-' * paperWidth);
     }
 
-    // QR/Scan reference
+    // QR Code - actual ESC/POS QR code for scanning
     final showQr = prefs.getBool('bill_show_qr_code') ?? true;
     if (showQr && vehicle.ticketId != null) {
       receipt.writeln(centerText('--- SCAN TO EXIT ---', paperWidth));
+      // ESC/POS QR Code commands (GS ( k)
+      // Data: ticketId|vehicleNumber for scanning
+      final qrData = '${vehicle.ticketId}|${vehicle.vehicleNumber}';
+      receipt.write(_generateQrEscPos(qrData));
+      receipt.writeln('');
+      receipt.write(ESC_SIZE_1_5X_BOLD);
       receipt.writeln(centerText(vehicle.ticketId!, paperWidth));
-      receipt.writeln(centerText('Show this ticket at exit', paperWidth));
+      receipt.write(ESC_NORMAL);
       receipt.writeln('-' * paperWidth);
     }
 
@@ -292,21 +302,25 @@ class ReceiptService {
     receipt.writeln(centerText('EXIT RECEIPT', paperWidth));
     receipt.writeln(divider);
 
-    // Ticket details - Ticket ID on separate line
+    // Ticket details - LARGE AND BOLD
+    receipt.write(ESC_BOLD_ON);
     receipt.writeln('Ticket ID:');
-    receipt.write(getSizeCommand(ticketIdSize, ticketIdBold));
+    receipt.write(ESC_SIZE_2X_BOLD);
     receipt.writeln(vehicle.ticketId ?? 'N/A');
     receipt.write(ESC_NORMAL);
+    receipt.write(ESC_SIZE_1_5X_BOLD);
     receipt.writeln('Date: ${Helpers.formatDate(DateTime.now())}');
+    receipt.write(ESC_NORMAL);
     receipt.writeln(dashLine);
 
-    // Vehicle details - Vehicle Number on separate line
+    // Vehicle details - LARGE AND BOLD
+    receipt.write(ESC_BOLD_ON);
     receipt.writeln('Vehicle No:');
-    receipt.write(getSizeCommand(vehicleNumberSize, vehicleNumberBold));
+    receipt.write(ESC_SIZE_2X_BOLD);
     receipt.writeln(vehicle.vehicleNumber);
     receipt.write(ESC_NORMAL);
-    receipt.write(getSizeCommand(vehicleTypeSize, vehicleTypeBold));
-    receipt.writeln('Vehicle Type: ${vehicle.vehicleType}');
+    receipt.write(ESC_SIZE_1_5X_BOLD);
+    receipt.writeln('Type: ${vehicle.vehicleType}');
     receipt.write(ESC_NORMAL);
     receipt.writeln(dashLine);
 
@@ -332,14 +346,17 @@ class ReceiptService {
     // Time details
     receipt.writeln('Entry: ${Helpers.formatDateTime(vehicle.entryTime)}');
     receipt.writeln('Exit: ${Helpers.formatDateTime(vehicle.exitTime ?? DateTime.now())}');
+    receipt.write(ESC_SIZE_1_5X_BOLD);
     receipt.writeln('Duration: $durationStr');
+    receipt.write(ESC_NORMAL);
     receipt.writeln(dashLine);
 
-    // Amount details
+    // Amount details - EXTRA LARGE
     receipt.writeln('');
-    receipt.writeln('Total Amount:');
-    receipt.write(getSizeCommand(amountSize, amountBold));
-    receipt.writeln('Rs. ${amount.toStringAsFixed(2)}');
+    receipt.write(ESC_BOLD_ON);
+    receipt.writeln('TOTAL AMOUNT:');
+    receipt.write(ESC_SIZE_2X_BOLD);
+    receipt.writeln('Rs. ${amount.toStringAsFixed(0)}');
     receipt.write(ESC_NORMAL);
     receipt.writeln('');
     receipt.writeln(divider);
@@ -365,6 +382,33 @@ class ReceiptService {
   }
 
   // Helper function to center text
+  /// Generate ESC/POS QR code commands
+  /// Uses GS ( k command set for QR code printing
+  static String _generateQrEscPos(String data) {
+    final bytes = <int>[];
+    final dataBytes = data.codeUnits;
+    final len = dataBytes.length + 3;
+
+    // GS ( k - QR Code: Set model (Model 2)
+    bytes.addAll([0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00]);
+
+    // GS ( k - QR Code: Set size (module size 6 = larger)
+    bytes.addAll([0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x06]);
+
+    // GS ( k - QR Code: Set error correction (Level M = 49)
+    bytes.addAll([0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x31]);
+
+    // GS ( k - QR Code: Store data
+    bytes.addAll([0x1D, 0x28, 0x6B, len & 0xFF, (len >> 8) & 0xFF, 0x31, 0x50, 0x30]);
+    bytes.addAll(dataBytes);
+
+    // GS ( k - QR Code: Print
+    bytes.addAll([0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30]);
+
+    // Center alignment before QR, reset after
+    return '\x1B\x61\x01${String.fromCharCodes(bytes)}\x1B\x61\x00';
+  }
+
   static String centerText(String text, int width) {
     if (text.length >= width) return text;
     final padding = (width - text.length) ~/ 2;

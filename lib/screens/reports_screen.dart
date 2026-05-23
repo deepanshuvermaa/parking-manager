@@ -269,9 +269,104 @@ class _ReportsScreenState extends State<ReportsScreen>
               ),
             ),
           ],
+
+          // Detailed breakdown
+          const SizedBox(height: Go2Spacing.xl),
+          Text('Detailed Breakdown', style: theme.textTheme.titleMedium),
+          const SizedBox(height: Go2Spacing.md),
+
+          // Type-wise revenue table
+          if (typeCounts.isNotEmpty) ...[
+            Card(child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('By Vehicle Type', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Go2Colors.textPrimary)),
+                const SizedBox(height: 8),
+                ...typeCounts.entries.map((e) {
+                  final typeVehicles = vehicles.where((v) => v.vehicleType == e.key).toList();
+                  final typeRevenue = typeVehicles.fold<double>(0, (s, v) => s + (v.amount ?? 0));
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(children: [
+                      Expanded(flex: 3, child: Text(e.key, style: const TextStyle(fontSize: 13))),
+                      Expanded(flex: 1, child: Text('${e.value}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600), textAlign: TextAlign.center)),
+                      Expanded(flex: 2, child: Text('₹${typeRevenue.toStringAsFixed(0)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Go2Colors.success), textAlign: TextAlign.right)),
+                    ]),
+                  );
+                }),
+                const Divider(height: 16),
+                Row(children: [
+                  const Expanded(flex: 3, child: Text('Total', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700))),
+                  Expanded(flex: 1, child: Text('${vehicles.length}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700), textAlign: TextAlign.center)),
+                  Expanded(flex: 2, child: Text('₹${revenue.toStringAsFixed(0)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Go2Colors.success), textAlign: TextAlign.right)),
+                ]),
+              ]),
+            )),
+            const SizedBox(height: 12),
+          ],
+
+          // Duration breakdown
+          if (vehicles.isNotEmpty) ...[
+            Card(child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('By Duration', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Go2Colors.textPrimary)),
+                const SizedBox(height: 8),
+                ..._durationBreakdown(vehicles).entries.map((e) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Row(children: [
+                    Expanded(child: Text(e.key, style: const TextStyle(fontSize: 13))),
+                    Text('${e.value} vehicles', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Go2Colors.textSecondary)),
+                  ]),
+                )),
+              ]),
+            )),
+            const SizedBox(height: 12),
+          ],
+
+          // Vehicle list
+          if (vehicles.isNotEmpty) ...[
+            Card(child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  const Text('All Vehicles', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Go2Colors.textPrimary)),
+                  const Spacer(),
+                  Text('${vehicles.length} total', style: const TextStyle(fontSize: 11, color: Go2Colors.textHint)),
+                ]),
+                const SizedBox(height: 8),
+                ...vehicles.take(20).map((v) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Row(children: [
+                    Expanded(flex: 3, child: Text(v.vehicleNumber, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))),
+                    Expanded(flex: 2, child: Text(v.vehicleType, style: const TextStyle(fontSize: 11, color: Go2Colors.textHint))),
+                    Expanded(flex: 2, child: Text(v.exitTime != null ? '${v.exitTime!.hour}:${v.exitTime!.minute.toString().padLeft(2, '0')}' : '-', style: const TextStyle(fontSize: 11, color: Go2Colors.textSecondary), textAlign: TextAlign.center)),
+                    Expanded(flex: 1, child: Text('₹${(v.amount ?? 0).toStringAsFixed(0)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Go2Colors.success), textAlign: TextAlign.right)),
+                  ]),
+                )),
+                if (vehicles.length > 20) Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text('+ ${vehicles.length - 20} more...', style: const TextStyle(fontSize: 11, color: Go2Colors.textHint)),
+                ),
+              ]),
+            )),
+          ],
+          const SizedBox(height: 32),
         ],
       ),
     );
+  }
+
+  Map<String, int> _durationBreakdown(List<SimpleVehicle> vehicles) {
+    int under1h = 0, h1to3 = 0, h3to6 = 0, over6h = 0;
+    for (final v in vehicles) {
+      final mins = v.durationMinutes ?? (v.exitTime != null ? v.exitTime!.difference(v.entryTime).inMinutes : 0);
+      if (mins < 60) under1h++;
+      else if (mins < 180) h1to3++;
+      else if (mins < 360) h3to6++;
+      else over6h++;
+    }
+    return {'Under 1 hour': under1h, '1-3 hours': h1to3, '3-6 hours': h3to6, 'Over 6 hours': over6h};
   }
 
   Widget _buildRevenueChart(List<SimpleVehicle> vehicles, String period) {
