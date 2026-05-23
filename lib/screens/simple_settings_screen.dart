@@ -186,7 +186,7 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
               },
             ),
           ]),
-          const SizedBox(height: Go2Spacing.xxl),
+          const SizedBox(height: 80), // Extra space so logout isn't hidden behind system nav
         ],
       ),
     );

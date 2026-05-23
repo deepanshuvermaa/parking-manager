@@ -27,27 +27,20 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
   SimpleVehicle? _lastVehicle;
   String? _lastReceipt;
 
+  // Only 6 primary types - user can add more via Settings > Rates
   static const _types = [
-    ('Bike', Icons.two_wheeler),
-    ('Scooter', Icons.two_wheeler),
-    ('Car', Icons.directions_car),
-    ('SUV', Icons.directions_car_filled),
-    ('Van', Icons.airport_shuttle),
-    ('Bus', Icons.directions_bus),
-    ('Truck', Icons.local_shipping),
-    ('Auto Rickshaw', Icons.electric_rickshaw),
-    ('E-Rickshaw', Icons.electric_rickshaw),
-    ('Cycle', Icons.pedal_bike),
-    ('E-Cycle', Icons.pedal_bike),
-    ('Tempo', Icons.fire_truck),
-    ('Mini Truck', Icons.fire_truck),
+    ('Car', Icons.directions_car_rounded),
+    ('Bike', Icons.two_wheeler_rounded),
+    ('Truck', Icons.local_shipping_rounded),
+    ('Auto', Icons.electric_rickshaw_rounded),
+    ('Cycle', Icons.pedal_bike_rounded),
+    ('Scooter', Icons.two_wheeler_rounded),
   ];
 
   @override
   void dispose() { _plateController.dispose(); super.dispose(); }
 
   Future<void> _scanPlate() async {
-    // Request camera permission
     var status = await Permission.camera.status;
     if (!status.isGranted) {
       status = await Permission.camera.request();
@@ -61,35 +54,43 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
     }
 
     final picker = ImagePicker();
-    final image = await picker.pickImage(source: ImageSource.camera, maxWidth: 1920);
+    final image = await picker.pickImage(source: ImageSource.camera, maxWidth: 1920, imageQuality: 90);
     if (image == null) return;
 
-    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reading plate number...'), duration: Duration(seconds: 1)));
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reading plate...'), duration: Duration(seconds: 1)));
 
-    // OCR with Google ML Kit
     final inputImage = InputImage.fromFilePath(image.path);
     final textRecognizer = TextRecognizer();
     try {
-      final recognized = await textRecognizer.processImage(inputImage);
-      final plateRegex = RegExp(r'[A-Z]{2}\s*\d{1,2}\s*[A-Z]{1,3}\s*\d{1,4}');
-      String? plate;
-      for (final block in recognized.blocks) {
-        final match = plateRegex.firstMatch(block.text.toUpperCase().replaceAll('\n', ' '));
-        if (match != null) {
-          plate = match.group(0)?.replaceAll(RegExp(r'\s+'), ' ').trim();
-          break;
-        }
-      }
+      final result = await textRecognizer.processImage(inputImage);
+      String? plate = _extractPlate(result.text);
       if (plate != null && mounted) {
         _plateController.text = plate;
         setState(() {});
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Detected: $plate'), backgroundColor: Go2Colors.success));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('✓ $plate'), backgroundColor: Go2Colors.success));
       } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not detect plate. Please type manually.'), backgroundColor: Go2Colors.warning));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not detect plate. Try again.'), backgroundColor: Go2Colors.warning));
       }
     } finally {
       textRecognizer.close();
     }
+  }
+
+  String? _extractPlate(String text) {
+    // Indian plate formats: MH12AB1234, MH 12 AB 1234, DL 01 CA 0001, etc.
+    final cleaned = text.toUpperCase().replaceAll('\n', ' ').replaceAll(RegExp(r'[^A-Z0-9 ]'), ' ');
+    // Pattern: 2 letters + 1-2 digits + 1-3 letters + 1-4 digits
+    final patterns = [
+      RegExp(r'([A-Z]{2})\s*(\d{1,2})\s*([A-Z]{1,3})\s*(\d{1,4})'),
+      RegExp(r'([A-Z]{2})(\d{2})([A-Z]{1,3})(\d{1,4})'),
+    ];
+    for (final regex in patterns) {
+      final match = regex.firstMatch(cleaned);
+      if (match != null) {
+        return '${match.group(1)} ${match.group(2)} ${match.group(3)} ${match.group(4)}'.trim();
+      }
+    }
+    return null;
   }
 
   Future<void> _submit() async {
@@ -107,12 +108,10 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
         context.read<ParkingProvider>().recordEntry();
         HapticFeedback.mediumImpact();
 
-        // Generate receipt
         final receipt = await ReceiptService.generateEntryReceipt(vehicle);
         _lastVehicle = vehicle;
         _lastReceipt = receipt;
 
-        // Auto-print
         final prefs = await SharedPreferences.getInstance();
         final autoPrint = prefs.getBool('auto_print') ?? true;
         final connected = await PlatformPrinterService.isConnected();
@@ -125,7 +124,7 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
         }
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Go2Colors.success));
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg, style: const TextStyle(fontSize: 15)), backgroundColor: Go2Colors.success));
           _plateController.clear();
           setState(() {});
         }
@@ -157,103 +156,109 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
         title: const Text('Vehicle Entry'),
         actions: [
           if (_lastReceipt != null)
-            IconButton(
-              icon: const Icon(Icons.print_rounded, size: 20),
-              tooltip: 'Reprint last receipt',
-              onPressed: _reprint,
-            ),
+            IconButton(icon: const Icon(Icons.print_rounded), tooltip: 'Reprint', onPressed: _reprint),
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          // Vehicle type grid
-          GridView.builder(
+          // 6 vehicle types - large tiles for dark parking lot
+          GridView.count(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 4, mainAxisSpacing: 6, crossAxisSpacing: 6, childAspectRatio: 1.05,
-            ),
-            itemCount: _types.length,
-            itemBuilder: (_, i) {
-              final (type, icon) = _types[i];
+            crossAxisCount: 3,
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            childAspectRatio: 1.2,
+            children: _types.map((t) {
+              final (type, icon) = t;
               final sel = _selectedType == type;
               return GestureDetector(
-                onTap: () => setState(() => _selectedType = type),
-                child: Container(
+                onTap: () { setState(() => _selectedType = type); HapticFeedback.lightImpact(); },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
                   decoration: BoxDecoration(
                     color: sel ? Go2Colors.primary : Go2Colors.surface,
-                    borderRadius: BorderRadius.circular(Go2Radius.md),
-                    border: Border.all(color: sel ? Go2Colors.primary : Go2Colors.divider, width: sel ? 1.5 : 0.5),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: sel ? Go2Colors.primary : Go2Colors.divider, width: sel ? 2 : 0.5),
+                    boxShadow: sel ? [BoxShadow(color: Go2Colors.primary.withValues(alpha: 0.2), blurRadius: 12, offset: const Offset(0, 4))] : null,
                   ),
                   child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    Icon(icon, color: sel ? Colors.white : Go2Colors.textSecondary, size: 20),
-                    const SizedBox(height: 2),
-                    Text(type, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w500, color: sel ? Colors.white : Go2Colors.textHint), textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Icon(icon, color: sel ? Colors.white : Go2Colors.textPrimary, size: 28),
+                    const SizedBox(height: 6),
+                    Text(type, style: TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w600,
+                      color: sel ? Colors.white : Go2Colors.textPrimary,
+                    )),
                   ]),
                 ),
               );
-            },
+            }).toList(),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
 
-          // Rate display
+          // Rate chip
           Center(child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-            decoration: BoxDecoration(color: Go2Colors.skyWash, borderRadius: BorderRadius.circular(Go2Radius.full)),
-            child: Text('₹${(rates['hourly'] as num).toStringAsFixed(0)}/hr  •  Min ₹${(rates['minimum'] as num).toStringAsFixed(0)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Go2Colors.primary)),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            decoration: BoxDecoration(color: Go2Colors.skyWash, borderRadius: BorderRadius.circular(20)),
+            child: Text('₹${(rates['hourly'] as num).toStringAsFixed(0)}/hr  •  Min ₹${(rates['minimum'] as num).toStringAsFixed(0)}',
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Go2Colors.primary)),
           )),
           const SizedBox(height: 20),
 
-          // Plate input
+          // Plate input - LARGE for dark parking lot visibility
           TextFormField(
             controller: _plateController,
             textCapitalization: TextCapitalization.characters,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, letterSpacing: 1.2),
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: 2),
             decoration: InputDecoration(
               hintText: 'MH 12 AB 1234',
-              prefixIcon: const Icon(Icons.pin_outlined, size: 20),
+              hintStyle: TextStyle(fontSize: 24, fontWeight: FontWeight.w400, color: Go2Colors.textHint.withValues(alpha: 0.5), letterSpacing: 2),
+              prefixIcon: const Icon(Icons.pin_outlined, size: 24),
               suffixIcon: IconButton(
-                icon: const Icon(Icons.camera_alt_rounded, size: 22, color: Go2Colors.primary),
-                tooltip: 'Scan plate with camera',
+                icon: const Icon(Icons.camera_alt_rounded, size: 26, color: Go2Colors.primary),
+                tooltip: 'Scan plate',
                 onPressed: _scanPlate,
               ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
             ),
             inputFormatters: [UpperCaseTextFormatter(), LengthLimitingTextInputFormatter(14)],
             onChanged: (_) => setState(() {}),
             onFieldSubmitted: (_) => _submit(),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
 
-          // Park button
+          // Park button - large, prominent
           SizedBox(
-            height: 48,
+            height: 54,
             child: ElevatedButton(
               onPressed: _isSubmitting || _plateController.text.trim().isEmpty ? null : _submit,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Go2Colors.success,
+                foregroundColor: Colors.white,
+                textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
               child: _isSubmitting
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Park Vehicle', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                  ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+                  : const Text('Park Vehicle'),
             ),
           ),
 
-          // Last entry info
+          // Last entry
           if (_lastVehicle != null) ...[
             const SizedBox(height: 20),
             Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: Go2Colors.skyWash, borderRadius: BorderRadius.circular(Go2Radius.md)),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(color: Go2Colors.skyWash, borderRadius: BorderRadius.circular(10)),
               child: Row(children: [
-                const Icon(Icons.check_circle_rounded, color: Go2Colors.success, size: 18),
+                const Icon(Icons.check_circle_rounded, color: Go2Colors.success, size: 20),
                 const SizedBox(width: 10),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Last: ${_lastVehicle!.vehicleNumber}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Go2Colors.textPrimary)),
-                  Text('${_lastVehicle!.vehicleType} • ${_lastVehicle!.ticketId ?? ''}', style: const TextStyle(fontSize: 11, color: Go2Colors.textHint)),
+                  Text('Last: ${_lastVehicle!.vehicleNumber}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                  Text('${_lastVehicle!.vehicleType} • ${_lastVehicle!.ticketId ?? ''}', style: const TextStyle(fontSize: 12, color: Go2Colors.textHint)),
                 ])),
-                TextButton.icon(
-                  onPressed: _reprint,
-                  icon: const Icon(Icons.print_rounded, size: 14),
-                  label: const Text('Reprint', style: TextStyle(fontSize: 12)),
-                ),
+                TextButton(onPressed: _reprint, child: const Text('Reprint', style: TextStyle(fontSize: 13))),
               ]),
             ),
           ],

@@ -77,48 +77,37 @@ class AuthProvider extends ChangeNotifier {
       return;
     }
 
-    // Validate token with backend
+    // Trust saved token - mark as online, validate in background
+    _isOffline = false;
+    _status = AuthStatus.authenticated;
+    notifyListeners();
+
+    // Initialize vehicle service (loads from local DB first, syncs in background)
+    await SimpleVehicleService.initialize(_token!);
+
+    // Background validate - don't block the UI
+    _validateInBackground();
+
+    notifyListeners();
+  }
+
+  Future<void> _validateInBackground() async {
     try {
       final response = await http.get(
         Uri.parse('${ApiConfig.baseUrl}/auth/validate'),
         headers: {'Authorization': 'Bearer $_token'},
-      ).timeout(const Duration(seconds: 5));
+      ).timeout(const Duration(seconds: 8));
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['success'] == true) {
-          if (trialExpired) {
-            _status = AuthStatus.unauthenticated;
-          } else {
-            _isOffline = false;
-            await SimpleVehicleService.initialize(_token!);
-            _status = AuthStatus.authenticated;
-          }
-        } else {
-          _status = AuthStatus.unauthenticated;
-          await _clearCredentials();
-        }
-      } else {
-        _status = AuthStatus.unauthenticated;
-        await _clearCredentials();
-      }
-    } catch (e) {
-      // Network error — allow offline access with existing credentials
-      if (e.toString().contains('SocketException') || 
-          e.toString().contains('TimeoutException') ||
-          e.toString().contains('Failed host lookup')) {
+      if (response.statusCode != 200) {
+        // Token expired on server - force re-login next time
         _isOffline = true;
-        await SimpleVehicleService.loadFromLocalDatabase();
-        _status = AuthStatus.authenticated;
-      } else {
-        // Other errors (parsing, etc) - still allow offline
-        _isOffline = true;
-        await SimpleVehicleService.loadFromLocalDatabase();
-        _status = AuthStatus.authenticated;
+        notifyListeners();
       }
+    } catch (_) {
+      // Network issue - mark offline silently
+      _isOffline = true;
+      notifyListeners();
     }
-
-    notifyListeners();
   }
 
   /// Login with credentials

@@ -83,7 +83,7 @@ class Go2Theme {
         onPrimary: Colors.white,
         onSurface: Go2Colors.textPrimary,
       ),
-      scaffoldBackgroundColor: Go2Colors.canvas,
+      scaffoldBackgroundColor: const Color(0xFFF4F6F8),
       appBarTheme: AppBarTheme(
         backgroundColor: const Color(0xFFE3F2FD),  // Sky blue blend
         foregroundColor: Go2Colors.textPrimary,
@@ -102,10 +102,10 @@ class Go2Theme {
       ),
       cardTheme: CardThemeData(
         color: Go2Colors.surface,
-        elevation: 0,
+        elevation: 2,
+        shadowColor: Colors.black.withValues(alpha: 0.08),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(Go2Radius.md),
-          side: const BorderSide(color: Color(0xFFEEEEEE), width: 0.5),
         ),
         margin: EdgeInsets.zero,
       ),
