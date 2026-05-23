@@ -193,6 +193,16 @@ class ReceiptService {
       receipt.writeln(wrapText(receiptFooter, paperWidth));
       receipt.writeln('-' * paperWidth);
     }
+
+    // QR/Scan reference
+    final showQr = prefs.getBool('bill_show_qr_code') ?? true;
+    if (showQr && vehicle.ticketId != null) {
+      receipt.writeln(centerText('--- SCAN TO EXIT ---', paperWidth));
+      receipt.writeln(centerText(vehicle.ticketId!, paperWidth));
+      receipt.writeln(centerText('Show this ticket at exit', paperWidth));
+      receipt.writeln('-' * paperWidth);
+    }
+
     receipt.writeln(divider);
     receipt.writeln(centerText('KEEP THIS RECEIPT SAFE', paperWidth));
     receipt.writeln(divider);

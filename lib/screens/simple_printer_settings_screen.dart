@@ -6,6 +6,7 @@ import '../services/simple_bluetooth_service.dart';
 import '../services/platform_printer_service.dart';
 import '../services/native_usb_printer_service.dart';
 import '../services/desktop_printer_service.dart';
+import '../services/windows_native_printer_service.dart';
 import '../theme/app_theme.dart';
 
 class SimplePrinterSettingsScreen extends StatefulWidget {
@@ -125,6 +126,9 @@ class _SimplePrinterSettingsScreenState extends State<SimplePrinterSettingsScree
           ? NativeUsbPrinterService.isConnected
           : SimpleBluetoothService.isConnected;
     }
+    if (Platform.isWindows) {
+      return WindowsNativePrinterService.isConnected;
+    }
     return false;
   }
 
@@ -133,6 +137,9 @@ class _SimplePrinterSettingsScreenState extends State<SimplePrinterSettingsScree
       return _connectionType == 'usb'
           ? NativeUsbPrinterService.connectedDeviceName
           : SimpleBluetoothService.connectedDeviceName;
+    }
+    if (Platform.isWindows) {
+      return WindowsNativePrinterService.connectedPrinterName;
     }
     return null;
   }
