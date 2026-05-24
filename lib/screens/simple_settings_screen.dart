@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
+import 'package:file_picker/file_picker.dart';
 import '../providers/auth_provider.dart';
 import '../services/settings_sync_service.dart';
+import '../services/export_import_service.dart';
 import '../theme/app_theme.dart';
 import 'receipt_customization_screen.dart';
 import 'vehicle_rates_management_screen.dart';
@@ -142,6 +144,47 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
           _section('Vehicle Rates'),
           _card([
             _nav('Manage Rates', Icons.currency_rupee_rounded, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VehicleRatesManagementScreen()))),
+          ]),
+
+          // Backup
+          _section('Data Backup'),
+          _card([
+            ListTile(
+              dense: true,
+              leading: const Icon(Icons.backup_rounded, size: 20, color: Go2Colors.primary),
+              title: const Text('Create Backup'),
+              subtitle: const Text('Save all data to device storage'),
+              trailing: const Icon(Icons.chevron_right_rounded, size: 18, color: Go2Colors.textHint),
+              onTap: () async {
+                final path = await ExportImportService.createBackup();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text(path != null ? '✓ Backup saved' : 'Backup failed'),
+                    backgroundColor: path != null ? Go2Colors.success : Go2Colors.error,
+                  ));
+                }
+              },
+            ),
+            const Divider(height: 1),
+            ListTile(
+              dense: true,
+              leading: const Icon(Icons.restore_rounded, size: 20, color: Go2Colors.primary),
+              title: const Text('Restore Backup'),
+              subtitle: const Text('Import data from backup file'),
+              trailing: const Icon(Icons.chevron_right_rounded, size: 18, color: Go2Colors.textHint),
+              onTap: () async {
+                final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['json']);
+                if (result != null && result.files.single.path != null) {
+                  final success = await ExportImportService.restoreBackup(result.files.single.path!);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(success ? '✓ Data restored' : 'Restore failed'),
+                      backgroundColor: success ? Go2Colors.success : Go2Colors.error,
+                    ));
+                  }
+                }
+              },
+            ),
           ]),
 
           // Account
