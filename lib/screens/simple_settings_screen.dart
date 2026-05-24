@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../services/settings_sync_service.dart';
 import '../theme/app_theme.dart';
 import 'receipt_customization_screen.dart';
 import 'vehicle_rates_management_screen.dart';
@@ -58,6 +59,7 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
     await p.setBool('auto_print_exit', _autoPrintExit);
     await p.setBool('bill_show_qr_code', _showQr);
     await p.setInt('paper_width', _paperWidth);
+    SettingsSyncService.syncToBackend(widget.token);
     setState(() => _saved = true);
     Future.delayed(const Duration(seconds: 2), () { if (mounted) setState(() => _saved = false); });
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✓ Settings saved'), backgroundColor: Go2Colors.success, duration: Duration(seconds: 1)));

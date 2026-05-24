@@ -454,6 +454,36 @@ class ExportImportService {
     return prefs.getBool(AUTO_BACKUP_ENABLED_KEY) ?? true;
   }
 
+  /// Create a simple backup file and return its path
+  static Future<String?> createBackup() async {
+    try {
+      final exportData = await exportAllData();
+      final backupDir = await getBackupDirectory();
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final file = File('${backupDir.path}/go2parking_backup_$timestamp.json');
+      await file.writeAsString(JsonEncoder.withIndent('  ').convert(exportData));
+      return file.path;
+    } catch (e) {
+      DebugLogger.log('❌ createBackup failed: $e');
+      return null;
+    }
+  }
+
+  /// Restore from a backup file path
+  static Future<bool> restoreBackup(String filePath) async {
+    try {
+      final file = File(filePath);
+      if (!await file.exists()) return false;
+      final jsonString = await file.readAsString();
+      final importData = json.decode(jsonString) as Map<String, dynamic>;
+      final result = await _restoreData(importData);
+      return result['success'] == true;
+    } catch (e) {
+      DebugLogger.log('❌ restoreBackup failed: $e');
+      return false;
+    }
+  }
+
   /// Get backup info without importing
   static Future<Map<String, dynamic>?> getBackupInfo(String filePath) async {
     try {

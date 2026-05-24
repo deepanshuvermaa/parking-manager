@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
 import '../services/device_service.dart';
 import '../services/simple_vehicle_service.dart';
+import '../services/settings_sync_service.dart';
 
 enum AuthStatus { uninitialized, authenticated, unauthenticated, loading }
 
@@ -84,6 +85,9 @@ class AuthProvider extends ChangeNotifier {
 
     // Initialize vehicle service (loads from local DB first, syncs in background)
     await SimpleVehicleService.initialize(_token!);
+
+    // Sync settings from backend
+    SettingsSyncService.loadFromBackend(_token!);
 
     // Background validate - don't block the UI
     _validateInBackground();
@@ -289,6 +293,9 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> _clearCredentials() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    // Only remove auth keys - preserve business settings, rates, printer config
+    for (final key in ['auth_token', 'refresh_token', 'user_id', 'user_name', 'user_email', 'user_role', 'parking_name', 'trial_expires']) {
+      await prefs.remove(key);
+    }
   }
 }
