@@ -112,7 +112,9 @@ class ReceiptService {
       receipt.write(ESC_NORMAL);
     }
     receipt.writeln(divider);
+    receipt.write(ESC_SIZE_2X_BOLD);
     receipt.writeln(centerText('PARKING RECEIPT', paperWidth));
+    receipt.write(ESC_NORMAL);
     receipt.writeln(divider);
 
     // Receipt header message
@@ -201,14 +203,12 @@ class ReceiptService {
     // QR Code - actual ESC/POS QR code for scanning
     final showQr = prefs.getBool('bill_show_qr_code') ?? true;
     if (showQr && vehicle.ticketId != null) {
-      receipt.writeln(centerText('--- SCAN TO EXIT ---', paperWidth));
-      // ESC/POS QR Code commands (GS ( k)
-      // Data: ticketId|vehicleNumber for scanning
+      receipt.writeln(centerText('SCAN TO EXIT', paperWidth));
       final qrData = '${vehicle.ticketId}|${vehicle.vehicleNumber}';
       receipt.write(_generateQrEscPos(qrData));
       receipt.writeln('');
-      receipt.write(ESC_SIZE_1_5X_BOLD);
-      receipt.writeln(centerText(vehicle.ticketId!, paperWidth));
+      receipt.write(ESC_BOLD_ON);
+      receipt.writeln('Ticket: ${vehicle.ticketId}');
       receipt.write(ESC_NORMAL);
       receipt.writeln('-' * paperWidth);
     }
@@ -299,7 +299,9 @@ class ReceiptService {
       receipt.write(ESC_NORMAL);
     }
     receipt.writeln(divider);
+    receipt.write(ESC_SIZE_2X_BOLD);
     receipt.writeln(centerText('EXIT RECEIPT', paperWidth));
+    receipt.write(ESC_NORMAL);
     receipt.writeln(divider);
 
     // Ticket details - LARGE AND BOLD

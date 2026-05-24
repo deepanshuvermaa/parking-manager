@@ -166,6 +166,26 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
               },
             ),
 
+            // Reprint entry receipt
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  final connected = await PlatformPrinterService.isConnected();
+                  if (connected) {
+                    final receipt = await ReceiptService.generateEntryReceipt(vehicle);
+                    await PlatformPrinterService.printText(receipt);
+                    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✓ Entry receipt reprinted'), backgroundColor: Go2Colors.success));
+                  } else {
+                    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Printer not connected'), backgroundColor: Go2Colors.error));
+                  }
+                },
+                icon: const Icon(Icons.print_rounded, size: 16),
+                label: const Text('Reprint Entry Receipt'),
+              ),
+            ),
+            const SizedBox(height: Go2Spacing.sm),
+
             // Exit button + Print
             SizedBox(
               width: double.infinity,
@@ -383,7 +403,7 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
   }
 
   Future<void> _scanQR() async {
-    // Request camera permission
+    // Request camera permission instantly
     var status = await Permission.camera.status;
     if (!status.isGranted) {
       status = await Permission.camera.request();
@@ -396,26 +416,36 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
       }
     }
 
+    // Open camera directly - high quality for low light readability
     final picker = ImagePicker();
-    final image = await picker.pickImage(source: ImageSource.camera);
+    final image = await picker.pickImage(
+      source: ImageSource.camera,
+      preferredCameraDevice: CameraDevice.rear,
+      maxWidth: 1920,
+      imageQuality: 95, // High quality for low light
+    );
     if (image == null) return;
 
-    // Use ML Kit to read ticket ID from QR/text
+    // Show instant feedback
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reading...'), duration: Duration(milliseconds: 800)));
+
+    // Process with ML Kit
     final inputImage = InputImage.fromFilePath(image.path);
     final textRecognizer = TextRecognizer();
     try {
       final result = await textRecognizer.processImage(inputImage);
-      // Look for ticket ID pattern (PT + digits) or plate number
-      final ticketRegex = RegExp(r'PT\d{7,}');
-      final plateRegex = RegExp(r'[A-Z]{2}\s*\d{1,2}\s*[A-Z]{1,3}\s*\d{1,4}');
+      final allText = result.blocks.map((b) => b.text.toUpperCase()).join(' ');
+      
+      // Look for ticket ID (PT + digits) or plate number
       String? searchTerm;
-      for (final block in result.blocks) {
-        final text = block.text.toUpperCase();
-        final ticketMatch = ticketRegex.firstMatch(text);
-        if (ticketMatch != null) { searchTerm = ticketMatch.group(0); break; }
-        final plateMatch = plateRegex.firstMatch(text);
-        if (plateMatch != null) { searchTerm = plateMatch.group(0); break; }
+      final ticketMatch = RegExp(r'PT\d{5,}').firstMatch(allText);
+      if (ticketMatch != null) {
+        searchTerm = ticketMatch.group(0);
+      } else {
+        final plateMatch = RegExp(r'[A-Z]{2}\s*\d{1,2}\s*[A-Z]{1,3}\s*\d{1,4}').firstMatch(allText);
+        if (plateMatch != null) searchTerm = plateMatch.group(0);
       }
+
       if (searchTerm != null && mounted) {
         _searchController.text = searchTerm;
         _filter(searchTerm);
