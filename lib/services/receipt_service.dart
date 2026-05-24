@@ -94,7 +94,7 @@ class ReceiptService {
     final receipt = StringBuffer();
     final divider = '=' * paperWidth;
 
-    // Header
+    // Header - normal size
     receipt.writeln(divider);
     if (showBusinessName) {
       receipt.write(getSizeCommand(businessNameSize, businessNameBold));
@@ -102,17 +102,13 @@ class ReceiptService {
       receipt.write(ESC_NORMAL);
     }
     if (showBusinessAddress && businessAddress.isNotEmpty) {
-      receipt.write(getSizeCommand(businessAddressSize, businessAddressBold));
       receipt.writeln(centerText(businessAddress, paperWidth));
-      receipt.write(ESC_NORMAL);
     }
     if (showBusinessPhone && businessPhone.isNotEmpty) {
-      receipt.write(getSizeCommand(businessPhoneSize, businessPhoneBold));
       receipt.writeln(centerText(businessPhone, paperWidth));
-      receipt.write(ESC_NORMAL);
     }
     receipt.writeln(divider);
-    receipt.write(ESC_SIZE_2X_BOLD);
+    receipt.write(ESC_BOLD_ON);
     receipt.writeln(centerText('PARKING RECEIPT', paperWidth));
     receipt.write(ESC_NORMAL);
     receipt.writeln(divider);
@@ -123,35 +119,27 @@ class ReceiptService {
       receipt.writeln('-' * paperWidth);
     }
 
-    // Ticket details - LARGE AND BOLD
-    receipt.write(ESC_BOLD_ON);
+    // Ticket ID - customizable size (default XL)
     receipt.writeln('Ticket ID:');
-    receipt.write(ESC_SIZE_2X_BOLD);
+    receipt.write(getSizeCommand(ticketIdSize, ticketIdBold));
     receipt.writeln(vehicle.ticketId ?? 'N/A');
     receipt.write(ESC_NORMAL);
-    receipt.write(ESC_SIZE_1_5X_BOLD);
     receipt.writeln('Date: ${Helpers.formatDate(vehicle.entryTime)}');
     receipt.writeln('Time: ${Helpers.formatTime(vehicle.entryTime)}');
-    receipt.write(ESC_NORMAL);
     receipt.writeln('-' * paperWidth);
 
-    // Vehicle details - LARGE AND BOLD
-    receipt.write(ESC_BOLD_ON);
+    // Vehicle Number - customizable size (default XL)
     receipt.writeln('Vehicle No:');
-    receipt.write(ESC_SIZE_2X_BOLD);
+    receipt.write(getSizeCommand(vehicleNumberSize, vehicleNumberBold));
     receipt.writeln(vehicle.vehicleNumber);
     receipt.write(ESC_NORMAL);
-    receipt.write(ESC_SIZE_1_5X_BOLD);
     receipt.writeln('Type: ${vehicle.vehicleType}');
-    receipt.write(ESC_NORMAL);
     receipt.writeln('-' * paperWidth);
 
     // Travel Details (if provided)
     if (vehicle.fromLocation != null && vehicle.fromLocation!.isNotEmpty ||
         vehicle.toLocation != null && vehicle.toLocation!.isNotEmpty) {
-      receipt.write(getSizeCommand(travelHeaderSize, travelHeaderBold));
       receipt.writeln('TRAVEL DETAILS:');
-      receipt.write(ESC_NORMAL);
       if (vehicle.fromLocation != null && vehicle.fromLocation!.isNotEmpty) {
         receipt.write(getSizeCommand(travelFromSize, travelFromBold));
         receipt.writeln('From: ${vehicle.fromLocation}');
@@ -299,39 +287,31 @@ class ReceiptService {
       receipt.write(ESC_NORMAL);
     }
     receipt.writeln(divider);
-    receipt.write(ESC_SIZE_2X_BOLD);
+    receipt.write(ESC_BOLD_ON);
     receipt.writeln(centerText('EXIT RECEIPT', paperWidth));
     receipt.write(ESC_NORMAL);
     receipt.writeln(divider);
 
     // Ticket details - LARGE AND BOLD
-    receipt.write(ESC_BOLD_ON);
     receipt.writeln('Ticket ID:');
-    receipt.write(ESC_SIZE_2X_BOLD);
+    receipt.write(getSizeCommand(ticketIdSize, ticketIdBold));
     receipt.writeln(vehicle.ticketId ?? 'N/A');
     receipt.write(ESC_NORMAL);
-    receipt.write(ESC_SIZE_1_5X_BOLD);
     receipt.writeln('Date: ${Helpers.formatDate(DateTime.now())}');
-    receipt.write(ESC_NORMAL);
     receipt.writeln(dashLine);
 
-    // Vehicle details - LARGE AND BOLD
-    receipt.write(ESC_BOLD_ON);
+    // Vehicle details - customizable size
     receipt.writeln('Vehicle No:');
-    receipt.write(ESC_SIZE_2X_BOLD);
+    receipt.write(getSizeCommand(vehicleNumberSize, vehicleNumberBold));
     receipt.writeln(vehicle.vehicleNumber);
     receipt.write(ESC_NORMAL);
-    receipt.write(ESC_SIZE_1_5X_BOLD);
     receipt.writeln('Type: ${vehicle.vehicleType}');
-    receipt.write(ESC_NORMAL);
     receipt.writeln(dashLine);
 
     // Travel Details (if provided)
     if (vehicle.fromLocation != null && vehicle.fromLocation!.isNotEmpty ||
         vehicle.toLocation != null && vehicle.toLocation!.isNotEmpty) {
-      receipt.write(getSizeCommand(travelHeaderSize, travelHeaderBold));
       receipt.writeln('TRAVEL DETAILS:');
-      receipt.write(ESC_NORMAL);
       if (vehicle.fromLocation != null && vehicle.fromLocation!.isNotEmpty) {
         receipt.write(getSizeCommand(travelFromSize, travelFromBold));
         receipt.writeln('From: ${vehicle.fromLocation}');
@@ -348,17 +328,13 @@ class ReceiptService {
     // Time details
     receipt.writeln('Entry: ${Helpers.formatDateTime(vehicle.entryTime)}');
     receipt.writeln('Exit: ${Helpers.formatDateTime(vehicle.exitTime ?? DateTime.now())}');
-    receipt.write(ESC_SIZE_1_5X_BOLD);
     receipt.writeln('Duration: $durationStr');
-    receipt.write(ESC_NORMAL);
     receipt.writeln(dashLine);
 
-    // Amount details - EXTRA LARGE
+    // Amount - bold only, customizable size
     receipt.writeln('');
-    receipt.write(ESC_BOLD_ON);
-    receipt.writeln('TOTAL AMOUNT:');
-    receipt.write(ESC_SIZE_2X_BOLD);
-    receipt.writeln('Rs. ${amount.toStringAsFixed(0)}');
+    receipt.write(getSizeCommand(amountSize, amountBold));
+    receipt.writeln('TOTAL: Rs. ${amount.toStringAsFixed(0)}');
     receipt.write(ESC_NORMAL);
     receipt.writeln('');
     receipt.writeln(divider);

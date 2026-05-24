@@ -3,8 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import '../providers/auth_provider.dart';
 import '../providers/parking_provider.dart';
 import '../services/simple_vehicle_service.dart';
@@ -403,7 +402,6 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
   }
 
   Future<void> _scanQR() async {
-    // Request camera permission instantly
     var status = await Permission.camera.status;
     if (!status.isGranted) {
       status = await Permission.camera.request();
@@ -416,45 +414,87 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
       }
     }
 
-    // Open camera directly - high quality for low light readability
-    final picker = ImagePicker();
-    final image = await picker.pickImage(
-      source: ImageSource.camera,
-      preferredCameraDevice: CameraDevice.rear,
-      maxWidth: 1920,
-      imageQuality: 95, // High quality for low light
-    );
-    if (image == null) return;
+    // Open live scanner - auto-reads QR/text instantly
+    final result = await Navigator.push<String>(context, MaterialPageRoute(
+      builder: (_) => const _LiveScannerScreen(),
+    ));
 
-    // Show instant feedback
-    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reading...'), duration: Duration(milliseconds: 800)));
-
-    // Process with ML Kit
-    final inputImage = InputImage.fromFilePath(image.path);
-    final textRecognizer = TextRecognizer();
-    try {
-      final result = await textRecognizer.processImage(inputImage);
-      final allText = result.blocks.map((b) => b.text.toUpperCase()).join(' ');
-      
-      // Look for ticket ID (PT + digits) or plate number
-      String? searchTerm;
-      final ticketMatch = RegExp(r'PT\d{5,}').firstMatch(allText);
-      if (ticketMatch != null) {
-        searchTerm = ticketMatch.group(0);
-      } else {
-        final plateMatch = RegExp(r'[A-Z]{2}\s*\d{1,2}\s*[A-Z]{1,3}\s*\d{1,4}').firstMatch(allText);
-        if (plateMatch != null) searchTerm = plateMatch.group(0);
-      }
-
-      if (searchTerm != null && mounted) {
-        _searchController.text = searchTerm;
-        _filter(searchTerm);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Found: $searchTerm'), backgroundColor: Go2Colors.success));
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not read ticket. Try again.'), backgroundColor: Go2Colors.warning));
-      }
-    } finally {
-      textRecognizer.close();
+    if (result != null && result.isNotEmpty && mounted) {
+      _searchController.text = result;
+      _filter(result);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Found: $result'), backgroundColor: Go2Colors.success));
     }
+  }
+}
+
+/// Live QR/Barcode scanner screen - auto-detects and returns immediately
+class _LiveScannerScreen extends StatefulWidget {
+  const _LiveScannerScreen();
+
+  @override
+  State<_LiveScannerScreen> createState() => _LiveScannerScreenState();
+}
+
+class _LiveScannerScreenState extends State<_LiveScannerScreen> {
+  bool _detected = false;
+
+  void _onDetect(BarcodeCapture capture) {
+    if (_detected) return;
+    for (final barcode in capture.barcodes) {
+      final value = barcode.rawValue;
+      if (value != null && value.isNotEmpty) {
+        _detected = true;
+        HapticFeedback.mediumImpact();
+        // Parse: QR data is "ticketId|vehicleNumber"
+        final parts = value.split('|');
+        final searchTerm = parts.isNotEmpty ? parts[0] : value;
+        Navigator.pop(context, searchTerm);
+        return;
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        title: const Text('Scan Ticket QR', style: TextStyle(color: Colors.white)),
+      ),
+      body: Stack(
+        children: [
+          MobileScanner(
+            onDetect: _onDetect,
+            controller: MobileScannerController(
+              detectionSpeed: DetectionSpeed.noDuplicates,
+              facing: CameraFacing.back,
+              torchEnabled: false,
+            ),
+          ),
+          // Scan overlay
+          Center(
+            child: Container(
+              width: 250, height: 250,
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.white, width: 2),
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+          ),
+          // Instructions
+          const Positioned(
+            bottom: 80,
+            left: 0, right: 0,
+            child: Text(
+              'Point at the QR code on the ticket',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white70, fontSize: 14),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

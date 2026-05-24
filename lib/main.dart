@@ -7,6 +7,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'theme/app_theme.dart';
 import 'providers/auth_provider.dart';
 import 'providers/parking_provider.dart';
+import 'services/platform_printer_service.dart';
 import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/dashboard_screen.dart';
@@ -79,6 +80,13 @@ class MainNavScreen extends StatefulWidget {
 
 class MainNavScreenState extends State<MainNavScreen> {
   int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Auto-reconnect to last saved printer
+    PlatformPrinterService.autoConnect();
+  }
 
   void switchToTab(int index) {
     setState(() => _currentIndex = index);

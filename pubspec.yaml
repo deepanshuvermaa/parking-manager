@@ -59,6 +59,9 @@ dependencies:
   # Image Picker
   image_picker: ^1.0.7
 
+  # Live QR/Barcode Scanner
+  mobile_scanner: ^5.1.1
+
   # Desktop Printing (USB/System printers)
   printing: ^5.12.0
 
