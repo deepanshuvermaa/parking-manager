@@ -826,8 +826,15 @@ app.use('*', (req, res) => {
 // ================================
 
 // Admin-only guard for admin panel endpoints
+// Accepts either: valid ParkEase admin token OR X-Admin-Key header
+const ADMIN_API_KEY = process.env.JWT_SECRET; // Use JWT_SECRET as admin key
 const adminGuard = async (req, res, next) => {
   try {
+    // Check admin API key first (for cross-service admin panel calls)
+    const apiKey = req.headers['x-admin-key'];
+    if (apiKey && apiKey === ADMIN_API_KEY) return next();
+
+    // Otherwise check if user is admin via token
     const user = await pool.query('SELECT user_type, role FROM users WHERE id = $1', [req.userId]);
     if (!user.rows[0] || user.rows[0].user_type !== 'admin') {
       return res.status(403).json({ success: false, error: 'Admin access required' });
@@ -975,7 +982,7 @@ app.get('/api/business/staff/activity', verifyToken, async (req, res) => {
 // ADMIN PANEL ENDPOINTS (for ParkEase tab)
 // ================================
 
-app.get('/api/admin/parkease/stats', verifyToken, adminGuard, async (req, res) => {
+app.get('/api/admin/parkease/stats', adminGuard, async (req, res) => {
   try {
     const users = await pool.query('SELECT COUNT(*) as count FROM users');
     const vehicles = await pool.query('SELECT COUNT(*) as count FROM vehicles');
@@ -985,14 +992,14 @@ app.get('/api/admin/parkease/stats', verifyToken, adminGuard, async (req, res) =
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
-app.get('/api/admin/parkease/users', verifyToken, adminGuard, async (req, res) => {
+app.get('/api/admin/parkease/users', adminGuard, async (req, res) => {
   try {
     const result = await pool.query('SELECT id, username, full_name, email, role, user_type, is_active, is_staff, business_id, last_login_at, created_at FROM users ORDER BY created_at DESC');
     res.json({ success: true, data: { users: result.rows } });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
-app.get('/api/admin/parkease/vehicles', verifyToken, adminGuard, async (req, res) => {
+app.get('/api/admin/parkease/vehicles', adminGuard, async (req, res) => {
   try {
     const { status, limit } = req.query;
     let query = 'SELECT * FROM vehicles';
@@ -1005,7 +1012,7 @@ app.get('/api/admin/parkease/vehicles', verifyToken, adminGuard, async (req, res
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
-app.post('/api/admin/parkease/users/:userId/toggle', verifyToken, adminGuard, async (req, res) => {
+app.post('/api/admin/parkease/users/:userId/toggle', adminGuard, async (req, res) => {
   try {
     const { is_active } = req.body;
     await pool.query('UPDATE users SET is_active = $1 WHERE id = $2', [is_active, req.params.userId]);
@@ -1014,7 +1021,7 @@ app.post('/api/admin/parkease/users/:userId/toggle', verifyToken, adminGuard, as
 });
 
 // Extend subscription
-app.post('/api/admin/parkease/users/:userId/subscription', verifyToken, adminGuard, async (req, res) => {
+app.post('/api/admin/parkease/users/:userId/subscription', adminGuard, async (req, res) => {
   try {
     const { days, max_devices, multi_device_enabled } = req.body;
     const updates = [];
