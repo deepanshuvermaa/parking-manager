@@ -276,7 +276,7 @@ app.get('/api/vehicles', verifyToken, checkTrialExpiry, async (req, res) => {
 });
 
 // Add Vehicle
-app.post('/api/vehicles', verifyToken, subscriptionCheck, checkTrialExpiry, async (req, res) => {
+app.post('/api/vehicles', verifyToken, checkTrialExpiry, async (req, res) => {
   try {
     // Accept both camelCase and snake_case for compatibility
     const {
