@@ -29,34 +29,7 @@ const config = {
 
   // CORS
   cors: {
-    origin: function (origin, callback) {
-      // Allow requests with no origin (mobile apps, Postman, etc.)
-      if (!origin) return callback(null, true);
-
-      // Allowed origins
-      const allowedOrigins = [
-        'http://localhost:3000',
-        'http://localhost:5000',
-        'http://192.168.1.7:5000',
-        'https://parkease-production-6679.up.railway.app',
-        /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}:\d+$/,  // Local network
-        /^http:\/\/localhost:\d+$/,  // Any localhost port
-      ];
-
-      const isAllowed = allowedOrigins.some(allowed => {
-        if (allowed instanceof RegExp) {
-          return allowed.test(origin);
-        }
-        return allowed === origin;
-      });
-
-      if (isAllowed) {
-        callback(null, true);
-      } else {
-        console.log('CORS blocked origin:', origin);
-        callback(null, true); // Allow anyway in dev
-      }
-    },
+    origin: true, // Allow all origins
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'X-Admin-Key'],
