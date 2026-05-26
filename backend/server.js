@@ -982,7 +982,7 @@ app.get('/api/business/staff/activity', verifyToken, async (req, res) => {
 // ADMIN PANEL ENDPOINTS (for ParkEase tab)
 // ================================
 
-app.get('/api/admin/parkease/stats', adminGuard, async (req, res) => {
+app.get('/api/parkease-admin/stats', adminGuard, async (req, res) => {
   try {
     const users = await pool.query('SELECT COUNT(*) as count FROM users');
     const vehicles = await pool.query('SELECT COUNT(*) as count FROM vehicles');
@@ -992,14 +992,14 @@ app.get('/api/admin/parkease/stats', adminGuard, async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
-app.get('/api/admin/parkease/users', adminGuard, async (req, res) => {
+app.get('/api/parkease-admin/users', adminGuard, async (req, res) => {
   try {
     const result = await pool.query('SELECT id, username, full_name, email, role, user_type, is_active, is_staff, business_id, last_login_at, created_at FROM users ORDER BY created_at DESC');
     res.json({ success: true, data: { users: result.rows } });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
-app.get('/api/admin/parkease/vehicles', adminGuard, async (req, res) => {
+app.get('/api/parkease-admin/vehicles', adminGuard, async (req, res) => {
   try {
     const { status, limit } = req.query;
     let query = 'SELECT * FROM vehicles';
@@ -1012,7 +1012,7 @@ app.get('/api/admin/parkease/vehicles', adminGuard, async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
-app.post('/api/admin/parkease/users/:userId/toggle', adminGuard, async (req, res) => {
+app.post('/api/parkease-admin/users/:userId/toggle', adminGuard, async (req, res) => {
   try {
     const { is_active } = req.body;
     await pool.query('UPDATE users SET is_active = $1 WHERE id = $2', [is_active, req.params.userId]);
@@ -1021,7 +1021,7 @@ app.post('/api/admin/parkease/users/:userId/toggle', adminGuard, async (req, res
 });
 
 // Extend subscription
-app.post('/api/admin/parkease/users/:userId/subscription', adminGuard, async (req, res) => {
+app.post('/api/parkease-admin/users/:userId/subscription', adminGuard, async (req, res) => {
   try {
     const { days, max_devices, multi_device_enabled } = req.body;
     const updates = [];
