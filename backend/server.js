@@ -276,7 +276,7 @@ app.get('/api/vehicles', verifyToken, checkTrialExpiry, async (req, res) => {
 });
 
 // Add Vehicle
-app.post('/api/vehicles', verifyToken, checkTrialExpiry, async (req, res) => {
+app.post('/api/vehicles', verifyToken, subscriptionCheck, checkTrialExpiry, async (req, res) => {
   try {
     // Accept both camelCase and snake_case for compatibility
     const {
@@ -822,6 +822,39 @@ app.use('*', (req, res) => {
 
 // Global error handler
 // ================================
+// MIDDLEWARE: Admin Guard & Subscription Check
+// ================================
+
+// Admin-only guard for admin panel endpoints
+const adminGuard = async (req, res, next) => {
+  try {
+    const user = await pool.query('SELECT user_type, role FROM users WHERE id = $1', [req.userId]);
+    if (!user.rows[0] || user.rows[0].user_type !== 'admin') {
+      return res.status(403).json({ success: false, error: 'Admin access required' });
+    }
+    next();
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+};
+
+// Subscription check - blocks expired users from vehicle operations
+const subscriptionCheck = async (req, res, next) => {
+  try {
+    const user = await pool.query('SELECT trial_expires_at, subscription_expires_at, is_active FROM users WHERE id = $1', [req.userId]);
+    if (!user.rows[0] || !user.rows[0].is_active) {
+      return res.status(403).json({ success: false, error: 'Account disabled', code: 'ACCOUNT_DISABLED' });
+    }
+    const { trial_expires_at, subscription_expires_at } = user.rows[0];
+    const now = new Date();
+    const trialValid = trial_expires_at && new Date(trial_expires_at) > now;
+    const subValid = subscription_expires_at && new Date(subscription_expires_at) > now;
+    if (!trialValid && !subValid) {
+      return res.status(403).json({ success: false, error: 'Subscription expired', code: 'SUBSCRIPTION_EXPIRED' });
+    }
+    next();
+  } catch (e) { next(); } // Don't block on DB errors
+};
+
+// ================================
 // STAFF MANAGEMENT ENDPOINTS
 // ================================
 
@@ -907,11 +940,42 @@ app.get('/api/auth/me', verifyToken, async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
+// Get staff activity (manager/owner) - per-staff vehicle counts, revenue, last active
+app.get('/api/business/staff/activity', verifyToken, async (req, res) => {
+  try {
+    const user = await pool.query('SELECT * FROM users WHERE id = $1', [req.userId]);
+    if (!user.rows[0] || !['owner', 'manager'].includes(user.rows[0].role)) {
+      return res.status(403).json({ success: false, error: 'Manager/Owner access required' });
+    }
+    const businessId = user.rows[0].business_id;
+    const { period } = req.query; // today, week, month
+    
+    let dateFilter = "AND v.entry_time >= CURRENT_DATE";
+    if (period === 'week') dateFilter = "AND v.entry_time >= CURRENT_DATE - INTERVAL '7 days'";
+    if (period === 'month') dateFilter = "AND v.entry_time >= CURRENT_DATE - INTERVAL '30 days'";
+
+    const result = await pool.query(`
+      SELECT 
+        u.id, u.username, u.full_name, u.role, u.last_login_at,
+        COUNT(v.id) FILTER (WHERE v.status = 'parked') as vehicles_parked,
+        COUNT(v.id) FILTER (WHERE v.status = 'exited') as vehicles_exited,
+        COALESCE(SUM(v.amount) FILTER (WHERE v.status = 'exited'), 0) as revenue_collected
+      FROM users u
+      LEFT JOIN vehicles v ON v.user_id = u.id ${dateFilter}
+      WHERE u.business_id = $1
+      GROUP BY u.id, u.username, u.full_name, u.role, u.last_login_at
+      ORDER BY revenue_collected DESC
+    `, [businessId]);
+
+    res.json({ success: true, data: { staff: result.rows } });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
 // ================================
 // ADMIN PANEL ENDPOINTS (for ParkEase tab)
 // ================================
 
-app.get('/api/admin/parkease/stats', verifyToken, async (req, res) => {
+app.get('/api/admin/parkease/stats', verifyToken, adminGuard, async (req, res) => {
   try {
     const users = await pool.query('SELECT COUNT(*) as count FROM users');
     const vehicles = await pool.query('SELECT COUNT(*) as count FROM vehicles');
@@ -921,14 +985,14 @@ app.get('/api/admin/parkease/stats', verifyToken, async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
-app.get('/api/admin/parkease/users', verifyToken, async (req, res) => {
+app.get('/api/admin/parkease/users', verifyToken, adminGuard, async (req, res) => {
   try {
     const result = await pool.query('SELECT id, username, full_name, email, role, user_type, is_active, is_staff, business_id, last_login_at, created_at FROM users ORDER BY created_at DESC');
     res.json({ success: true, data: { users: result.rows } });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
-app.get('/api/admin/parkease/vehicles', verifyToken, async (req, res) => {
+app.get('/api/admin/parkease/vehicles', verifyToken, adminGuard, async (req, res) => {
   try {
     const { status, limit } = req.query;
     let query = 'SELECT * FROM vehicles';
@@ -941,10 +1005,27 @@ app.get('/api/admin/parkease/vehicles', verifyToken, async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
-app.post('/api/admin/parkease/users/:userId/toggle', verifyToken, async (req, res) => {
+app.post('/api/admin/parkease/users/:userId/toggle', verifyToken, adminGuard, async (req, res) => {
   try {
     const { is_active } = req.body;
     await pool.query('UPDATE users SET is_active = $1 WHERE id = $2', [is_active, req.params.userId]);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// Extend subscription
+app.post('/api/admin/parkease/users/:userId/subscription', verifyToken, adminGuard, async (req, res) => {
+  try {
+    const { days, max_devices, multi_device_enabled } = req.body;
+    const updates = [];
+    const params = [];
+    let idx = 1;
+    if (days) { updates.push(`subscription_expires_at = NOW() + INTERVAL '${parseInt(days)} days'`); }
+    if (max_devices !== undefined) { updates.push(`max_devices = $${idx}`); params.push(max_devices); idx++; }
+    if (multi_device_enabled !== undefined) { updates.push(`multi_device_enabled = $${idx}`); params.push(multi_device_enabled); idx++; }
+    if (updates.length === 0) return res.status(400).json({ success: false, error: 'No updates provided' });
+    params.push(req.params.userId);
+    await pool.query(`UPDATE users SET ${updates.join(', ')} WHERE id = $${idx}`, params);
     res.json({ success: true });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });

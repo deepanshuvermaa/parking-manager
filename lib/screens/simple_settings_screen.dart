@@ -8,6 +8,8 @@ import '../services/export_import_service.dart';
 import '../theme/app_theme.dart';
 import 'receipt_customization_screen.dart';
 import 'vehicle_rates_management_screen.dart';
+import 'staff_management_screen.dart';
+import 'staff_overview_screen.dart';
 
 class SimpleSettingsScreen extends StatefulWidget {
   final String token;
@@ -139,6 +141,15 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
             _nav('Printer Connection', Icons.print_rounded, () => Navigator.pushNamed(context, '/printer')),
             _nav('Customize Receipt', Icons.receipt_long_rounded, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReceiptCustomizationScreen()))),
           ]),
+
+          // Staff (owner only)
+          if (auth.userRole == 'owner') ...[
+            _section('Staff Management'),
+            _card([
+              _nav('Manage Staff', Icons.people_rounded, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StaffManagementScreen()))),
+              _nav('Staff Activity', Icons.analytics_rounded, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StaffOverviewScreen()))),
+            ]),
+          ],
 
           // Rates
           _section('Vehicle Rates'),

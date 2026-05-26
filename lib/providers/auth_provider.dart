@@ -89,6 +89,9 @@ class AuthProvider extends ChangeNotifier {
     // Sync settings from backend
     SettingsSyncService.loadFromBackend(_token!);
 
+    // Refresh role from backend (in case admin changed it)
+    _refreshRole();
+
     // Background validate - don't block the UI
     _validateInBackground();
 
@@ -112,6 +115,27 @@ class AuthProvider extends ChangeNotifier {
       _isOffline = true;
       notifyListeners();
     }
+  }
+
+  Future<void> _refreshRole() async {
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/auth/me'),
+        headers: {'Authorization': 'Bearer $_token'},
+      ).timeout(const Duration(seconds: 5));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true && data['data']?['user'] != null) {
+          final newRole = data['data']['user']['role'] as String? ?? _userRole;
+          if (newRole != _userRole) {
+            _userRole = newRole;
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('user_role', _userRole);
+            notifyListeners();
+          }
+        }
+      }
+    } catch (_) {}
   }
 
   /// Login with credentials
