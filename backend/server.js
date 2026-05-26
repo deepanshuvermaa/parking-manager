@@ -827,19 +827,20 @@ app.use('*', (req, res) => {
 
 // Admin-only guard for admin panel endpoints
 // Accepts either: valid ParkEase admin token OR X-Admin-Key header
-const ADMIN_API_KEY = process.env.JWT_SECRET; // Use JWT_SECRET as admin key
+const ADMIN_API_KEY = process.env.JWT_SECRET || '4b94df66634f7b97b95b9ed45cf8fe4856e526dba97da566676e3ce4e606c24b';
 const adminGuard = async (req, res, next) => {
   try {
     // Check admin API key first (for cross-service admin panel calls)
     const apiKey = req.headers['x-admin-key'];
-    if (apiKey && apiKey === ADMIN_API_KEY) return next();
+    if (apiKey === ADMIN_API_KEY) return next();
 
-    // Otherwise check if user is admin via token
-    const user = await pool.query('SELECT user_type, role FROM users WHERE id = $1', [req.userId]);
-    if (!user.rows[0] || user.rows[0].user_type !== 'admin') {
-      return res.status(403).json({ success: false, error: 'Admin access required' });
+    // Otherwise check if user is admin via token (requires verifyToken before this)
+    if (req.userId) {
+      const user = await pool.query('SELECT user_type, role FROM users WHERE id = $1', [req.userId]);
+      if (user.rows[0] && user.rows[0].user_type === 'admin') return next();
     }
-    next();
+
+    return res.status(403).json({ success: false, error: 'Admin access required' });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 };
 
