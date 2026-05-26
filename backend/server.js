@@ -821,6 +821,135 @@ app.use('*', (req, res) => {
 });
 
 // Global error handler
+// ================================
+// STAFF MANAGEMENT ENDPOINTS
+// ================================
+
+// List staff for a business (owner only)
+app.get('/api/business/staff', verifyToken, async (req, res) => {
+  try {
+    const user = await pool.query('SELECT * FROM users WHERE id = $1', [req.userId]);
+    if (!user.rows[0] || user.rows[0].role !== 'owner') {
+      return res.status(403).json({ success: false, error: 'Owner access required' });
+    }
+    const businessId = user.rows[0].business_id;
+    const staff = await pool.query(
+      'SELECT id, username, full_name, role, is_active, last_login_at, created_at FROM users WHERE business_id = $1 AND id != $2 ORDER BY created_at DESC',
+      [businessId, req.userId]
+    );
+    res.json({ success: true, data: { staff: staff.rows } });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// Create staff member (owner only)
+app.post('/api/business/staff', verifyToken, async (req, res) => {
+  try {
+    const user = await pool.query('SELECT * FROM users WHERE id = $1', [req.userId]);
+    if (!user.rows[0] || user.rows[0].role !== 'owner') {
+      return res.status(403).json({ success: false, error: 'Owner access required' });
+    }
+    const { username, password, fullName, role } = req.body;
+    if (!username || !password || !fullName) {
+      return res.status(400).json({ success: false, error: 'username, password, fullName required' });
+    }
+    const validRoles = ['staff', 'manager'];
+    const staffRole = validRoles.includes(role) ? role : 'staff';
+    const hash = await bcrypt.hash(password, 10);
+    const businessId = user.rows[0].business_id;
+    const result = await pool.query(
+      `INSERT INTO users (username, full_name, password_hash, user_type, role, business_id, parent_user_id, is_staff, is_active, max_devices, trial_expires_at)
+       VALUES ($1, $2, $3, 'admin', $4, $5, $6, true, true, 2, NOW() + INTERVAL '365 days') RETURNING id, username, full_name, role`,
+      [username, fullName, hash, staffRole, businessId, req.userId]
+    );
+    res.json({ success: true, data: { staff: result.rows[0] } });
+  } catch (e) {
+    if (e.code === '23505') return res.status(400).json({ success: false, error: 'Username already exists' });
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// Update staff (owner only)
+app.put('/api/business/staff/:staffId', verifyToken, async (req, res) => {
+  try {
+    const user = await pool.query('SELECT * FROM users WHERE id = $1', [req.userId]);
+    if (!user.rows[0] || user.rows[0].role !== 'owner') {
+      return res.status(403).json({ success: false, error: 'Owner access required' });
+    }
+    const { role, is_active } = req.body;
+    const businessId = user.rows[0].business_id;
+    await pool.query(
+      'UPDATE users SET role = COALESCE($1, role), is_active = COALESCE($2, is_active) WHERE id = $3 AND business_id = $4',
+      [role, is_active, req.params.staffId, businessId]
+    );
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// Delete staff (owner only)
+app.delete('/api/business/staff/:staffId', verifyToken, async (req, res) => {
+  try {
+    const user = await pool.query('SELECT * FROM users WHERE id = $1', [req.userId]);
+    if (!user.rows[0] || user.rows[0].role !== 'owner') {
+      return res.status(403).json({ success: false, error: 'Owner access required' });
+    }
+    const businessId = user.rows[0].business_id;
+    await pool.query('DELETE FROM users WHERE id = $1 AND business_id = $2 AND is_staff = true', [req.params.staffId, businessId]);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// Get user role/permissions (for app RBAC)
+app.get('/api/auth/me', verifyToken, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id, username, full_name, role, is_staff, business_id, is_active FROM users WHERE id = $1', [req.userId]);
+    if (!result.rows[0]) return res.status(404).json({ success: false, error: 'User not found' });
+    res.json({ success: true, data: { user: result.rows[0] } });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// ================================
+// ADMIN PANEL ENDPOINTS (for ParkEase tab)
+// ================================
+
+app.get('/api/admin/parkease/stats', verifyToken, async (req, res) => {
+  try {
+    const users = await pool.query('SELECT COUNT(*) as count FROM users');
+    const vehicles = await pool.query('SELECT COUNT(*) as count FROM vehicles');
+    const parked = await pool.query("SELECT COUNT(*) as count FROM vehicles WHERE status = 'parked'");
+    const revenue = await pool.query("SELECT COALESCE(SUM(amount), 0) as total FROM vehicles WHERE status = 'exited'");
+    res.json({ success: true, data: { totalUsers: users.rows[0].count, totalVehicles: vehicles.rows[0].count, currentlyParked: parked.rows[0].count, totalRevenue: revenue.rows[0].total } });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+app.get('/api/admin/parkease/users', verifyToken, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id, username, full_name, email, role, user_type, is_active, is_staff, business_id, last_login_at, created_at FROM users ORDER BY created_at DESC');
+    res.json({ success: true, data: { users: result.rows } });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+app.get('/api/admin/parkease/vehicles', verifyToken, async (req, res) => {
+  try {
+    const { status, limit } = req.query;
+    let query = 'SELECT * FROM vehicles';
+    const params = [];
+    if (status) { query += ' WHERE status = $1'; params.push(status); }
+    query += ' ORDER BY entry_time DESC LIMIT $' + (params.length + 1);
+    params.push(parseInt(limit) || 100);
+    const result = await pool.query(query, params);
+    res.json({ success: true, data: { vehicles: result.rows } });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+app.post('/api/admin/parkease/users/:userId/toggle', verifyToken, async (req, res) => {
+  try {
+    const { is_active } = req.body;
+    await pool.query('UPDATE users SET is_active = $1 WHERE id = $2', [is_active, req.params.userId]);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// Global error handler
 app.use((error, req, res, next) => {
   console.error('Unhandled error:', error);
   res.status(500).json({ success: false, error: 'Internal server error' });

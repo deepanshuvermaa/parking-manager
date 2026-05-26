@@ -84,7 +84,6 @@ class MainNavScreenState extends State<MainNavScreen> {
   @override
   void initState() {
     super.initState();
-    // Auto-reconnect to last saved printer
     PlatformPrinterService.autoConnect();
   }
 
@@ -94,29 +93,37 @@ class MainNavScreenState extends State<MainNavScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final role = context.watch<AuthProvider>().userRole;
+    final isStaffOnly = role == 'staff';
+
     final screens = [
       DashboardScreen(onTabSwitch: switchToTab),
       const VehicleEntryScreen(),
       const VehicleExitScreen(),
-      const ReportsScreen(),
+      if (!isStaffOnly) const ReportsScreen(),
     ];
 
+    final navItems = [
+      const BottomNavigationBarItem(icon: Icon(Icons.home_rounded, size: 22), label: 'Home'),
+      const BottomNavigationBarItem(icon: Icon(Icons.add_circle_rounded, size: 28), label: 'Entry'),
+      const BottomNavigationBarItem(icon: Icon(Icons.exit_to_app_rounded, size: 22), label: 'Exit'),
+      if (!isStaffOnly) const BottomNavigationBarItem(icon: Icon(Icons.bar_chart_rounded, size: 22), label: 'Reports'),
+    ];
+
+    // Clamp index if role changed
+    final safeIndex = _currentIndex.clamp(0, screens.length - 1);
+
     return Scaffold(
-      body: IndexedStack(index: _currentIndex, children: screens),
+      body: IndexedStack(index: safeIndex, children: screens),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           color: Go2Colors.surface,
           border: Border(top: BorderSide(color: Go2Colors.divider, width: 0.5)),
         ),
         child: BottomNavigationBar(
-          currentIndex: _currentIndex,
+          currentIndex: safeIndex,
           onTap: switchToTab,
-          items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.home_rounded, size: 22), label: 'Home'),
-            BottomNavigationBarItem(icon: Icon(Icons.add_circle_rounded, size: 28), label: 'Entry'),
-            BottomNavigationBarItem(icon: Icon(Icons.exit_to_app_rounded, size: 22), label: 'Exit'),
-            BottomNavigationBarItem(icon: Icon(Icons.bar_chart_rounded, size: 22), label: 'Reports'),
-          ],
+          items: navItems,
         ),
       ),
     );

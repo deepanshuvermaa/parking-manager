@@ -66,7 +66,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ? const Padding(padding: EdgeInsets.only(right: 8), child: Icon(Icons.print_rounded, size: 18, color: Go2Colors.success))
                 : const SizedBox.shrink(),
           ),
-          IconButton(icon: const Icon(Icons.settings_outlined, size: 20), onPressed: () => Navigator.pushNamed(context, '/settings')),
+          if (auth.userRole != 'staff')
+            IconButton(icon: const Icon(Icons.settings_outlined, size: 20), onPressed: () => Navigator.pushNamed(context, '/settings')),
         ],
       ),
       body: RefreshIndicator(
