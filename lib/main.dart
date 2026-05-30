@@ -96,12 +96,27 @@ class MainNavScreenState extends State<MainNavScreen> {
     final role = context.watch<AuthProvider>().userRole;
     final isStaffOnly = role == 'staff';
 
-    final screens = [
-      DashboardScreen(onTabSwitch: switchToTab),
-      const VehicleEntryScreen(),
-      const VehicleExitScreen(),
-      if (!isStaffOnly) const ReportsScreen(),
-    ];
+    final maxIndex = isStaffOnly ? 2 : 3;
+    final safeIndex = _currentIndex.clamp(0, maxIndex);
+
+    // Only build the active screen - no IndexedStack
+    Widget body;
+    switch (safeIndex) {
+      case 0:
+        body = DashboardScreen(onTabSwitch: switchToTab);
+        break;
+      case 1:
+        body = const VehicleEntryScreen();
+        break;
+      case 2:
+        body = const VehicleExitScreen();
+        break;
+      case 3:
+        body = const ReportsScreen();
+        break;
+      default:
+        body = DashboardScreen(onTabSwitch: switchToTab);
+    }
 
     final navItems = [
       const BottomNavigationBarItem(icon: Icon(Icons.home_rounded, size: 22), label: 'Home'),
@@ -110,11 +125,8 @@ class MainNavScreenState extends State<MainNavScreen> {
       if (!isStaffOnly) const BottomNavigationBarItem(icon: Icon(Icons.bar_chart_rounded, size: 22), label: 'Reports'),
     ];
 
-    // Clamp index if role changed
-    final safeIndex = _currentIndex.clamp(0, screens.length - 1);
-
     return Scaffold(
-      body: IndexedStack(index: safeIndex, children: screens),
+      body: body,
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           color: Go2Colors.surface,

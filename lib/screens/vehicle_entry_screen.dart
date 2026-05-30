@@ -2,9 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import '../providers/auth_provider.dart';
 import '../providers/parking_provider.dart';
 import '../services/simple_vehicle_service.dart';
@@ -27,6 +24,7 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
   bool _isSubmitting = false;
   SimpleVehicle? _lastVehicle;
   String? _lastReceipt;
+  SharedPreferences? _prefs;
 
   // Only 6 primary types - user can add more via Settings > Rates
   static const _types = [
@@ -44,62 +42,11 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
     _plateController.addListener(() {
       _hasText.value = _plateController.text.trim().isNotEmpty;
     });
+    SharedPreferences.getInstance().then((p) => _prefs = p);
   }
 
   @override
   void dispose() { _plateController.dispose(); _hasText.dispose(); super.dispose(); }
-
-  Future<void> _scanPlate() async {
-    var status = await Permission.camera.status;
-    if (!status.isGranted) {
-      status = await Permission.camera.request();
-      if (!status.isGranted) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Camera permission required'), backgroundColor: Go2Colors.error));
-          if (status.isPermanentlyDenied) openAppSettings();
-        }
-        return;
-      }
-    }
-
-    final picker = ImagePicker();
-    final image = await picker.pickImage(source: ImageSource.camera, maxWidth: 1920, imageQuality: 90);
-    if (image == null) return;
-
-    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reading plate...'), duration: Duration(seconds: 1)));
-
-    final inputImage = InputImage.fromFilePath(image.path);
-    final textRecognizer = TextRecognizer();
-    try {
-      final result = await textRecognizer.processImage(inputImage);
-      String? plate = _extractPlate(result.text);
-      if (plate != null && mounted) {
-        _plateController.text = plate;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('✓ $plate'), backgroundColor: Go2Colors.success));
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not detect plate. Try again.'), backgroundColor: Go2Colors.warning));
-      }
-    } finally {
-      textRecognizer.close();
-    }
-  }
-
-  String? _extractPlate(String text) {
-    // Indian plate formats: MH12AB1234, MH 12 AB 1234, DL 01 CA 0001, etc.
-    final cleaned = text.toUpperCase().replaceAll('\n', ' ').replaceAll(RegExp(r'[^A-Z0-9 ]'), ' ');
-    // Pattern: 2 letters + 1-2 digits + 1-3 letters + 1-4 digits
-    final patterns = [
-      RegExp(r'([A-Z]{2})\s*(\d{1,2})\s*([A-Z]{1,3})\s*(\d{1,4})'),
-      RegExp(r'([A-Z]{2})(\d{2})([A-Z]{1,3})(\d{1,4})'),
-    ];
-    for (final regex in patterns) {
-      final match = regex.firstMatch(cleaned);
-      if (match != null) {
-        return '${match.group(1)} ${match.group(2)} ${match.group(3)} ${match.group(4)}'.trim();
-      }
-    }
-    return null;
-  }
 
   Future<void> _submit() async {
     final plate = _plateController.text.trim().toUpperCase();
@@ -120,7 +67,7 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
         _lastVehicle = vehicle;
         _lastReceipt = receipt;
 
-        final prefs = await SharedPreferences.getInstance();
+        final prefs = _prefs ?? await SharedPreferences.getInstance();
         final autoPrint = prefs.getBool('auto_print') ?? true;
         final connected = await PlatformPrinterService.isConnected();
         String msg;
@@ -223,11 +170,6 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
               hintText: 'MH 12 AB 1234',
               hintStyle: TextStyle(fontSize: 24, fontWeight: FontWeight.w400, color: Go2Colors.textHint.withValues(alpha: 0.5), letterSpacing: 2),
               prefixIcon: const Icon(Icons.pin_outlined, size: 24),
-              suffixIcon: IconButton(
-                icon: const Icon(Icons.camera_alt_rounded, size: 26, color: Go2Colors.primary),
-                tooltip: 'Scan plate',
-                onPressed: _scanPlate,
-              ),
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
             ),
             inputFormatters: [UpperCaseTextFormatter(), LengthLimitingTextInputFormatter(14)],

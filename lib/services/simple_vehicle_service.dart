@@ -11,6 +11,7 @@ class SimpleVehicleService {
   static String get baseUrl => ApiConfig.baseUrl.replaceAll('/api', '');
   static List<SimpleVehicle> _cachedVehicles = [];
   static bool _isInitialized = false;
+  static DateTime? _lastSyncTime;
 
   // ============================================
   // INITIALIZATION AND SYNC
@@ -105,11 +106,15 @@ class SimpleVehicleService {
       await initialize(token);
     }
 
-    // Try to refresh from backend in background (skip for offline)
+    // Debounce: only sync if >60 seconds since last sync
     if (token.isNotEmpty && token != 'offline_local_token') {
-      syncWithBackend(token).catchError((e) {
-        print('Background sync failed: $e');
-      });
+      final now = DateTime.now();
+      if (_lastSyncTime == null || now.difference(_lastSyncTime!).inSeconds > 60) {
+        _lastSyncTime = now;
+        syncWithBackend(token).catchError((e) {
+          print('Background sync failed: $e');
+        });
+      }
     }
 
     return _cachedVehicles;

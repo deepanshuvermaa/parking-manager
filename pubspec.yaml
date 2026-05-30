@@ -27,13 +27,10 @@ dependencies:
   
   # UI
   google_fonts: ^6.1.0
-  flutter_svg: ^2.0.9
-  lottie: ^3.0.0
   
   # Utilities
   intl: ^0.18.1
   qr_flutter: ^4.1.0
-  google_mlkit_text_recognition: ^0.13.0
   path_provider: ^2.1.2
   pdf: ^3.10.7
   share_plus: ^7.2.2
@@ -55,9 +52,6 @@ dependencies:
   
   # Device Info
   device_info_plus: ^10.1.0
-  
-  # Image Picker
-  image_picker: ^1.0.7
 
   # Live QR/Barcode Scanner
   mobile_scanner: ^5.1.1
@@ -65,12 +59,11 @@ dependencies:
   # Desktop Printing (USB/System printers)
   printing: ^5.12.0
 
-  # Windows native APIs
+  # Windows native APIs (desktop only)
   win32: ^5.0.0
   ffi: ^2.1.0
 
-  # Platform detection
-  flutter_platform_widgets: ^7.0.1
+  # ESC/POS formatting
   esc_pos_utils_plus: ^2.0.4
 
 dev_dependencies:
@@ -83,9 +76,7 @@ flutter:
   uses-material-design: true
   
   assets:
-    - assets/images/
     - assets/icons/
-    - assets/fonts/
 
 # Flutter launcher icons configuration
 flutter_launcher_icons:
