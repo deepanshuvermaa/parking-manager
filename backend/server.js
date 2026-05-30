@@ -245,20 +245,33 @@ app.get('/api/auth/validate', verifyToken, async (req, res) => {
 // VEHICLE MANAGEMENT ENDPOINTS
 // ================================
 
-// Get Vehicles (with trial check)
+// Get Vehicles (with trial check) - returns all business vehicles for multi-staff
 app.get('/api/vehicles', verifyToken, checkTrialExpiry, async (req, res) => {
   try {
     const { status, limit = 100, offset = 0 } = req.query;
 
-    let query = 'SELECT * FROM vehicles WHERE user_id = $1';
-    const params = [req.userId];
+    // Get user's business_id for multi-staff support
+    const userResult = await pool.query('SELECT business_id FROM users WHERE id = $1', [req.userId]);
+    const businessId = userResult.rows[0]?.business_id;
+
+    let query;
+    let params;
+
+    if (businessId) {
+      // Return all vehicles for the business (owner sees staff entries, staff sees all)
+      query = 'SELECT v.*, u.full_name as entered_by FROM vehicles v LEFT JOIN users u ON v.user_id = u.id WHERE (v.business_id = $1 OR (v.business_id IS NULL AND v.user_id = $2))';
+      params = [businessId, req.userId];
+    } else {
+      query = 'SELECT * FROM vehicles WHERE user_id = $1';
+      params = [req.userId];
+    }
 
     if (status) {
-      query += ' AND status = $2';
+      query += ` AND status = $${params.length + 1}`;
       params.push(status);
     }
 
-    query += ' ORDER BY entry_time DESC LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2);
+    query += ` ORDER BY entry_time DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
     params.push(limit, offset);
 
     const result = await pool.query(query, params);
@@ -309,12 +322,17 @@ app.post('/api/vehicles', verifyToken, checkTrialExpiry, async (req, res) => {
 
     console.log('Adding vehicle with normalized data:', normalizedData);
 
+    // Get user's business_id for multi-staff data sharing
+    const userResult = await pool.query('SELECT business_id FROM users WHERE id = $1', [req.userId]);
+    const businessId = userResult.rows[0]?.business_id || null;
+
     const result = await pool.query(
-      `INSERT INTO vehicles (user_id, vehicle_number, vehicle_type, entry_time, hourly_rate, minimum_rate, ticket_id, notes, from_location, to_location)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `INSERT INTO vehicles (user_id, business_id, vehicle_number, vehicle_type, entry_time, hourly_rate, minimum_rate, ticket_id, notes, from_location, to_location)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING *`,
       [
         req.userId,
+        businessId,
         normalizedData.vehicleNumber,
         normalizedData.vehicleType,
         normalizedData.entryTime || new Date(),
@@ -349,11 +367,23 @@ app.put('/api/vehicles/:id/exit', verifyToken, checkTrialExpiry, async (req, res
     const { id } = req.params;
     const { exitTime, amount, notes } = req.body;
 
-    // Get current vehicle data (handle both UUID and string IDs like "local_1759730204667")
-    const currentResult = await pool.query(
-      'SELECT * FROM vehicles WHERE (CAST(id AS TEXT) = $1 OR ticket_id = $1) AND user_id = $2',
-      [id, req.userId]
-    );
+    // Get user's business_id for multi-staff support
+    const userResult = await pool.query('SELECT business_id FROM users WHERE id = $1', [req.userId]);
+    const businessId = userResult.rows[0]?.business_id;
+
+    // Get current vehicle data - search within business scope so any staff can exit
+    let currentResult;
+    if (businessId) {
+      currentResult = await pool.query(
+        'SELECT * FROM vehicles WHERE (CAST(id AS TEXT) = $1 OR ticket_id = $1) AND (business_id = $2 OR user_id = $3)',
+        [id, businessId, req.userId]
+      );
+    } else {
+      currentResult = await pool.query(
+        'SELECT * FROM vehicles WHERE (CAST(id AS TEXT) = $1 OR ticket_id = $1) AND user_id = $2',
+        [id, req.userId]
+      );
+    }
 
     if (currentResult.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Vehicle not found' });
@@ -366,13 +396,13 @@ app.put('/api/vehicles/:id/exit', verifyToken, checkTrialExpiry, async (req, res
     const entry = new Date(currentVehicle.entry_time);
     const durationMinutes = Math.floor((exit - entry) / (1000 * 60));
 
-    // Update vehicle (handle both UUID and string IDs)
+    // Update vehicle
     const result = await pool.query(
       `UPDATE vehicles
        SET exit_time = $1, amount = $2, status = 'exited', duration_minutes = $3, notes = $4, updated_at = NOW()
-       WHERE (CAST(id AS TEXT) = $5 OR ticket_id = $5) AND user_id = $6
+       WHERE id = $5
        RETURNING *`,
-      [exit, amount, durationMinutes, notes, id, req.userId]
+      [exit, amount, durationMinutes, notes, currentVehicle.id]
     );
 
     const updatedVehicle = result.rows[0];
@@ -493,6 +523,10 @@ app.post('/api/vehicles/sync', verifyToken, checkTrialExpiry, async (req, res) =
       return res.status(400).json({ success: false, error: 'Vehicles must be an array' });
     }
 
+    // Get user's business_id for multi-staff data sharing
+    const userResult = await pool.query('SELECT business_id FROM users WHERE id = $1', [req.userId]);
+    const businessId = userResult.rows[0]?.business_id || null;
+
     const client = await pool.connect();
 
     try {
@@ -514,13 +548,13 @@ app.post('/api/vehicles/sync', verifyToken, checkTrialExpiry, async (req, res) =
           notes
         } = vehicle;
 
-        // Check if vehicle already exists by ticket_id or unique combination
+        // Check if vehicle already exists by ticket_id (within business scope)
         let existingVehicle = null;
         if (ticketId) {
-          const existingResult = await client.query(
-            'SELECT id FROM vehicles WHERE user_id = $1 AND ticket_id = $2',
-            [req.userId, ticketId]
-          );
+          const existingQuery = businessId
+            ? 'SELECT id FROM vehicles WHERE business_id = $1 AND ticket_id = $2'
+            : 'SELECT id FROM vehicles WHERE user_id = $1 AND ticket_id = $2';
+          const existingResult = await client.query(existingQuery, [businessId || req.userId, ticketId]);
           existingVehicle = existingResult.rows[0];
         }
 
@@ -530,22 +564,22 @@ app.post('/api/vehicles/sync', verifyToken, checkTrialExpiry, async (req, res) =
             `UPDATE vehicles
              SET vehicle_number = $1, vehicle_type = $2, entry_time = $3, exit_time = $4,
                  amount = $5, status = $6, hourly_rate = $7, minimum_rate = $8, notes = $9, updated_at = NOW()
-             WHERE id = $10 AND user_id = $11
+             WHERE id = $10
              RETURNING *`,
             [
               vehicleNumber, vehicleType, entryTime, exitTime, amount,
-              status, hourlyRate, minimumRate, notes, existingVehicle.id, req.userId
+              status, hourlyRate, minimumRate, notes, existingVehicle.id
             ]
           );
           syncedVehicles.push(result.rows[0]);
         } else {
-          // Insert new vehicle
+          // Insert new vehicle with business_id
           const result = await client.query(
-            `INSERT INTO vehicles (user_id, vehicle_number, vehicle_type, entry_time, exit_time, amount, status, ticket_id, hourly_rate, minimum_rate, notes)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            `INSERT INTO vehicles (user_id, business_id, vehicle_number, vehicle_type, entry_time, exit_time, amount, status, ticket_id, hourly_rate, minimum_rate, notes)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
              RETURNING *`,
             [
-              req.userId, vehicleNumber, vehicleType, entryTime, exitTime,
+              req.userId, businessId, vehicleNumber, vehicleType, entryTime, exitTime,
               amount, status, ticketId, hourlyRate, minimumRate, notes
             ]
           );

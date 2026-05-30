@@ -47,6 +47,7 @@ class _VehicleRatesManagementScreenState extends State<VehicleRatesManagementScr
         'type': type,
         'hourly': match.isNotEmpty ? match.first.hourlyRate : defaults['hourly'],
         'minimum': match.isNotEmpty ? match.first.minimumCharge : defaults['minimum'],
+        'minimumDurationMinutes': match.isNotEmpty ? match.first.minimumDurationMinutes : (defaults['minimumDurationMinutes'] ?? 30),
       });
     }
     setState(() => _rates = list);
@@ -56,6 +57,7 @@ class _VehicleRatesManagementScreenState extends State<VehicleRatesManagementScr
     final rate = _rates[index];
     final hourlyCtrl = TextEditingController(text: rate['hourly'].toStringAsFixed(0));
     final minCtrl = TextEditingController(text: rate['minimum'].toStringAsFixed(0));
+    final durationCtrl = TextEditingController(text: (rate['minimumDurationMinutes'] ?? 30).toString());
     final formKey = GlobalKey<FormState>();
 
     final saved = await showDialog<bool>(
@@ -77,8 +79,18 @@ class _VehicleRatesManagementScreenState extends State<VehicleRatesManagementScr
               TextFormField(
                 controller: minCtrl,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Minimum Rate (₹)'),
+                decoration: const InputDecoration(labelText: 'Minimum Charge (₹)'),
                 validator: (v) => (v == null || double.tryParse(v) == null) ? 'Enter valid amount' : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: durationCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Minimum Duration (minutes)',
+                  helperText: 'Parking within this time = minimum charge',
+                ),
+                validator: (v) => (v == null || int.tryParse(v) == null) ? 'Enter valid minutes' : null,
               ),
             ],
           ),
@@ -100,15 +112,16 @@ class _VehicleRatesManagementScreenState extends State<VehicleRatesManagementScr
       final idx = rates.indexWhere((r) => r.vehicleType == rate['type']);
       final hourly = double.parse(hourlyCtrl.text);
       final minimum = double.parse(minCtrl.text);
+      final minDuration = int.parse(durationCtrl.text);
       if (idx != -1) {
-        rates[idx] = rates[idx].copyWith(hourlyRate: hourly, minimumCharge: minimum);
+        rates[idx] = rates[idx].copyWith(hourlyRate: hourly, minimumCharge: minimum, minimumDurationMinutes: minDuration);
       } else {
-        final defaults = SimpleVehicleService.getDefaultRate(rate['type']);
         rates.add(VehicleRate(
           vehicleType: rate['type'],
           hourlyRate: hourly,
           minimumCharge: minimum,
-          freeMinutes: (defaults['freeMinutes'] as num).toInt(),
+          freeMinutes: 5,
+          minimumDurationMinutes: minDuration,
         ));
       }
       await VehicleRateService.saveRates(rates);
@@ -120,6 +133,7 @@ class _VehicleRatesManagementScreenState extends State<VehicleRatesManagementScr
     final nameCtrl = TextEditingController();
     final hourlyCtrl = TextEditingController(text: '20');
     final minCtrl = TextEditingController(text: '20');
+    final durationCtrl = TextEditingController(text: '30');
     final formKey = GlobalKey<FormState>();
 
     final saved = await showDialog<bool>(
@@ -137,7 +151,13 @@ class _VehicleRatesManagementScreenState extends State<VehicleRatesManagementScr
             const SizedBox(height: 12),
             TextFormField(controller: hourlyCtrl, decoration: const InputDecoration(labelText: 'Hourly Rate (₹)'), keyboardType: TextInputType.number),
             const SizedBox(height: 12),
-            TextFormField(controller: minCtrl, decoration: const InputDecoration(labelText: 'Minimum Rate (₹)'), keyboardType: TextInputType.number),
+            TextFormField(controller: minCtrl, decoration: const InputDecoration(labelText: 'Minimum Charge (₹)'), keyboardType: TextInputType.number),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: durationCtrl,
+              decoration: const InputDecoration(labelText: 'Minimum Duration (minutes)', helperText: 'Parking within this time = minimum charge'),
+              keyboardType: TextInputType.number,
+            ),
           ]),
         ),
         actions: [
@@ -153,7 +173,8 @@ class _VehicleRatesManagementScreenState extends State<VehicleRatesManagementScr
         vehicleType: nameCtrl.text.trim(),
         hourlyRate: double.tryParse(hourlyCtrl.text) ?? 20,
         minimumCharge: double.tryParse(minCtrl.text) ?? 20,
-        freeMinutes: 15,
+        freeMinutes: 5,
+        minimumDurationMinutes: int.tryParse(durationCtrl.text) ?? 30,
       ));
       await VehicleRateService.saveRates(rates);
       _loadRates();
@@ -182,12 +203,13 @@ class _VehicleRatesManagementScreenState extends State<VehicleRatesManagementScr
 
   Widget _buildCard(int index) {
     final rate = _rates[index];
+    final minDur = rate['minimumDurationMinutes'] ?? 30;
     return Card(
       child: ListTile(
         leading: Icon(_icons[rate['type']] ?? Icons.directions_car, color: Go2Colors.primary),
         title: Text(rate['type'], style: const TextStyle(color: Go2Colors.textPrimary, fontWeight: FontWeight.w500)),
         subtitle: Text(
-          '₹${rate['hourly'].toStringAsFixed(0)}/hr • Min ₹${rate['minimum'].toStringAsFixed(0)}',
+          '₹${rate['hourly'].toStringAsFixed(0)}/hr • Min ₹${rate['minimum'].toStringAsFixed(0)} (≤${minDur}min)',
           style: const TextStyle(color: Go2Colors.textSecondary, fontSize: 13),
         ),
         trailing: IconButton(

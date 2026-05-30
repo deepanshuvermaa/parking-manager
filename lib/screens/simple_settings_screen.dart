@@ -8,6 +8,7 @@ import '../services/export_import_service.dart';
 import '../theme/app_theme.dart';
 import 'receipt_customization_screen.dart';
 import 'vehicle_rates_management_screen.dart';
+import 'parking_space_config_screen.dart';
 import 'staff_management_screen.dart';
 import 'staff_overview_screen.dart';
 
@@ -155,6 +156,12 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
           _section('Vehicle Rates'),
           _card([
             _nav('Manage Rates', Icons.currency_rupee_rounded, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VehicleRatesManagementScreen()))),
+          ]),
+
+          // Parking Space
+          _section('Parking Space'),
+          _card([
+            _nav('Configure Slots', Icons.grid_view_rounded, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ParkingSpaceConfigScreen()))),
           ]),
 
           // Backup

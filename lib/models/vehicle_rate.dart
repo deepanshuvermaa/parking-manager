@@ -5,6 +5,7 @@ class VehicleRate {
   final double hourlyRate;
   final double minimumCharge;
   final int freeMinutes;
+  final int minimumDurationMinutes; // Parking within this time = minimumCharge
   final List<TimedRate> timedRates; // Optional time-based rates
 
   VehicleRate({
@@ -12,14 +13,20 @@ class VehicleRate {
     required this.hourlyRate,
     required this.minimumCharge,
     this.freeMinutes = 0,
+    this.minimumDurationMinutes = 30,
     this.timedRates = const [],
   });
 
   /// Calculate fee based on duration
   double calculateFee(Duration duration) {
-    // Check if we're still in free period
-    if (duration.inMinutes <= freeMinutes) {
+    // Grace period: truly free (for accidental entries)
+    if (freeMinutes > 0 && duration.inMinutes <= freeMinutes) {
       return 0;
+    }
+
+    // Within minimum duration: charge minimumCharge
+    if (duration.inMinutes <= minimumDurationMinutes) {
+      return minimumCharge;
     }
 
     // Check if any time-based rates apply
@@ -54,6 +61,7 @@ class VehicleRate {
       'hourlyRate': hourlyRate,
       'minimumCharge': minimumCharge,
       'freeMinutes': freeMinutes,
+      'minimumDurationMinutes': minimumDurationMinutes,
       'timedRates': timedRates.map((e) => e.toJson()).toList(),
     };
   }
@@ -65,6 +73,7 @@ class VehicleRate {
       hourlyRate: (json['hourlyRate'] as num).toDouble(),
       minimumCharge: (json['minimumCharge'] as num).toDouble(),
       freeMinutes: json['freeMinutes'] as int? ?? 0,
+      minimumDurationMinutes: json['minimumDurationMinutes'] as int? ?? 30,
       timedRates: (json['timedRates'] as List<dynamic>?)
               ?.map((e) => TimedRate.fromJson(e as Map<String, dynamic>))
               .toList() ??
@@ -83,6 +92,7 @@ class VehicleRate {
     double? hourlyRate,
     double? minimumCharge,
     int? freeMinutes,
+    int? minimumDurationMinutes,
     List<TimedRate>? timedRates,
   }) {
     return VehicleRate(
@@ -90,6 +100,7 @@ class VehicleRate {
       hourlyRate: hourlyRate ?? this.hourlyRate,
       minimumCharge: minimumCharge ?? this.minimumCharge,
       freeMinutes: freeMinutes ?? this.freeMinutes,
+      minimumDurationMinutes: minimumDurationMinutes ?? this.minimumDurationMinutes,
       timedRates: timedRates ?? this.timedRates,
     );
   }

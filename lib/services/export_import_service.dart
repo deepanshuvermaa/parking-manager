@@ -4,6 +4,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../utils/debug_logger.dart';
 import 'local_database_service.dart';
 import 'taxi_booking_service.dart';
@@ -18,21 +19,25 @@ class ExportImportService {
   static const String LAST_BACKUP_RECORD_COUNT_KEY = 'last_backup_record_count';
   static const String AUTO_BACKUP_ENABLED_KEY = 'auto_backup_enabled';
 
-  /// Get backup directory on device
+  /// Get backup directory on device - uses Downloads folder to survive uninstall
   static Future<Directory> getBackupDirectory() async {
     Directory appDocDir;
 
     if (Platform.isAndroid) {
-      // Use external storage for Android (accessible by user)
-      final externalDir = await getExternalStorageDirectory();
-      if (externalDir != null) {
-        appDocDir = Directory('${externalDir.path}/$BACKUP_DIR');
+      // Use Downloads/ParkEase_Backups/ - survives app uninstall
+      final downloadsDir = Directory('/storage/emulated/0/Download/$BACKUP_DIR');
+      if (await _requestStoragePermission()) {
+        appDocDir = downloadsDir;
       } else {
-        // Fallback to app documents directory
-        appDocDir = Directory('${(await getApplicationDocumentsDirectory()).path}/$BACKUP_DIR');
+        // Fallback to external storage (scoped, deleted on uninstall)
+        final externalDir = await getExternalStorageDirectory();
+        if (externalDir != null) {
+          appDocDir = Directory('${externalDir.path}/$BACKUP_DIR');
+        } else {
+          appDocDir = Directory('${(await getApplicationDocumentsDirectory()).path}/$BACKUP_DIR');
+        }
       }
     } else {
-      // Use documents directory for other platforms
       appDocDir = Directory('${(await getApplicationDocumentsDirectory()).path}/$BACKUP_DIR');
     }
 
@@ -41,6 +46,22 @@ class ExportImportService {
     }
 
     return appDocDir;
+  }
+
+  /// Request storage permission for writing to Downloads
+  static Future<bool> _requestStoragePermission() async {
+    if (!Platform.isAndroid) return true;
+    // Android 11+ uses MANAGE_EXTERNAL_STORAGE, below uses WRITE_EXTERNAL_STORAGE
+    if (await Permission.manageExternalStorage.isGranted) return true;
+    if (await Permission.storage.isGranted) return true;
+
+    // Try manage external storage first (Android 11+)
+    var status = await Permission.manageExternalStorage.request();
+    if (status.isGranted) return true;
+
+    // Fallback to regular storage permission
+    status = await Permission.storage.request();
+    return status.isGranted;
   }
 
   /// Export all app data (settings + vehicle data + taxi bookings)
@@ -194,11 +215,11 @@ class ExportImportService {
     }
   }
 
-  /// Cleanup old backups (keep only last 24 hours)
+  /// Cleanup old backups (keep last 7 days)
   static Future<void> _cleanupOldBackups(Directory hourlyDir) async {
     try {
       final now = DateTime.now();
-      final cutoffTime = now.subtract(const Duration(hours: 24));
+      final cutoffTime = now.subtract(const Duration(days: 7));
 
       final files = await hourlyDir.list().toList();
       for (final file in files) {

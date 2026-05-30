@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'dart:convert';
@@ -18,6 +19,9 @@ class LocalDatabaseService {
   /// Initialize database with tables
   static Future<Database> _initDB() async {
     String path = join(await getDatabasesPath(), 'parkease.db');
+
+    // Pre-migration backup: save a copy before any upgrade
+    await _preMigrationBackup(path);
 
     return await openDatabase(
       path,
@@ -97,6 +101,33 @@ class LocalDatabaseService {
         }
       },
     );
+  }
+
+  /// Create a backup copy of the database before any migration
+  static Future<void> _preMigrationBackup(String dbPath) async {
+    try {
+      final dbFile = File(dbPath);
+      if (!await dbFile.exists()) return; // No DB yet, skip
+
+      final backupDir = Directory('${dirname(dbPath)}/pre_migration_backups');
+      if (!await backupDir.exists()) await backupDir.create(recursive: true);
+
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final backupPath = '${backupDir.path}/parkease_pre_migration_$timestamp.db';
+      await dbFile.copy(backupPath);
+      print('✅ Pre-migration backup created: $backupPath');
+
+      // Keep only last 3 backups
+      final files = await backupDir.list().where((f) => f is File).toList();
+      if (files.length > 3) {
+        files.sort((a, b) => a.path.compareTo(b.path));
+        for (var i = 0; i < files.length - 3; i++) {
+          await files[i].delete();
+        }
+      }
+    } catch (e) {
+      print('⚠️ Pre-migration backup failed: $e');
+    }
   }
 
   // ============================================

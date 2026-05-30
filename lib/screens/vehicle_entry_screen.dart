@@ -22,6 +22,7 @@ class VehicleEntryScreen extends StatefulWidget {
 
 class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
   final _plateController = TextEditingController();
+  final _hasText = ValueNotifier<bool>(false);
   String _selectedType = 'Car';
   bool _isSubmitting = false;
   SimpleVehicle? _lastVehicle;
@@ -38,7 +39,15 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
   ];
 
   @override
-  void dispose() { _plateController.dispose(); super.dispose(); }
+  void initState() {
+    super.initState();
+    _plateController.addListener(() {
+      _hasText.value = _plateController.text.trim().isNotEmpty;
+    });
+  }
+
+  @override
+  void dispose() { _plateController.dispose(); _hasText.dispose(); super.dispose(); }
 
   Future<void> _scanPlate() async {
     var status = await Permission.camera.status;
@@ -66,7 +75,6 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
       String? plate = _extractPlate(result.text);
       if (plate != null && mounted) {
         _plateController.text = plate;
-        setState(() {});
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('✓ $plate'), backgroundColor: Go2Colors.success));
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not detect plate. Try again.'), backgroundColor: Go2Colors.warning));
@@ -223,7 +231,6 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
             ),
             inputFormatters: [UpperCaseTextFormatter(), LengthLimitingTextInputFormatter(14)],
-            onChanged: (_) => setState(() {}),
             onFieldSubmitted: (_) => _submit(),
           ),
           const SizedBox(height: 24),
@@ -231,17 +238,20 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
           // Park button - large, prominent
           SizedBox(
             height: 54,
-            child: ElevatedButton(
-              onPressed: _isSubmitting || _plateController.text.trim().isEmpty ? null : _submit,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Go2Colors.success,
-                foregroundColor: Colors.white,
-                textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: ValueListenableBuilder<bool>(
+              valueListenable: _hasText,
+              builder: (_, hasText, __) => ElevatedButton(
+                onPressed: _isSubmitting || !hasText ? null : _submit,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Go2Colors.success,
+                  foregroundColor: Colors.white,
+                  textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: _isSubmitting
+                    ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+                    : const Text('Park Vehicle'),
               ),
-              child: _isSubmitting
-                  ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
-                  : const Text('Park Vehicle'),
             ),
           ),
 

@@ -52,12 +52,12 @@ class ParkingProvider extends ChangeNotifier {
   int get todayExits => _todayExits;
   bool get isLoading => _isLoading;
 
-  int get totalCapacity => _zones.fold(0, (sum, z) => sum + z.totalSlots);
+  int get totalCapacity => _zones.where((z) => z.totalSlots != 9999).fold(0, (sum, z) => sum + z.totalSlots);
   int get totalOccupied => _zones.fold(0, (sum, z) => sum + z.occupiedSlots);
-  int get totalAvailable => totalCapacity - totalOccupied;
+  int get totalAvailable => totalCapacity > 0 ? totalCapacity - totalOccupied : 0;
   double get occupancyPercent =>
       totalCapacity > 0 ? (totalOccupied / totalCapacity) * 100 : 0;
-  bool get isFull => totalAvailable <= 0 && totalCapacity > 0;
+  bool get isFull => totalCapacity > 0 && totalAvailable <= 0;
 
   /// Initialize parking data
   Future<void> initialize(String token) async {
@@ -86,6 +86,7 @@ class ParkingProvider extends ChangeNotifier {
 
       // Update zone occupancy from active vehicles
       _updateZoneOccupancy();
+      await _saveZones();
       notifyListeners();
     } catch (e) {
       // Silent fail, keep cached data
@@ -128,9 +129,9 @@ class ParkingProvider extends ChangeNotifier {
   /// Record a vehicle entry (increment occupancy)
   void recordEntry() {
     if (_zones.isNotEmpty) {
-      // Fill first non-full zone
+      // Fill first non-full zone (unlimited zones are never full)
       for (var zone in _zones) {
-        if (!zone.isFull) {
+        if (zone.totalSlots == 9999 || !zone.isFull) {
           zone.occupiedSlots++;
           break;
         }
@@ -151,16 +152,24 @@ class ParkingProvider extends ChangeNotifier {
     }
     _todayRevenue += amount;
     _todayExits++;
+    _saveZones();
     notifyListeners();
   }
 
   void _updateZoneOccupancy() {
     if (_zones.isEmpty) return;
+    final parkedCount = _activeVehicles.length;
     // Distribute active vehicles across zones proportionally
-    int remaining = _activeVehicles.length;
+    int remaining = parkedCount;
     for (var zone in _zones) {
-      zone.occupiedSlots = remaining.clamp(0, zone.totalSlots);
-      remaining -= zone.occupiedSlots;
+      if (zone.totalSlots == 9999) {
+        // Unlimited zone: assign all remaining
+        zone.occupiedSlots = remaining;
+        remaining = 0;
+      } else {
+        zone.occupiedSlots = remaining.clamp(0, zone.totalSlots);
+        remaining -= zone.occupiedSlots;
+      }
       if (remaining <= 0) break;
     }
   }
