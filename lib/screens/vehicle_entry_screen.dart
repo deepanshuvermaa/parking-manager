@@ -164,11 +164,12 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
           // Plate input - LARGE for dark parking lot visibility
           TextFormField(
             controller: _plateController,
-            textCapitalization: TextCapitalization.characters,
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: 2),
+            autocorrect: false,
+            enableSuggestions: false,
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: 1),
             decoration: InputDecoration(
               hintText: 'MH 12 AB 1234',
-              hintStyle: TextStyle(fontSize: 24, fontWeight: FontWeight.w400, color: Go2Colors.textHint.withValues(alpha: 0.5), letterSpacing: 2),
+              hintStyle: TextStyle(fontSize: 24, fontWeight: FontWeight.w400, color: Go2Colors.textHint.withValues(alpha: 0.5), letterSpacing: 1),
               prefixIcon: const Icon(Icons.pin_outlined, size: 24),
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
             ),
