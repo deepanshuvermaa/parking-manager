@@ -32,13 +32,13 @@ class _ReceiptCustomizationScreenState extends State<ReceiptCustomizationScreen>
     setState(() {
       _showBusinessName = p.getBool('bill_show_business_name') ?? true;
       _showAddress = p.getBool('bill_show_business_address') ?? true;
-      _showPhone = p.getBool('bill_show_phone') ?? true;
-      _showGST = p.getBool('bill_show_gst') ?? false;
+      _showPhone = p.getBool('bill_show_business_phone') ?? true;
+      _showGST = p.getBool('bill_show_gst_number') ?? false;
       _showRateInfo = p.getBool('bill_show_rate_info') ?? true;
       _showQRCode = p.getBool('bill_show_qr_code') ?? true;
       _showNotes = p.getBool('bill_show_notes') ?? false;
-      _showHeader = p.getBool('bill_show_header') ?? true;
-      _showFooter = p.getBool('bill_show_footer') ?? true;
+      _showHeader = p.getBool('bill_show_receipt_header') ?? true;
+      _showFooter = p.getBool('bill_show_receipt_footer') ?? true;
       _is3Inch = p.getBool('bill_paper_3inch') ?? false;
     });
   }
@@ -139,9 +139,9 @@ class _ReceiptCustomizationScreenState extends State<ReceiptCustomizationScreen>
                 (v) => setState(() => _showBusinessName = v)),
             _toggle('Show Address', _showAddress, 'bill_show_business_address',
                 (v) => setState(() => _showAddress = v)),
-            _toggle('Show Phone', _showPhone, 'bill_show_phone',
+            _toggle('Show Phone', _showPhone, 'bill_show_business_phone',
                 (v) => setState(() => _showPhone = v)),
-            _toggle('Show GST Number', _showGST, 'bill_show_gst',
+            _toggle('Show GST Number', _showGST, 'bill_show_gst_number',
                 (v) => setState(() => _showGST = v)),
           ]),
           _buildCard('Receipt Content', [
@@ -151,9 +151,9 @@ class _ReceiptCustomizationScreenState extends State<ReceiptCustomizationScreen>
                 (v) => setState(() => _showQRCode = v)),
             _toggle('Show Notes', _showNotes, 'bill_show_notes',
                 (v) => setState(() => _showNotes = v)),
-            _toggle('Show Receipt Header', _showHeader, 'bill_show_header',
+            _toggle('Show Receipt Header', _showHeader, 'bill_show_receipt_header',
                 (v) => setState(() => _showHeader = v)),
-            _toggle('Show Receipt Footer', _showFooter, 'bill_show_footer',
+            _toggle('Show Receipt Footer', _showFooter, 'bill_show_receipt_footer',
                 (v) => setState(() => _showFooter = v)),
           ]),
           _buildCard('Text Formatting', [

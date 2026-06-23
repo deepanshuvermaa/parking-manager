@@ -12,9 +12,25 @@ class SettingsSyncService {
 
   /// Also sync vehicle_rates_v2 and parking_zones
   static const _extraKeys = [
+    // Rates and zones
     'vehicle_rates_v2', 'parking_zones',
+    // Ticket counter
     'ticket_id_prefix', 'ticket_id_serial', 'ticket_device_suffix',
+    // Optional entry fields
     'show_driver_name', 'show_driver_mobile', 'show_fare',
+    // Receipt customization toggles
+    'bill_show_business_name', 'bill_show_business_address', 'bill_show_business_phone',
+    'bill_show_gst_number', 'bill_show_rate_info', 'bill_show_notes',
+    'bill_show_receipt_header', 'bill_show_receipt_footer',
+    // Receipt formatting (bold/size)
+    'receipt_business_name_bold', 'receipt_business_name_size',
+    'receipt_business_address_bold', 'receipt_business_address_size',
+    'receipt_business_phone_bold', 'receipt_business_phone_size',
+    'receipt_ticket_id_bold', 'receipt_ticket_id_size',
+    'receipt_vehicle_number_bold', 'receipt_vehicle_number_size',
+    'receipt_vehicle_type_bold', 'receipt_vehicle_type_size',
+    'receipt_amount_bold', 'receipt_amount_size',
+    'receipt_header', 'receipt_footer',
   ];
 
   static Future<void> syncToBackend(String token) async {
