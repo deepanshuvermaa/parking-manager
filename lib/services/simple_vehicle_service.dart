@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 import 'package:http/http.dart' as http;
 import '../models/simple_vehicle.dart';
 import '../utils/debug_logger.dart';
@@ -12,108 +14,142 @@ class SimpleVehicleService {
   static List<SimpleVehicle> _cachedVehicles = [];
   static bool _isInitialized = false;
   static DateTime? _lastSyncTime;
+  static Timer? _syncTimer;
+  static bool _isSyncing = false;
+
+  // Sync health — exposed so UI can show warnings
+  static int syncErrorCount = 0;
+  static String? lastSyncError;
+  static int unsyncedCount = 0;
+
+  /// Generate a collision-safe local ID using random hex (UUID v4)
+  static String _generateLocalId() {
+    final rng = Random.secure();
+    final bytes = List<int>.generate(16, (_) => rng.nextInt(256));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    return 'local_${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
+  }
 
   // ============================================
   // INITIALIZATION AND SYNC
   // ============================================
 
-  /// Initialize service and sync with backend
+  /// Initialize service, load local data, start background sync
   static Future<void> initialize(String token) async {
-    if (_isInitialized) {
-      print('⚠️ Service already initialized');
-      return;
-    }
+    if (_isInitialized) return;
+
+    // Always load from local DB first (instant)
+    await loadFromLocalDatabase();
+    _isInitialized = true;
 
     // Skip backend for offline mode
-    if (token.isEmpty || token == 'offline_local_token') {
-      await loadFromLocalDatabase();
-      _isInitialized = true;
-      print('✅ SimpleVehicleService initialized (offline)');
-      return;
-    }
+    if (token.isEmpty || token == 'offline_local_token') return;
+
+    // Background: push unsynced, then pull from backend
+    _fullSync(token);
+
+    // Start periodic sync every 2 minutes
+    _startPeriodicSync(token);
+  }
+
+  /// Start periodic background sync timer
+  static void _startPeriodicSync(String token) {
+    _syncTimer?.cancel();
+    _syncTimer = Timer.periodic(const Duration(minutes: 2), (_) {
+      if (!_isSyncing) _fullSync(token);
+    });
+  }
+
+  /// Stop periodic sync (call on logout)
+  static void stopPeriodicSync() {
+    _syncTimer?.cancel();
+    _syncTimer = null;
+  }
+
+  /// Full bidirectional sync: push local unsynced → pull from backend
+  static Future<void> _fullSync(String token) async {
+    if (_isSyncing) return;
+    _isSyncing = true;
 
     try {
-      await syncWithBackend(token);
-      _isInitialized = true;
-      print('✅ SimpleVehicleService initialized');
+      // STEP 1: Push unsynced local vehicles to backend
+      await syncPendingChanges(token);
+
+      // STEP 2: Pull from backend and batch-save to local DB
+      await _pullFromBackend(token);
+
+      syncErrorCount = 0;
+      lastSyncError = null;
+      _lastSyncTime = DateTime.now();
     } catch (e) {
-      print('⚠️ Initialization failed, loading from local DB: $e');
-      await loadFromLocalDatabase();
-      _isInitialized = true;
+      syncErrorCount++;
+      lastSyncError = e.toString();
+      print('❌ Full sync failed: $e');
+    } finally {
+      _isSyncing = false;
+      // Update unsynced count
+      try {
+        final unsynced = await LocalDatabaseService.getUnsyncedVehicles();
+        unsyncedCount = unsynced.length;
+      } catch (_) {}
     }
   }
 
-  /// Sync all data from backend to local database
-  static Future<void> syncWithBackend(String token) async {
-    try {
-      print('🔄 Starting full sync with backend...');
+  /// Pull vehicles from backend and batch-save to local database
+  static Future<void> _pullFromBackend(String token) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/vehicles'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    ).timeout(const Duration(seconds: 15));
 
-      final response = await http.get(
-        Uri.parse('$baseUrl/api/vehicles'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-      ).timeout(const Duration(seconds: 15));
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['success'] == true && data['data'] != null) {
+        final vehiclesList = data['data']['vehicles'] as List;
+        final backendVehicles = vehiclesList
+            .map((v) => SimpleVehicle.fromJson(v))
+            .toList();
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['success'] == true && data['data'] != null) {
-          final vehiclesList = data['data']['vehicles'] as List;
-          final backendVehicles = vehiclesList
-              .map((v) => SimpleVehicle.fromJson(v))
-              .toList();
+        // Batch save in a single transaction
+        await LocalDatabaseService.batchSaveVehicles(backendVehicles, synced: true);
 
-          print('✅ Downloaded ${backendVehicles.length} vehicles from backend');
-
-          // Save all vehicles to local database
-          for (var vehicle in backendVehicles) {
-            await LocalDatabaseService.saveVehicle(vehicle, synced: true);
-          }
-
-          // Update memory cache
-          _cachedVehicles = backendVehicles;
-
-          print('✅ Sync complete - ${_cachedVehicles.length} vehicles loaded');
-          return;
-        }
+        // Reload cache from DB (single source of truth)
+        await loadFromLocalDatabase();
+        return;
       }
-
-      print('⚠️ Backend sync failed, loading from local DB');
-      await loadFromLocalDatabase();
-    } catch (e) {
-      print('❌ Sync error: $e');
-      print('📂 Loading from local database...');
-      await loadFromLocalDatabase();
     }
+
+    throw Exception('Pull failed: HTTP ${response.statusCode}');
   }
 
-  /// Load vehicles from local database
+  /// Load vehicles from local database (recent ones only for performance)
   static Future<void> loadFromLocalDatabase() async {
     try {
-      _cachedVehicles = await LocalDatabaseService.getVehicles();
-      print('📂 Loaded ${_cachedVehicles.length} vehicles from local DB');
+      // Load only last 30 days + all parked vehicles for active use
+      _cachedVehicles = await LocalDatabaseService.getRecentVehicles(days: 30);
     } catch (e) {
       print('❌ Error loading from local DB: $e');
       _cachedVehicles = [];
     }
   }
 
-  /// Get all vehicles (from memory cache)
+  /// Get all vehicles (from memory cache, triggers background sync)
   static Future<List<SimpleVehicle>> getVehicles(String token) async {
-    // If not initialized, initialize first
     if (!_isInitialized) {
       await initialize(token);
     }
 
-    // Debounce: only sync if >60 seconds since last sync
+    // Trigger background sync if stale (>60s since last sync)
     if (token.isNotEmpty && token != 'offline_local_token') {
       final now = DateTime.now();
       if (_lastSyncTime == null || now.difference(_lastSyncTime!).inSeconds > 60) {
         _lastSyncTime = now;
-        syncWithBackend(token).catchError((e) {
-          print('Background sync failed: $e');
-        });
+        _fullSync(token); // Fire-and-forget, non-blocking
       }
     }
 
@@ -124,7 +160,15 @@ class SimpleVehicleService {
   // VEHICLE OPERATIONS (OFFLINE-FIRST)
   // ============================================
 
-  /// Add new vehicle - SAVE LOCALLY FIRST, then sync to backend
+  /// Check if a vehicle plate is already parked (duplicate detection)
+  static bool isVehicleParked(String plateNumber) {
+    final plate = plateNumber.toUpperCase().trim();
+    return _cachedVehicles.any(
+      (v) => v.vehicleNumber == plate && v.status == 'parked',
+    );
+  }
+
+  /// Add new vehicle - SAVE LOCALLY FIRST, then fire-and-forget sync to backend
   static Future<SimpleVehicle?> addVehicle({
     required String token,
     required String vehicleNumber,
@@ -135,12 +179,10 @@ class SimpleVehicleService {
     String? fromLocation,
     String? toLocation,
   }) async {
-    // Generate sequential ticket ID in format PT{DDMM}{serial}
     final ticketId = await TicketIdService.generateNextTicketId();
 
-    // Create vehicle object
     final vehicle = SimpleVehicle(
-      id: 'local_${DateTime.now().millisecondsSinceEpoch}',
+      id: _generateLocalId(),
       vehicleNumber: vehicleNumber.toUpperCase(),
       vehicleType: vehicleType,
       entryTime: DateTime.now(),
@@ -153,76 +195,62 @@ class SimpleVehicleService {
       toLocation: toLocation,
     );
 
-    // 1. SAVE LOCALLY FIRST (guaranteed to succeed)
+    // 1. SAVE LOCALLY FIRST (instant, guaranteed)
     try {
       await LocalDatabaseService.saveVehicle(vehicle, synced: false);
       _cachedVehicles.insert(0, vehicle);
-      print('✅ Vehicle saved locally: ${vehicle.vehicleNumber}');
     } catch (e) {
       print('❌ Failed to save locally: $e');
       return null;
     }
 
-    // 2. TRY TO SYNC TO BACKEND (skip for offline mode)
-    if (token.isEmpty || token == 'offline_local_token') {
-      return vehicle;
+    // 2. FIRE-AND-FORGET backend sync (non-blocking — UI returns immediately)
+    if (token.isNotEmpty && token != 'offline_local_token') {
+      _syncSingleVehicleToBackend(token, vehicle);
     }
 
+    return vehicle;
+  }
+
+  /// Non-blocking: sync a single newly added vehicle to backend
+  static Future<void> _syncSingleVehicleToBackend(String token, SimpleVehicle vehicle) async {
     try {
-      final requestBody = {
-        'vehicleNumber': vehicle.vehicleNumber,
-        'vehicleType': vehicle.vehicleType,
-        'entryTime': vehicle.entryTime.toIso8601String(),
-        'hourlyRate': vehicle.hourlyRate,
-        'minimumRate': vehicle.minimumRate,
-        'notes': vehicle.notes,
-        'ticketId': vehicle.ticketId,
-        'fromLocation': vehicle.fromLocation,
-        'toLocation': vehicle.toLocation,
-      };
-
-      DebugLogger.log('=== VEHICLE ADD REQUEST ===');
-      DebugLogger.log('URL: $baseUrl/api/vehicles');
-      DebugLogger.log('Request: ${jsonEncode(requestBody)}');
-
       final response = await http.post(
         Uri.parse('$baseUrl/api/vehicles'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode(requestBody),
-      ).timeout(const Duration(seconds: 30));
-
-      DebugLogger.log('Response Status: ${response.statusCode}');
+        body: jsonEncode({
+          'vehicleNumber': vehicle.vehicleNumber,
+          'vehicleType': vehicle.vehicleType,
+          'entryTime': vehicle.entryTime.toIso8601String(),
+          'hourlyRate': vehicle.hourlyRate,
+          'minimumRate': vehicle.minimumRate,
+          'notes': vehicle.notes,
+          'ticketId': vehicle.ticketId,
+          'fromLocation': vehicle.fromLocation,
+          'toLocation': vehicle.toLocation,
+        }),
+      ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 201 || response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (data['success'] == true && data['data'] != null && data['data']['vehicle'] != null) {
+        if (data['success'] == true && data['data']?['vehicle'] != null) {
           final backendVehicle = SimpleVehicle.fromJson(data['data']['vehicle']);
-
-          // Update local record with backend ID and mark as synced
           await LocalDatabaseService.saveVehicle(backendVehicle, synced: true);
-
-          // Update in cache
+          // Update cache
           final index = _cachedVehicles.indexWhere((v) => v.ticketId == vehicle.ticketId);
-          if (index != -1) {
-            _cachedVehicles[index] = backendVehicle;
-          }
-
-          print('✅ Vehicle synced to backend: ${backendVehicle.id}');
-          return backendVehicle;
+          if (index != -1) _cachedVehicles[index] = backendVehicle;
         }
       }
     } catch (e) {
-      print('⚠️ Backend sync failed (will retry later): $e');
-      // Vehicle is already saved locally, so operation succeeded
+      // Will be retried by periodic syncPendingChanges
+      print('⚠️ Background sync will retry: $e');
     }
-
-    return vehicle; // Return local vehicle even if backend sync failed
   }
 
-  /// Exit vehicle - SAVE LOCALLY FIRST, then sync to backend
+  /// Exit vehicle - SAVE LOCALLY FIRST, then fire-and-forget sync
   static Future<SimpleVehicle?> exitVehicle({
     required String token,
     required String vehicleId,
@@ -238,138 +266,139 @@ class SimpleVehicleService {
 
     final vehicle = _cachedVehicles[index];
 
-    // Calculate duration
+    // Optimistic lock: prevent double-exit
+    if (vehicle.status == 'exited') {
+      print('⚠️ Vehicle already exited: $vehicleId');
+      return null;
+    }
+
     final exitTime = DateTime.now();
     final durationMinutes = exitTime.difference(vehicle.entryTime).inMinutes;
 
-    // Update vehicle locally
     vehicle.exitTime = exitTime;
     vehicle.status = 'exited';
     vehicle.amount = amount;
     vehicle.notes = notes;
     vehicle.durationMinutes = durationMinutes;
 
-    // 1. SAVE LOCALLY FIRST
+    // 1. SAVE LOCALLY FIRST (instant)
     try {
       await LocalDatabaseService.updateVehicle(vehicle, synced: false);
       _cachedVehicles[index] = vehicle;
-      print('✅ Vehicle exit saved locally: ${vehicle.vehicleNumber}');
     } catch (e) {
       print('❌ Failed to save exit locally: $e');
       return null;
     }
 
-    // 2. TRY TO SYNC TO BACKEND (skip for offline mode)
-    if (token.isEmpty || token == 'offline_local_token') {
-      return vehicle;
+    // 2. FIRE-AND-FORGET backend sync
+    if (token.isNotEmpty && token != 'offline_local_token') {
+      _syncExitToBackend(token, vehicle);
     }
 
+    return vehicle;
+  }
+
+  /// Non-blocking: sync vehicle exit to backend
+  static Future<void> _syncExitToBackend(String token, SimpleVehicle vehicle) async {
     try {
       final response = await http.put(
-        Uri.parse('$baseUrl/api/vehicles/$vehicleId/exit'),
+        Uri.parse('$baseUrl/api/vehicles/${vehicle.id}/exit'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
           'exitTime': vehicle.exitTime!.toIso8601String(),
-          'amount': amount,
-          'notes': notes,
+          'amount': vehicle.amount,
+          'notes': vehicle.notes,
         }),
-      ).timeout(const Duration(seconds: 15));
+      ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['success'] == true) {
-          await LocalDatabaseService.markAsSynced(vehicleId);
-          print('✅ Vehicle exit synced to backend');
-        }
+        await LocalDatabaseService.markAsSynced(vehicle.id);
       }
     } catch (e) {
-      print('⚠️ Backend sync failed (will retry later): $e');
+      print('⚠️ Exit sync will retry: $e');
     }
-
-    return vehicle; // Return updated vehicle even if backend sync failed
   }
 
   // ============================================
-  // BACKGROUND SYNC
+  // BACKGROUND SYNC — PUSH UNSYNCED TO BACKEND
   // ============================================
 
-  /// Sync pending changes to backend (call periodically)
+  /// Push all unsynced local changes to backend (called by periodic timer)
   static Future<void> syncPendingChanges(String token) async {
-    try {
-      final unsyncedVehicles = await LocalDatabaseService.getUnsyncedVehicles();
+    if (token.isEmpty || token == 'offline_local_token') return;
 
-      if (unsyncedVehicles.isEmpty) {
-        print('✅ No pending changes to sync');
-        return;
-      }
+    final unsyncedVehicles = await LocalDatabaseService.getUnsyncedVehicles();
+    if (unsyncedVehicles.isEmpty) {
+      unsyncedCount = 0;
+      return;
+    }
 
-      print('🔄 Syncing ${unsyncedVehicles.length} pending changes...');
+    int synced = 0;
+    int failed = 0;
 
-      for (var vehicle in unsyncedVehicles) {
-        try {
-          if (vehicle.status == 'exited' && vehicle.exitTime != null) {
-            // Sync vehicle exit
-            final response = await http.put(
-              Uri.parse('$baseUrl/api/vehicles/${vehicle.id}/exit'),
-              headers: {
-                'Authorization': 'Bearer $token',
-                'Content-Type': 'application/json',
-              },
-              body: jsonEncode({
-                'exitTime': vehicle.exitTime!.toIso8601String(),
-                'amount': vehicle.amount,
-                'notes': vehicle.notes,
-              }),
-            ).timeout(const Duration(seconds: 15));
+    for (var vehicle in unsyncedVehicles) {
+      try {
+        if (vehicle.status == 'exited' && vehicle.exitTime != null) {
+          final response = await http.put(
+            Uri.parse('$baseUrl/api/vehicles/${vehicle.id}/exit'),
+            headers: ApiConfig.authHeaders(token),
+            body: jsonEncode({
+              'exitTime': vehicle.exitTime!.toIso8601String(),
+              'amount': vehicle.amount,
+              'notes': vehicle.notes,
+            }),
+          ).timeout(const Duration(seconds: 10));
 
-            if (response.statusCode == 200) {
-              await LocalDatabaseService.markAsSynced(vehicle.id);
-              print('✅ Synced exit: ${vehicle.vehicleNumber}');
+          if (response.statusCode == 200) {
+            await LocalDatabaseService.markAsSynced(vehicle.id);
+            synced++;
+          } else {
+            failed++;
+          }
+        } else {
+          final response = await http.post(
+            Uri.parse('$baseUrl/api/vehicles'),
+            headers: ApiConfig.authHeaders(token),
+            body: jsonEncode({
+              'vehicleNumber': vehicle.vehicleNumber,
+              'vehicleType': vehicle.vehicleType,
+              'entryTime': vehicle.entryTime.toIso8601String(),
+              'hourlyRate': vehicle.hourlyRate,
+              'minimumRate': vehicle.minimumRate,
+              'notes': vehicle.notes,
+              'ticketId': vehicle.ticketId,
+              'fromLocation': vehicle.fromLocation,
+              'toLocation': vehicle.toLocation,
+            }),
+          ).timeout(const Duration(seconds: 10));
+
+          if (response.statusCode == 201 || response.statusCode == 200) {
+            final data = jsonDecode(response.body);
+            if (data['success'] == true && data['data']?['vehicle'] != null) {
+              final backendVehicle = SimpleVehicle.fromJson(data['data']['vehicle']);
+              await LocalDatabaseService.saveVehicle(backendVehicle, synced: true);
+              synced++;
             }
           } else {
-            // Sync new vehicle
-            final response = await http.post(
-              Uri.parse('$baseUrl/api/vehicles'),
-              headers: {
-                'Authorization': 'Bearer $token',
-                'Content-Type': 'application/json',
-              },
-              body: jsonEncode({
-                'vehicleNumber': vehicle.vehicleNumber,
-                'vehicleType': vehicle.vehicleType,
-                'entryTime': vehicle.entryTime.toIso8601String(),
-                'hourlyRate': vehicle.hourlyRate,
-                'minimumRate': vehicle.minimumRate,
-                'notes': vehicle.notes,
-                'ticketId': vehicle.ticketId,
-              }),
-            ).timeout(const Duration(seconds: 15));
-
-            if (response.statusCode == 201 || response.statusCode == 200) {
-              final data = jsonDecode(response.body);
-              if (data['success'] == true && data['data'] != null) {
-                final backendVehicle = SimpleVehicle.fromJson(data['data']['vehicle']);
-                await LocalDatabaseService.saveVehicle(backendVehicle, synced: true);
-                print('✅ Synced new vehicle: ${vehicle.vehicleNumber}');
-              }
-            }
+            failed++;
           }
-        } catch (e) {
-          print('⚠️ Failed to sync ${vehicle.vehicleNumber}: $e');
-          // Continue with next vehicle
         }
+      } catch (e) {
+        failed++;
       }
-
-      print('✅ Sync completed');
-    } catch (e) {
-      print('❌ Sync pending changes error: $e');
     }
+
+    unsyncedCount = failed;
+    if (synced > 0) print('✅ Synced $synced pending vehicles ($failed failed)');
   }
 
-  // Calculate parking fee (uses new VehicleRateService with time-based pricing)
+  // ============================================
+  // FEE CALCULATION
+  // ============================================
+
   static Future<double> calculateFeeAsync({
     required DateTime entryTime,
     required String vehicleType,
@@ -383,7 +412,6 @@ class SimpleVehicleService {
     );
   }
 
-  // Legacy sync method for backward compatibility
   static double calculateFee({
     required DateTime entryTime,
     required String vehicleType,
@@ -395,28 +423,17 @@ class SimpleVehicleService {
     final duration = exit.difference(entryTime);
     final minutes = duration.inMinutes;
 
-    // Get rates
     final rates = getDefaultRate(vehicleType);
     final hourly = hourlyRate ?? rates['hourly'];
     final minimum = minimumRate ?? rates['minimum'];
     final freeMinutes = rates['freeMinutes'] as int;
     final minimumDurationMinutes = rates['minimumDurationMinutes'] as int;
 
-    // Grace period: truly free (accidental entries)
-    if (freeMinutes > 0 && minutes <= freeMinutes) {
-      return 0;
-    }
+    if (freeMinutes > 0 && minutes <= freeMinutes) return 0;
+    if (minutes <= minimumDurationMinutes) return minimum;
 
-    // Within minimum duration: charge minimum
-    if (minutes <= minimumDurationMinutes) {
-      return minimum;
-    }
-
-    // Calculate hours (round up)
     final hours = (minutes / 60).ceil();
     final amount = hours * hourly;
-
-    // Apply minimum charge
     return amount < minimum ? minimum : amount.toDouble();
   }
 
@@ -437,45 +454,42 @@ class SimpleVehicleService {
     'Mini Truck': {'hourly': 30.0, 'minimum': 30.0, 'freeMinutes': 5, 'minimumDurationMinutes': 30},
   };
 
-  // Get default rates for vehicle type
   static Map<String, dynamic> getDefaultRate(String vehicleType) {
     return _defaultRates[vehicleType] ?? _defaultRates['Car']!;
   }
 
-  // Get vehicle types
   static List<String> getVehicleTypes() {
-    return [
-      'Car',
-      'Bike',
-      'Scooter',
-      'SUV',
-      'Van',
-      'Bus',
-      'Truck',
-      'Auto Rickshaw',
-      'E-Rickshaw',
-      'Cycle',
-      'E-Cycle',
-      'Tempo',
-      'Mini Truck',
-    ];
+    return ['Car', 'Bike', 'Scooter', 'SUV', 'Van', 'Bus', 'Truck', 'Auto Rickshaw', 'E-Rickshaw', 'Cycle', 'E-Cycle', 'Tempo', 'Mini Truck'];
   }
 
-  // Get parked vehicles count
   static int getParkedCount() {
     return _cachedVehicles.where((v) => v.status == 'parked').length;
   }
 
-  // Get today's collection
+  /// Get today's collection from LOCAL DATABASE (not memory cache)
+  static Future<double> getTodayCollectionFromDb() async {
+    return await LocalDatabaseService.getTodayRevenue();
+  }
+
+  /// Legacy: get from memory cache (fast but may be stale)
   static double getTodayCollection() {
     final today = DateTime.now();
     final todayStart = DateTime(today.year, today.month, today.day);
-
     return _cachedVehicles
-        .where((v) =>
-            v.exitTime != null &&
-            v.exitTime!.isAfter(todayStart) &&
-            v.amount != null)
+        .where((v) => v.exitTime != null && v.exitTime!.isAfter(todayStart) && v.amount != null)
         .fold(0.0, (sum, v) => sum + (v.amount ?? 0));
+  }
+
+  /// Get vehicles for reports with date range filter (from DB, not cache)
+  static Future<List<SimpleVehicle>> getVehiclesForReport({
+    required DateTime startDate,
+    required DateTime endDate,
+    String? status,
+  }) async {
+    return await LocalDatabaseService.getVehiclesByDateRange(
+      startDate: startDate,
+      endDate: endDate,
+      status: status,
+    );
   }
 }

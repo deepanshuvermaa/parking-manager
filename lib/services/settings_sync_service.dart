@@ -10,20 +10,29 @@ class SettingsSyncService {
     'paper_width', 'bill_show_qr_code',
   ];
 
+  /// Also sync vehicle_rates_v2 and parking_zones
+  static const _extraKeys = [
+    'vehicle_rates_v2', 'parking_zones',
+    'ticket_id_prefix', 'ticket_id_serial', 'ticket_device_suffix',
+  ];
+
   static Future<void> syncToBackend(String token) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final Map<String, dynamic> settings = {};
-      for (final key in _keys) {
+      for (final key in [..._keys, ..._extraKeys]) {
         final val = prefs.get(key);
         if (val != null) settings[key] = val;
       }
-      await http.post(
+      // Use PUT to update settings
+      await http.put(
         Uri.parse('${ApiConfig.baseUrl}/settings'),
         headers: ApiConfig.authHeaders(token),
-        body: jsonEncode({'settings': settings}),
+        body: jsonEncode(settings),
       ).timeout(ApiConfig.timeout);
-    } catch (_) {}
+    } catch (e) {
+      print('⚠️ Settings sync to backend failed: $e');
+    }
   }
 
   static Future<void> loadFromBackend(String token) async {
@@ -33,17 +42,27 @@ class SettingsSyncService {
         headers: ApiConfig.authHeaders(token),
       ).timeout(ApiConfig.timeout);
       if (res.statusCode != 200) return;
-      final data = jsonDecode(res.body);
-      final settings = (data['settings'] ?? data['data']?['settings']) as Map<String, dynamic>?;
-      if (settings == null) return;
+      final body = jsonDecode(res.body);
+      if (body['success'] != true) return;
+
+      // Backend returns { success: true, data: { business_name: ..., ... } }
+      // The data object itself IS the settings row
+      final data = body['data'] as Map<String, dynamic>?;
+      if (data == null) return;
+
       final prefs = await SharedPreferences.getInstance();
-      for (final entry in settings.entries) {
-        final v = entry.value;
-        if (v is String) await prefs.setString(entry.key, v);
-        else if (v is int) await prefs.setInt(entry.key, v);
-        else if (v is bool) await prefs.setBool(entry.key, v);
-        else if (v is double) await prefs.setDouble(entry.key, v);
+      // Only restore keys we care about
+      for (final key in [..._keys, ..._extraKeys]) {
+        final v = data[key];
+        if (v == null) continue;
+        if (v is String) await prefs.setString(key, v);
+        else if (v is int) await prefs.setInt(key, v);
+        else if (v is bool) await prefs.setBool(key, v);
+        else if (v is double) await prefs.setDouble(key, v);
+        else if (v is List) await prefs.setStringList(key, v.cast<String>());
       }
-    } catch (_) {}
+    } catch (e) {
+      print('⚠️ Settings load from backend failed: $e');
+    }
   }
 }

@@ -215,29 +215,7 @@ app.post('/api/auth/guest-signup-old', async (req, res) => {
 
 // Token refresh endpoint removed - using authController
 
-// Validate Session
-app.get('/api/auth/validate', verifyToken, async (req, res) => {
-  try {
-    const userResult = await pool.query(
-      'SELECT id, username, full_name, user_type, trial_expires_at FROM users WHERE id = $1 AND is_active = true',
-      [req.userId]
-    );
-
-    if (userResult.rows.length === 0) {
-      return res.status(401).json({ success: false, error: 'User not found' });
-    }
-
-    res.json({
-      success: true,
-      data: { user: userResult.rows[0] },
-      message: 'Session valid'
-    });
-
-  } catch (error) {
-    console.error('Session validation error:', error);
-    res.status(500).json({ success: false, error: 'Internal server error' });
-  }
-});
+// Validate Session — handled by authController.validateToken above
 
 // Logout endpoint removed - using authController
 
@@ -849,12 +827,6 @@ try {
 // ERROR HANDLING - Must be AFTER all routes
 // ================================
 
-// 404 handler - catches all unmatched routes
-app.use('*', (req, res) => {
-  res.status(404).json({ success: false, error: 'Endpoint not found' });
-});
-
-// Global error handler
 // ================================
 // MIDDLEWARE: Admin Guard & Subscription Check
 // ================================
@@ -1072,19 +1044,18 @@ app.post('/api/parkease-admin/users/:userId/subscription', adminGuard, async (re
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
-// Global error handler
-app.use((error, req, res, next) => {
-  console.error('Unhandled error:', error);
-  res.status(500).json({ success: false, error: 'Internal server error' });
-});
-
 // Catch-all: serve landing page for non-API, non-file routes
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/')) {
     return res.status(404).json({ success: false, error: 'Endpoint not found' });
   }
-  // If no static file matched, serve index.html for SPA routing
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Global error handler — MUST be after all routes and catch-all
+app.use((error, req, res, next) => {
+  console.error('Unhandled error:', error);
+  res.status(500).json({ success: false, error: 'Internal server error' });
 });
 
 // Run database migrations on startup

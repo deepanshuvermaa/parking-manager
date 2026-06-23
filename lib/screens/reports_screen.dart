@@ -36,8 +36,14 @@ class _ReportsScreenState extends State<ReportsScreen>
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      final token = context.read<AuthProvider>().token ?? '';
-      _vehicles = await SimpleVehicleService.getVehicles(token);
+      // Load from DB with date range — NOT from memory cache
+      final now = DateTime.now();
+      final monthStart = DateTime(now.year, now.month, 1);
+      _vehicles = await SimpleVehicleService.getVehiclesForReport(
+        startDate: monthStart,
+        endDate: now,
+        status: 'exited',
+      );
     } catch (_) {}
     if (mounted) setState(() => _isLoading = false);
   }

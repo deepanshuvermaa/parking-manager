@@ -244,6 +244,61 @@ async function runStartupMigrations(pool) {
       console.log('✅ Taxi bookings migration already applied');
     }
 
+    // ========================================
+    // MIGRATION 4: Add parking_name, phone, user_settings_sync, ticket_counters
+    // ========================================
+    const settingsSyncCheck = await pool.query(
+      "SELECT * FROM schema_migrations WHERE migration_name = 'add_settings_sync'"
+    );
+
+    if (settingsSyncCheck.rows.length === 0) {
+      console.log('📦 Applying settings sync migration...');
+
+      // Add missing columns to users table
+      await pool.query(`
+        ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS parking_name VARCHAR(255),
+        ADD COLUMN IF NOT EXISTS phone VARCHAR(50)
+      `);
+
+      // Create user_settings_sync table — stores all SharedPreferences-equivalent data
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS user_settings_sync (
+          id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+          user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+          business_id VARCHAR(255),
+          setting_key VARCHAR(255) NOT NULL,
+          setting_value TEXT,
+          updated_at TIMESTAMP DEFAULT NOW(),
+          UNIQUE(user_id, setting_key)
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_user_settings_sync_user ON user_settings_sync(user_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_user_settings_sync_biz ON user_settings_sync(business_id)`);
+
+      // Create ticket_counters table — per-device counters synced to backend
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS ticket_counters (
+          id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+          business_id VARCHAR(255) NOT NULL,
+          device_id VARCHAR(255) NOT NULL,
+          date_prefix VARCHAR(20) NOT NULL,
+          current_serial INTEGER NOT NULL DEFAULT 0,
+          updated_at TIMESTAMP DEFAULT NOW(),
+          UNIQUE(business_id, device_id, date_prefix)
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_ticket_counters_biz ON ticket_counters(business_id)`);
+
+      await pool.query(
+        "INSERT INTO schema_migrations (migration_name) VALUES ('add_settings_sync')"
+      );
+
+      console.log('✅ Settings sync migration applied successfully');
+    } else {
+      console.log('✅ Settings sync migration already applied');
+    }
+
   } catch (error) {
     console.error('❌ Migration error:', error);
     // Don't crash the server if migration fails

@@ -51,6 +51,25 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
   Future<void> _submit() async {
     final plate = _plateController.text.trim().toUpperCase();
     if (plate.isEmpty) return;
+
+    // Duplicate plate detection — check if already parked
+    if (SimpleVehicleService.isVehicleParked(plate)) {
+      if (mounted) {
+        final proceed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Vehicle Already Parked'),
+            content: Text('$plate is already parked. Do you still want to create a new entry?'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+              ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Park Anyway')),
+            ],
+          ),
+        );
+        if (proceed != true) return;
+      }
+    }
+
     setState(() => _isSubmitting = true);
 
     try {

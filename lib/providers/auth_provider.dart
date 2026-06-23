@@ -268,6 +268,7 @@ class AuthProvider extends ChangeNotifier {
 
   /// Logout
   Future<void> logout() async {
+    SimpleVehicleService.stopPeriodicSync();
     await _clearCredentials();
     _token = null;
     _refreshToken = null;

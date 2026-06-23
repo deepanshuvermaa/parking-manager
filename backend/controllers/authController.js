@@ -291,11 +291,12 @@ class AuthController {
       const userResult = await this.pool.query(
         `INSERT INTO users (
           username, full_name, device_id, user_type, password_hash,
+          parking_name, phone,
           trial_starts_at, trial_expires_at, is_active,
           business_id, role
-        ) VALUES ($1, $2, $3, 'guest', $4, NOW(), NOW() + INTERVAL '3 days', true, $5, 'owner')
+        ) VALUES ($1, $2, $3, 'guest', $4, $5, $6, NOW(), NOW() + INTERVAL '3 days', true, $7, 'owner')
         RETURNING *`,
-        [username, finalFullName || finalParkingName || 'Guest User', finalDeviceId, passwordHash, businessId]
+        [username, finalFullName || finalParkingName || 'Guest User', finalDeviceId, passwordHash, finalParkingName || '', phone || '', businessId]
       );
 
       const user = userResult.rows[0];
@@ -350,9 +351,16 @@ class AuthController {
       });
     } catch (error) {
       console.error('Guest signup error:', error);
+      if (error.code === '23505') {
+        return res.status(409).json({
+          success: false,
+          error: 'An account already exists on this device. Please sign in with your existing credentials, or contact your parking admin.',
+          code: 'ACCOUNT_EXISTS'
+        });
+      }
       res.status(500).json({
         success: false,
-        error: 'Signup failed'
+        error: 'Signup failed. Please check your internet connection and try again.'
       });
     }
   }

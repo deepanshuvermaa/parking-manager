@@ -25,7 +25,11 @@ class LocalDatabaseService {
 
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
+      onConfigure: (db) async {
+        // Enable WAL mode — prevents corruption on crash during writes
+        await db.execute('PRAGMA journal_mode=WAL');
+      },
       onCreate: (db, version) async {
         print('🗄️ Creating local database...');
 
@@ -98,6 +102,14 @@ class LocalDatabaseService {
           await db.execute('ALTER TABLE vehicles ADD COLUMN from_location TEXT');
           await db.execute('ALTER TABLE vehicles ADD COLUMN to_location TEXT');
           print('✅ Added destination fields to vehicles table');
+        }
+
+        if (oldVersion < 4) {
+          // Add version field for optimistic locking on exit
+          await db.execute('ALTER TABLE vehicles ADD COLUMN version INTEGER DEFAULT 1');
+          // Add index on vehicle_number for duplicate detection
+          await db.execute('CREATE INDEX IF NOT EXISTS idx_vehicles_number ON vehicles(vehicle_number)');
+          print('✅ Added version field and vehicle_number index');
         }
       },
     );
@@ -291,7 +303,121 @@ class LocalDatabaseService {
       where: 'id = ?',
       whereArgs: [vehicleId],
     );
-    print('🗑️ Vehicle deleted locally: $vehicleId');
+  }
+
+  /// Batch save vehicles in a single transaction (for backend pull)
+  static Future<void> batchSaveVehicles(List<SimpleVehicle> vehicles, {bool synced = true}) async {
+    final db = await database;
+    final batch = db.batch();
+    final now = DateTime.now().toIso8601String();
+
+    for (var vehicle in vehicles) {
+      batch.insert(
+        'vehicles',
+        {
+          'id': vehicle.id,
+          'vehicle_number': vehicle.vehicleNumber,
+          'vehicle_type': vehicle.vehicleType,
+          'entry_time': vehicle.entryTime.toIso8601String(),
+          'exit_time': vehicle.exitTime?.toIso8601String(),
+          'amount': vehicle.amount,
+          'status': vehicle.status,
+          'ticket_id': vehicle.ticketId,
+          'hourly_rate': vehicle.hourlyRate,
+          'minimum_rate': vehicle.minimumRate,
+          'notes': vehicle.notes,
+          'duration_minutes': vehicle.durationMinutes,
+          'from_location': vehicle.fromLocation,
+          'to_location': vehicle.toLocation,
+          'synced': synced ? 1 : 0,
+          'created_at': now,
+          'updated_at': now,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+
+    await batch.commit(noResult: true);
+  }
+
+  /// Get recent vehicles: all parked + exited within last N days
+  static Future<List<SimpleVehicle>> getRecentVehicles({int days = 30}) async {
+    final db = await database;
+    final cutoff = DateTime.now().subtract(Duration(days: days)).toIso8601String();
+
+    final List<Map<String, dynamic>> maps = await db.rawQuery('''
+      SELECT * FROM vehicles
+      WHERE status = 'parked' OR entry_time >= ?
+      ORDER BY entry_time DESC
+    ''', [cutoff]);
+
+    return _mapsToVehicles(maps);
+  }
+
+  /// Get vehicles by date range (for reports — queries DB directly)
+  static Future<List<SimpleVehicle>> getVehiclesByDateRange({
+    required DateTime startDate,
+    required DateTime endDate,
+    String? status,
+  }) async {
+    final db = await database;
+    String query = 'SELECT * FROM vehicles WHERE entry_time >= ? AND entry_time <= ?';
+    List<dynamic> args = [startDate.toIso8601String(), endDate.toIso8601String()];
+
+    if (status != null) {
+      query += ' AND status = ?';
+      args.add(status);
+    }
+
+    query += ' ORDER BY entry_time DESC';
+    final maps = await db.rawQuery(query, args);
+    return _mapsToVehicles(maps);
+  }
+
+  /// Get today's revenue directly from DB
+  static Future<double> getTodayRevenue() async {
+    final db = await database;
+    final todayStart = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day).toIso8601String();
+
+    final result = await db.rawQuery('''
+      SELECT COALESCE(SUM(amount), 0) as total
+      FROM vehicles
+      WHERE status = 'exited' AND exit_time >= ? AND amount IS NOT NULL
+    ''', [todayStart]);
+
+    return (result.first['total'] as num?)?.toDouble() ?? 0.0;
+  }
+
+  /// Check if a plate is currently parked (for duplicate detection)
+  static Future<bool> isPlateParked(String plateNumber) async {
+    final db = await database;
+    final result = await db.rawQuery(
+      "SELECT COUNT(*) as cnt FROM vehicles WHERE vehicle_number = ? AND status = 'parked'",
+      [plateNumber.toUpperCase().trim()],
+    );
+    return (result.first['cnt'] as int) > 0;
+  }
+
+  /// Helper: convert DB maps to SimpleVehicle list
+  static List<SimpleVehicle> _mapsToVehicles(List<Map<String, dynamic>> maps) {
+    return List.generate(maps.length, (i) {
+      return SimpleVehicle(
+        id: maps[i]['id'],
+        vehicleNumber: maps[i]['vehicle_number'],
+        vehicleType: maps[i]['vehicle_type'],
+        entryTime: DateTime.parse(maps[i]['entry_time']),
+        exitTime: maps[i]['exit_time'] != null ? DateTime.parse(maps[i]['exit_time']) : null,
+        amount: maps[i]['amount'],
+        status: maps[i]['status'],
+        ticketId: maps[i]['ticket_id'],
+        hourlyRate: maps[i]['hourly_rate'],
+        minimumRate: maps[i]['minimum_rate'],
+        notes: maps[i]['notes'],
+        durationMinutes: maps[i]['duration_minutes'],
+        fromLocation: maps[i]['from_location'],
+        toLocation: maps[i]['to_location'],
+      );
+    });
   }
 
   // ============================================

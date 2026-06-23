@@ -60,6 +60,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Text('Offline', style: TextStyle(fontSize: 10, color: Go2Colors.warning, fontWeight: FontWeight.w500)),
               ]),
             ),
+          // Sync health indicator
+          if (SimpleVehicleService.unsyncedCount > 0)
+            GestureDetector(
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text('${SimpleVehicleService.unsyncedCount} records pending sync${SimpleVehicleService.lastSyncError != null ? "\nLast error: ${SimpleVehicleService.lastSyncError}" : ""}'),
+                  backgroundColor: Go2Colors.warning,
+                  duration: const Duration(seconds: 4),
+                ));
+              },
+              child: Container(
+                margin: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Go2Colors.error.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(Go2Radius.full),
+                ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.sync_problem_rounded, size: 12, color: Go2Colors.error),
+                  const SizedBox(width: 4),
+                  Text('${SimpleVehicleService.unsyncedCount} unsynced', style: const TextStyle(fontSize: 10, color: Go2Colors.error, fontWeight: FontWeight.w500)),
+                ]),
+              ),
+            ),
           FutureBuilder<bool>(
             future: PlatformPrinterService.isConnected(),
             builder: (_, snap) => snap.data == true

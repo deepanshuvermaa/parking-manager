@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -26,6 +27,7 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
   List<SimpleVehicle> _allVehicles = [];
   List<SimpleVehicle> _filtered = [];
   bool _isLoading = true;
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -35,6 +37,7 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -52,16 +55,20 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
   }
 
   void _filter(String query) {
-    setState(() {
-      if (query.isEmpty) {
-        _filtered = _allVehicles;
-      } else {
-        final q = query.toLowerCase();
-        _filtered = _allVehicles.where((v) =>
-            v.vehicleNumber.toLowerCase().contains(q) ||
-            (v.ticketId?.toLowerCase().contains(q) ?? false) ||
-            v.vehicleType.toLowerCase().contains(q)).toList();
-      }
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      setState(() {
+        if (query.isEmpty) {
+          _filtered = _allVehicles;
+        } else {
+          final q = query.toLowerCase();
+          _filtered = _allVehicles.where((v) =>
+              v.vehicleNumber.toLowerCase().contains(q) ||
+              (v.ticketId?.toLowerCase().contains(q) ?? false) ||
+              v.vehicleType.toLowerCase().contains(q)).toList();
+        }
+      });
     });
   }
 
