@@ -277,7 +277,10 @@ app.post('/api/vehicles', verifyToken, checkTrialExpiry, async (req, res) => {
       hourlyRate, hourly_rate,
       minimumRate, minimum_rate,
       ticketId, ticket_id,
-      notes
+      notes,
+      driverName, driver_name,
+      driverMobile, driver_mobile,
+      fare
     } = req.body;
 
     // Normalize fields
@@ -288,7 +291,10 @@ app.post('/api/vehicles', verifyToken, checkTrialExpiry, async (req, res) => {
       hourlyRate: hourlyRate || hourly_rate,
       minimumRate: minimumRate || minimum_rate,
       ticketId: ticketId || ticket_id,
-      notes
+      notes,
+      driverName: driverName || driver_name || null,
+      driverMobile: driverMobile || driver_mobile || null,
+      fare: fare || null,
     };
 
     if (!normalizedData.vehicleNumber || !normalizedData.vehicleType) {
@@ -305,8 +311,8 @@ app.post('/api/vehicles', verifyToken, checkTrialExpiry, async (req, res) => {
     const businessId = userResult.rows[0]?.business_id || null;
 
     const result = await pool.query(
-      `INSERT INTO vehicles (user_id, business_id, vehicle_number, vehicle_type, entry_time, hourly_rate, minimum_rate, ticket_id, notes, from_location, to_location)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      `INSERT INTO vehicles (user_id, business_id, vehicle_number, vehicle_type, entry_time, hourly_rate, minimum_rate, ticket_id, notes, from_location, to_location, driver_name, driver_mobile, fare)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        RETURNING *`,
       [
         req.userId,
@@ -319,7 +325,10 @@ app.post('/api/vehicles', verifyToken, checkTrialExpiry, async (req, res) => {
         normalizedData.ticketId,
         normalizedData.notes,
         normalizedData.fromLocation || null,
-        normalizedData.toLocation || null
+        normalizedData.toLocation || null,
+        normalizedData.driverName,
+        normalizedData.driverMobile,
+        normalizedData.fare,
       ]
     );
 

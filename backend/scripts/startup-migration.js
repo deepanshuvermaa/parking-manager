@@ -290,6 +290,14 @@ async function runStartupMigrations(pool) {
       `);
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_ticket_counters_biz ON ticket_counters(business_id)`);
 
+      // Add optional vehicle fields: driver_name, driver_mobile, fare
+      await pool.query(`
+        ALTER TABLE vehicles
+        ADD COLUMN IF NOT EXISTS driver_name VARCHAR(255),
+        ADD COLUMN IF NOT EXISTS driver_mobile VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS fare NUMERIC(10,2)
+      `);
+
       await pool.query(
         "INSERT INTO schema_migrations (migration_name) VALUES ('add_settings_sync')"
       );

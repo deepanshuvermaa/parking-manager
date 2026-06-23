@@ -31,6 +31,10 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
   bool _showQr = true;
   int _paperWidth = 32;
   bool _saved = false;
+  // Optional entry fields
+  bool _showDriverName = false;
+  bool _showDriverMobile = false;
+  bool _showFare = false;
 
   @override
   void initState() {
@@ -50,6 +54,9 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
       _autoPrintExit = p.getBool('auto_print_exit') ?? true;
       _showQr = p.getBool('bill_show_qr_code') ?? true;
       _paperWidth = p.getInt('paper_width') ?? 32;
+      _showDriverName = p.getBool('show_driver_name') ?? false;
+      _showDriverMobile = p.getBool('show_driver_mobile') ?? false;
+      _showFare = p.getBool('show_fare') ?? false;
     });
   }
 
@@ -64,6 +71,9 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
     await p.setBool('auto_print_exit', _autoPrintExit);
     await p.setBool('bill_show_qr_code', _showQr);
     await p.setInt('paper_width', _paperWidth);
+    await p.setBool('show_driver_name', _showDriverName);
+    await p.setBool('show_driver_mobile', _showDriverMobile);
+    await p.setBool('show_fare', _showFare);
     SettingsSyncService.syncToBackend(widget.token);
     setState(() => _saved = true);
     Future.delayed(const Duration(seconds: 2), () { if (mounted) setState(() => _saved = false); });
@@ -151,6 +161,34 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
               _nav('Staff Activity', Icons.analytics_rounded, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StaffOverviewScreen()))),
             ]),
           ],
+
+          // Optional Entry Fields
+          _section('Optional Entry Fields'),
+          _card([
+            SwitchListTile(
+              dense: true, activeColor: Go2Colors.primary,
+              title: const Text('Driver Name'),
+              subtitle: const Text('Show driver name field on vehicle entry'),
+              value: _showDriverName,
+              onChanged: (v) { setState(() => _showDriverName = v); _save(); },
+            ),
+            const Divider(height: 1),
+            SwitchListTile(
+              dense: true, activeColor: Go2Colors.primary,
+              title: const Text('Driver Mobile'),
+              subtitle: const Text('Show driver mobile number on entry'),
+              value: _showDriverMobile,
+              onChanged: (v) { setState(() => _showDriverMobile = v); _save(); },
+            ),
+            const Divider(height: 1),
+            SwitchListTile(
+              dense: true, activeColor: Go2Colors.primary,
+              title: const Text('Fare / Charge'),
+              subtitle: const Text('Show pre-agreed fare field on entry'),
+              value: _showFare,
+              onChanged: (v) { setState(() => _showFare = v); _save(); },
+            ),
+          ]),
 
           // Rates
           _section('Vehicle Rates'),

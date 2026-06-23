@@ -25,7 +25,7 @@ class LocalDatabaseService {
 
     return await openDatabase(
       path,
-      version: 4,
+      version: 5,
       onConfigure: (db) async {
         // Enable WAL mode — prevents corruption on crash during writes
         await db.execute('PRAGMA journal_mode=WAL');
@@ -105,11 +105,15 @@ class LocalDatabaseService {
         }
 
         if (oldVersion < 4) {
-          // Add version field for optimistic locking on exit
           await db.execute('ALTER TABLE vehicles ADD COLUMN version INTEGER DEFAULT 1');
-          // Add index on vehicle_number for duplicate detection
           await db.execute('CREATE INDEX IF NOT EXISTS idx_vehicles_number ON vehicles(vehicle_number)');
-          print('✅ Added version field and vehicle_number index');
+        }
+
+        if (oldVersion < 5) {
+          // Optional fields: driver name, mobile, fare
+          await db.execute('ALTER TABLE vehicles ADD COLUMN driver_name TEXT');
+          await db.execute('ALTER TABLE vehicles ADD COLUMN driver_mobile TEXT');
+          await db.execute('ALTER TABLE vehicles ADD COLUMN fare REAL');
         }
       },
     );
@@ -167,14 +171,15 @@ class LocalDatabaseService {
         'duration_minutes': vehicle.durationMinutes,
         'from_location': vehicle.fromLocation,
         'to_location': vehicle.toLocation,
+        'driver_name': vehicle.driverName,
+        'driver_mobile': vehicle.driverMobile,
+        'fare': vehicle.fare,
         'synced': synced ? 1 : 0,
         'created_at': DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
-
-    print('💾 Vehicle saved locally: ${vehicle.vehicleNumber} (synced: $synced)');
   }
 
   /// Get all vehicles from local database
@@ -214,6 +219,9 @@ class LocalDatabaseService {
         durationMinutes: maps[i]['duration_minutes'],
         fromLocation: maps[i]['from_location'],
         toLocation: maps[i]['to_location'],
+        driverName: maps[i]['driver_name'],
+        driverMobile: maps[i]['driver_mobile'],
+        fare: (maps[i]['fare'] as num?)?.toDouble(),
       );
     });
 
@@ -237,6 +245,9 @@ class LocalDatabaseService {
         'duration_minutes': vehicle.durationMinutes,
         'from_location': vehicle.fromLocation,
         'to_location': vehicle.toLocation,
+        'driver_name': vehicle.driverName,
+        'driver_mobile': vehicle.driverMobile,
+        'fare': vehicle.fare,
         'synced': synced ? 1 : 0,
         'updated_at': DateTime.now().toIso8601String(),
       },
@@ -276,6 +287,9 @@ class LocalDatabaseService {
         durationMinutes: maps[i]['duration_minutes'],
         fromLocation: maps[i]['from_location'],
         toLocation: maps[i]['to_location'],
+        driverName: maps[i]['driver_name'],
+        driverMobile: maps[i]['driver_mobile'],
+        fare: (maps[i]['fare'] as num?)?.toDouble(),
       );
     });
 
@@ -329,6 +343,9 @@ class LocalDatabaseService {
           'duration_minutes': vehicle.durationMinutes,
           'from_location': vehicle.fromLocation,
           'to_location': vehicle.toLocation,
+          'driver_name': vehicle.driverName,
+          'driver_mobile': vehicle.driverMobile,
+          'fare': vehicle.fare,
           'synced': synced ? 1 : 0,
           'created_at': now,
           'updated_at': now,
@@ -416,6 +433,9 @@ class LocalDatabaseService {
         durationMinutes: maps[i]['duration_minutes'],
         fromLocation: maps[i]['from_location'],
         toLocation: maps[i]['to_location'],
+        driverName: maps[i]['driver_name'],
+        driverMobile: maps[i]['driver_mobile'],
+        fare: (maps[i]['fare'] as num?)?.toDouble(),
       );
     });
   }

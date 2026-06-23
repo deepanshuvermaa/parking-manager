@@ -19,12 +19,19 @@ class VehicleEntryScreen extends StatefulWidget {
 
 class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
   final _plateController = TextEditingController();
+  final _driverNameController = TextEditingController();
+  final _driverMobileController = TextEditingController();
+  final _fareController = TextEditingController();
   final _hasText = ValueNotifier<bool>(false);
   String _selectedType = 'Car';
   bool _isSubmitting = false;
   SimpleVehicle? _lastVehicle;
   String? _lastReceipt;
   SharedPreferences? _prefs;
+  // Optional field visibility — loaded from settings
+  bool _showDriverName = false;
+  bool _showDriverMobile = false;
+  bool _showFare = false;
 
   // Only 6 primary types - user can add more via Settings > Rates
   static const _types = [
@@ -42,11 +49,21 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
     _plateController.addListener(() {
       _hasText.value = _plateController.text.trim().isNotEmpty;
     });
-    SharedPreferences.getInstance().then((p) => _prefs = p);
+    SharedPreferences.getInstance().then((p) {
+      _prefs = p;
+      if (mounted) {
+        setState(() {
+          _showDriverName = p.getBool('show_driver_name') ?? false;
+          _showDriverMobile = p.getBool('show_driver_mobile') ?? false;
+          _showFare = p.getBool('show_fare') ?? false;
+        });
+      }
+    });
   }
 
   @override
-  void dispose() { _plateController.dispose(); _hasText.dispose(); super.dispose(); }
+  @override
+  void dispose() { _plateController.dispose(); _driverNameController.dispose(); _driverMobileController.dispose(); _fareController.dispose(); _hasText.dispose(); super.dispose(); }
 
   Future<void> _submit() async {
     final plate = _plateController.text.trim().toUpperCase();
@@ -75,7 +92,14 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
     try {
       final token = context.read<AuthProvider>().token ?? '';
       final vehicle = await SimpleVehicleService.addVehicle(
-        token: token, vehicleNumber: plate, vehicleType: _selectedType,
+        token: token,
+        vehicleNumber: plate,
+        vehicleType: _selectedType,
+        driverName: _showDriverName ? _driverNameController.text.trim() : null,
+        driverMobile: _showDriverMobile ? _driverMobileController.text.trim() : null,
+        fare: _showFare && _fareController.text.trim().isNotEmpty
+            ? double.tryParse(_fareController.text.trim())
+            : null,
       );
 
       if (vehicle != null && mounted) {
@@ -100,6 +124,9 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg, style: const TextStyle(fontSize: 15)), backgroundColor: Go2Colors.success));
           _plateController.clear();
+          _driverNameController.clear();
+          _driverMobileController.clear();
+          _fareController.clear();
           setState(() {});
         }
       }
@@ -195,7 +222,58 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
             inputFormatters: [UpperCaseTextFormatter(), LengthLimitingTextInputFormatter(14)],
             onFieldSubmitted: (_) => _submit(),
           ),
-          const SizedBox(height: 24),
+
+          // Optional fields — shown based on Settings toggles
+          if (_showDriverName || _showDriverMobile || _showFare) ...[
+            const SizedBox(height: 12),
+            if (_showDriverName)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: TextFormField(
+                  controller: _driverNameController,
+                  autocorrect: false,
+                  textCapitalization: TextCapitalization.words,
+                  style: const TextStyle(fontSize: 16),
+                  decoration: const InputDecoration(
+                    hintText: 'Driver Name',
+                    prefixIcon: Icon(Icons.person_outline, size: 20),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    isDense: true,
+                  ),
+                ),
+              ),
+            if (_showDriverMobile)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: TextFormField(
+                  controller: _driverMobileController,
+                  keyboardType: TextInputType.phone,
+                  style: const TextStyle(fontSize: 16),
+                  decoration: const InputDecoration(
+                    hintText: 'Driver Mobile',
+                    prefixIcon: Icon(Icons.phone_outlined, size: 20),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    isDense: true,
+                  ),
+                ),
+              ),
+            if (_showFare)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: TextFormField(
+                  controller: _fareController,
+                  keyboardType: TextInputType.number,
+                  style: const TextStyle(fontSize: 16),
+                  decoration: const InputDecoration(
+                    hintText: 'Fare (₹)',
+                    prefixIcon: Icon(Icons.currency_rupee_outlined, size: 20),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    isDense: true,
+                  ),
+                ),
+              ),
+          ],
+          const SizedBox(height: 16),
 
           // Park button - large, prominent
           SizedBox(
