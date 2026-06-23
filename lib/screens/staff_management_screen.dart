@@ -33,19 +33,27 @@ class _StaffManagementScreenState extends State<StaffManagementScreen> {
       final res = await http.get(Uri.parse('${ApiConfig.baseUrl}/business/staff'), headers: _headers);
       if (res.statusCode == 200) {
         setState(() => _staff = jsonDecode(res.body)['data'] ?? jsonDecode(res.body));
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to load staff (${res.statusCode})'), backgroundColor: Colors.red));
       }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Network error: $e'), backgroundColor: Colors.red));
     } finally {
       setState(() => _loading = false);
     }
   }
 
   Future<void> _toggleActive(dynamic staff) async {
-    await http.put(
-      Uri.parse('${ApiConfig.baseUrl}/business/staff/${staff['id']}'),
-      headers: _headers,
-      body: jsonEncode({'is_active': !(staff['is_active'] ?? true)}),
-    );
-    _fetchStaff();
+    try {
+      await http.put(
+        Uri.parse('${ApiConfig.baseUrl}/business/staff/${staff['id']}'),
+        headers: _headers,
+        body: jsonEncode({'is_active': !(staff['is_active'] ?? true)}),
+      );
+      _fetchStaff();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to update: $e'), backgroundColor: Colors.red));
+    }
   }
 
   Future<void> _deleteStaff(dynamic staff) async {

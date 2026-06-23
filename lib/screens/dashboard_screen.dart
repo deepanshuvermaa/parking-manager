@@ -99,6 +99,44 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: ListView(
           padding: const EdgeInsets.all(Go2Spacing.lg),
           children: [
+            // Trial expired banner
+            if (auth.trialExpired)
+              Container(
+                margin: const EdgeInsets.only(bottom: Go2Spacing.lg),
+                padding: const EdgeInsets.all(Go2Spacing.lg),
+                decoration: BoxDecoration(
+                  color: Go2Colors.error.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(Go2Radius.md),
+                  border: Border.all(color: Go2Colors.error.withValues(alpha: 0.3)),
+                ),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Row(children: [
+                    Icon(Icons.warning_amber_rounded, color: Go2Colors.error, size: 20),
+                    SizedBox(width: 8),
+                    Text('Trial Expired', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Go2Colors.error)),
+                  ]),
+                  const SizedBox(height: 6),
+                  const Text('Your free trial has ended. Vehicles parked locally will still work, but data won\'t sync to the cloud. Contact your admin to activate your subscription.',
+                    style: TextStyle(fontSize: 13, color: Go2Colors.textSecondary, height: 1.4)),
+                ]),
+              ),
+            // Trial warning banner (< 3 days left)
+            if (!auth.trialExpired && auth.isGuest && auth.trialDaysLeft > 0 && auth.trialDaysLeft <= 3)
+              Container(
+                margin: const EdgeInsets.only(bottom: Go2Spacing.lg),
+                padding: const EdgeInsets.symmetric(horizontal: Go2Spacing.lg, vertical: Go2Spacing.md),
+                decoration: BoxDecoration(
+                  color: Go2Colors.warning.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(Go2Radius.md),
+                  border: Border.all(color: Go2Colors.warning.withValues(alpha: 0.3)),
+                ),
+                child: Row(children: [
+                  const Icon(Icons.timer_outlined, color: Go2Colors.warning, size: 18),
+                  const SizedBox(width: 8),
+                  Text('Trial ends in ${auth.trialDaysLeft} day${auth.trialDaysLeft == 1 ? '' : 's'}',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Go2Colors.warning)),
+                ]),
+              ),
             // Stats row
             _buildStats(parking),
             const SizedBox(height: Go2Spacing.xl),

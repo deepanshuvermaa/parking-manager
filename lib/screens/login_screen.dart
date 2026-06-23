@@ -98,7 +98,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 Text('Start Free Trial',
                     style: Theme.of(ctx).textTheme.headlineMedium),
                 const SizedBox(height: 4),
-                Text('3 days free. No credit card required.',
+                Text('7 days free. No credit card required.',
                     style: Theme.of(ctx).textTheme.bodySmall),
                 const SizedBox(height: Go2Spacing.xl),
                 TextFormField(
@@ -168,7 +168,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     backgroundColor: Go2Colors.accent,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
-                  child: const Text('Start 3-Day Free Trial'),
+                  child: const Text('Start 7-Day Free Trial'),
                 ),
                 const SizedBox(height: Go2Spacing.lg),
               ],

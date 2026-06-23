@@ -34,7 +34,11 @@ class _StaffOverviewScreenState extends State<StaffOverviewScreen> {
       final res = await http.get(Uri.parse('${ApiConfig.baseUrl}/business/staff/activity?period=$_period'), headers: _headers);
       if (res.statusCode == 200) {
         setState(() => _activity = jsonDecode(res.body)['data'] ?? jsonDecode(res.body));
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to load activity (${res.statusCode})'), backgroundColor: Colors.red));
       }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Network error: $e'), backgroundColor: Colors.red));
     } finally {
       setState(() => _loading = false);
     }

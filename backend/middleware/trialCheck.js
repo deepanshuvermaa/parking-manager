@@ -13,7 +13,7 @@ async function checkTrialExpiry(req, res, next) {
   try {
     // Get user from database
     const userResult = await req.pool.query(
-      'SELECT user_type, trial_expires_at, is_active FROM users WHERE id = $1',
+      'SELECT user_type, trial_expires_at, subscription_expires_at, is_active FROM users WHERE id = $1',
       [req.userId]
     );
 
@@ -36,31 +36,36 @@ async function checkTrialExpiry(req, res, next) {
       });
     }
 
-    // Only check trial expiry for guest users
-    if (user.user_type === 'guest') {
-      const now = new Date();
+    const now = new Date();
+
+    // Check subscription first (takes priority over trial)
+    if (user.subscription_expires_at) {
+      const subExpiry = new Date(user.subscription_expires_at);
+      if (now < subExpiry) {
+        // Active subscription — allow through
+        return next();
+      }
+    }
+
+    // Check trial expiry
+    if (user.trial_expires_at) {
       const trialExpiry = new Date(user.trial_expires_at);
 
-      // Check if trial has expired
       if (now > trialExpiry) {
-        // Calculate days expired
-        const daysExpired = Math.floor((now - trialExpiry) / (1000 * 60 * 60 * 24));
-
         return res.status(403).json({
           success: false,
-          error: 'Your 3-day free trial has expired. Please contact support to upgrade.',
+          error: 'Your free trial has expired. Please contact support to upgrade.',
           code: 'TRIAL_EXPIRED',
           data: {
             trialExpiresAt: user.trial_expires_at,
-            daysExpired: daysExpired
+            daysExpired: Math.floor((now - trialExpiry) / 86400000)
           }
         });
       }
 
-      // Check if trial is expiring soon (within 1 day)
-      const hoursRemaining = (trialExpiry - now) / (1000 * 60 * 60);
+      // Warning if expiring soon
+      const hoursRemaining = (trialExpiry - now) / 3600000;
       if (hoursRemaining < 24 && hoursRemaining > 0) {
-        // Add warning to response (but still allow access)
         req.trialWarning = {
           message: 'Your trial expires in less than 24 hours',
           hoursRemaining: Math.floor(hoursRemaining),
@@ -69,7 +74,7 @@ async function checkTrialExpiry(req, res, next) {
       }
     }
 
-    // Premium and admin users - no trial check needed
+    // Admin users with no trial/subscription set — allow through
     next();
 
   } catch (error) {

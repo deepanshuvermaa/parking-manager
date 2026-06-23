@@ -294,7 +294,7 @@ class AuthController {
           parking_name, phone,
           trial_starts_at, trial_expires_at, is_active,
           business_id, role
-        ) VALUES ($1, $2, $3, 'guest', $4, $5, $6, NOW(), NOW() + INTERVAL '3 days', true, $7, 'owner')
+        ) VALUES ($1, $2, $3, 'guest', $4, $5, $6, NOW(), NOW() + INTERVAL '7 days', true, $7, 'owner')
         RETURNING *`,
         [username, finalFullName || finalParkingName || 'Guest User', finalDeviceId, passwordHash, finalParkingName || '', phone || '', businessId]
       );

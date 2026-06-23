@@ -120,60 +120,25 @@ class SubscriptionScreen extends StatelessWidget {
   }
 
   void _handlePurchase(BuildContext context, String plan) {
-    // In production, integrate Razorpay/PhonePe SDK here
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(Go2Spacing.xl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.payment_rounded,
-                size: 48, color: Go2Colors.primary),
-            const SizedBox(height: Go2Spacing.lg),
-            Text('Complete Payment',
-                style: Theme.of(ctx).textTheme.headlineMedium),
-            const SizedBox(height: Go2Spacing.sm),
-            Text(
-              'You\'ll be redirected to our secure payment page.',
-              style: Theme.of(ctx).textTheme.bodySmall,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: Go2Spacing.xl),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  _launchPaymentUrl(plan);
-                },
-                child: const Text('Pay with UPI / Card'),
-              ),
-            ),
-            const SizedBox(height: Go2Spacing.md),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
-            ),
-            const SizedBox(height: Go2Spacing.lg),
-          ],
-        ),
-      ),
-    );
+    final planName = plan[0].toUpperCase() + plan.substring(1);
+    final msg = Uri.encodeComponent('Hi, I want to subscribe to the $planName plan for Go2-Parking. Please share payment details.');
+    _openWhatsApp(context, msg);
   }
 
-  void _launchPaymentUrl(String plan) async {
-    // Replace with actual Razorpay payment link
-    final url = Uri.parse('https://go2parking.com/subscribe?plan=$plan');
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
-    }
+  void _contactSupport(BuildContext context) {
+    final msg = Uri.encodeComponent('Hi, I need help with Go2-Parking subscription.');
+    _openWhatsApp(context, msg);
   }
 
-  void _contactSupport(BuildContext context) async {
-    final url = Uri.parse('https://wa.me/919876543210?text=Hi, I need a custom plan for Go2-Parking');
+  void _openWhatsApp(BuildContext context, String message) async {
+    // Replace with your actual support WhatsApp number
+    final url = Uri.parse('https://wa.me/917876483280?text=$message');
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
+    } else if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open WhatsApp. Contact: +91 78764 83280'), backgroundColor: Go2Colors.error),
+      );
     }
   }
 }
