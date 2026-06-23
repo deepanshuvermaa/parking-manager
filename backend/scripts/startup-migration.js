@@ -307,10 +307,34 @@ async function runStartupMigrations(pool) {
       console.log('✅ Settings sync migration already applied');
     }
 
+    // ========================================
+    // MIGRATION 5: Add driver/fare fields to vehicles
+    // ========================================
+    const driverFieldsCheck = await pool.query(
+      "SELECT * FROM schema_migrations WHERE migration_name = 'add_driver_fare_fields'"
+    );
+
+    if (driverFieldsCheck.rows.length === 0) {
+      console.log('📦 Applying driver/fare fields migration...');
+
+      await pool.query(`
+        ALTER TABLE vehicles
+        ADD COLUMN IF NOT EXISTS driver_name VARCHAR(255),
+        ADD COLUMN IF NOT EXISTS driver_mobile VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS fare NUMERIC(10,2)
+      `);
+
+      await pool.query(
+        "INSERT INTO schema_migrations (migration_name) VALUES ('add_driver_fare_fields')"
+      );
+
+      console.log('✅ Driver/fare fields migration applied successfully');
+    } else {
+      console.log('✅ Driver/fare fields migration already applied');
+    }
+
   } catch (error) {
     console.error('❌ Migration error:', error);
-    // Don't crash the server if migration fails
-    // The app should still work without the new features
     console.error('⚠️ Server will continue without new features');
   }
 }
