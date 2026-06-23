@@ -1010,7 +1010,13 @@ app.get('/api/parkease-admin/stats', adminGuard, async (req, res) => {
 
 app.get('/api/parkease-admin/users', adminGuard, async (req, res) => {
   try {
-    const result = await pool.query('SELECT id, username, full_name, email, role, user_type, is_active, is_staff, business_id, last_login_at, created_at FROM users ORDER BY created_at DESC');
+    const result = await pool.query(`
+      SELECT id, username, full_name, email, role, user_type, is_active, is_staff,
+             business_id, parking_name, phone, max_devices, multi_device_enabled,
+             trial_starts_at, trial_expires_at, subscription_expires_at,
+             last_login_at, created_at
+      FROM users ORDER BY created_at DESC
+    `);
     res.json({ success: true, data: { users: result.rows } });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
@@ -1050,6 +1056,103 @@ app.post('/api/parkease-admin/users/:userId/subscription', adminGuard, async (re
     params.push(req.params.userId);
     await pool.query(`UPDATE users SET ${updates.join(', ')} WHERE id = $${idx}`, params);
     res.json({ success: true });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// Get single user details with stats
+app.get('/api/parkease-admin/users/:userId', adminGuard, async (req, res) => {
+  try {
+    const user = await pool.query('SELECT * FROM users WHERE id = $1', [req.params.userId]);
+    if (user.rows.length === 0) return res.status(404).json({ success: false, error: 'User not found' });
+    // Get vehicle stats
+    const vstats = await pool.query(`
+      SELECT COUNT(*) as total,
+        COUNT(*) FILTER (WHERE status = 'parked') as parked,
+        COUNT(*) FILTER (WHERE status = 'exited') as exited,
+        COALESCE(SUM(amount) FILTER (WHERE status = 'exited'), 0) as revenue
+      FROM vehicles WHERE user_id = $1
+    `, [req.params.userId]);
+    // Get devices
+    const devices = await pool.query('SELECT * FROM devices WHERE user_id = $1 ORDER BY last_active_at DESC', [req.params.userId]);
+    // Get recent vehicles
+    const vehicles = await pool.query('SELECT * FROM vehicles WHERE user_id = $1 ORDER BY entry_time DESC LIMIT 50', [req.params.userId]);
+    const u = user.rows[0];
+    // Remove password
+    delete u.password_hash;
+    res.json({ success: true, data: { user: u, stats: vstats.rows[0], devices: devices.rows, vehicles: vehicles.rows } });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// Update user role
+app.put('/api/parkease-admin/users/:userId/role', adminGuard, async (req, res) => {
+  try {
+    const { role } = req.body;
+    const validRoles = ['owner', 'manager', 'staff'];
+    if (!validRoles.includes(role)) return res.status(400).json({ success: false, error: 'Invalid role. Must be: owner, manager, or staff' });
+    await pool.query('UPDATE users SET role = $1, is_staff = $2 WHERE id = $3', [role, role === 'staff', req.params.userId]);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// Update user details (name, parking_name, phone, email)
+app.put('/api/parkease-admin/users/:userId', adminGuard, async (req, res) => {
+  try {
+    const { full_name, parking_name, phone, email, user_type } = req.body;
+    const updates = []; const params = []; let idx = 1;
+    if (full_name !== undefined) { updates.push(`full_name = $${idx}`); params.push(full_name); idx++; }
+    if (parking_name !== undefined) { updates.push(`parking_name = $${idx}`); params.push(parking_name); idx++; }
+    if (phone !== undefined) { updates.push(`phone = $${idx}`); params.push(phone); idx++; }
+    if (email !== undefined) { updates.push(`email = $${idx}`); params.push(email); idx++; }
+    if (user_type !== undefined) { updates.push(`user_type = $${idx}`); params.push(user_type); idx++; }
+    if (updates.length === 0) return res.status(400).json({ success: false, error: 'No fields to update' });
+    updates.push(`updated_at = NOW()`);
+    params.push(req.params.userId);
+    await pool.query(`UPDATE users SET ${updates.join(', ')} WHERE id = $${idx}`, params);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// Reset user password
+app.post('/api/parkease-admin/users/:userId/reset-password', adminGuard, async (req, res) => {
+  try {
+    const { password } = req.body;
+    const newPass = password || 'ParkEase@123';
+    const hash = await bcrypt.hash(newPass, 10);
+    await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, req.params.userId]);
+    res.json({ success: true, data: { temporaryPassword: newPass } });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// Delete user (soft: disable + remove devices)
+app.delete('/api/parkease-admin/users/:userId', adminGuard, async (req, res) => {
+  try {
+    const { hard } = req.query;
+    if (hard === 'true') {
+      await pool.query('DELETE FROM vehicles WHERE user_id = $1', [req.params.userId]);
+      await pool.query('DELETE FROM devices WHERE user_id = $1', [req.params.userId]);
+      await pool.query('DELETE FROM sessions WHERE user_id = $1', [req.params.userId]);
+      await pool.query('DELETE FROM users WHERE id = $1', [req.params.userId]);
+      res.json({ success: true, message: 'User permanently deleted' });
+    } else {
+      await pool.query('UPDATE users SET is_active = false WHERE id = $1', [req.params.userId]);
+      await pool.query('UPDATE devices SET is_active = false WHERE user_id = $1', [req.params.userId]);
+      res.json({ success: true, message: 'User disabled' });
+    }
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// Get user's vehicles with pagination
+app.get('/api/parkease-admin/users/:userId/vehicles', adminGuard, async (req, res) => {
+  try {
+    const { status, limit = 100, offset = 0 } = req.query;
+    let query = 'SELECT * FROM vehicles WHERE user_id = $1';
+    const params = [req.params.userId];
+    if (status) { query += ' AND status = $2'; params.push(status); }
+    query += ` ORDER BY entry_time DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+    params.push(parseInt(limit), parseInt(offset));
+    const result = await pool.query(query, params);
+    const count = await pool.query('SELECT COUNT(*) as total FROM vehicles WHERE user_id = $1', [req.params.userId]);
+    res.json({ success: true, data: { vehicles: result.rows, total: parseInt(count.rows[0].total) } });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
