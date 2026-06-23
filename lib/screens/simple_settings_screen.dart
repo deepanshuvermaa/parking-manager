@@ -153,8 +153,8 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
             _nav('Customize Receipt', Icons.receipt_long_rounded, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReceiptCustomizationScreen()))),
           ]),
 
-          // Staff (owner only)
-          if (auth.userRole == 'owner') ...[
+          // Staff (owner + multi-staff enabled by admin only)
+          if (auth.userRole == 'owner' && auth.multiStaffEnabled) ...[
             _section('Staff Management'),
             _card([
               _nav('Manage Staff', Icons.people_rounded, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StaffManagementScreen()))),

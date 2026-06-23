@@ -957,7 +957,7 @@ app.delete('/api/business/staff/:staffId', verifyToken, async (req, res) => {
 // Get user role/permissions (for app RBAC)
 app.get('/api/auth/me', verifyToken, async (req, res) => {
   try {
-    const result = await pool.query('SELECT id, username, full_name, role, is_staff, business_id, is_active FROM users WHERE id = $1', [req.userId]);
+    const result = await pool.query('SELECT id, username, full_name, role, is_staff, business_id, is_active, multi_device_enabled, max_devices FROM users WHERE id = $1', [req.userId]);
     if (!result.rows[0]) return res.status(404).json({ success: false, error: 'User not found' });
     res.json({ success: true, data: { user: result.rows[0] } });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }

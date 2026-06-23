@@ -20,6 +20,7 @@ class AuthProvider extends ChangeNotifier {
   String _parkingName = '';
   DateTime? _trialExpires;
   bool _isOffline = false;
+  bool _multiStaffEnabled = false;
 
   // Getters
   AuthStatus get status => _status;
@@ -31,6 +32,7 @@ class AuthProvider extends ChangeNotifier {
   bool get isAuthenticated => _status == AuthStatus.authenticated;
   bool get isOffline => _isOffline;
   bool get isGuest => _userRole == 'guest';
+  bool get multiStaffEnabled => _multiStaffEnabled;
   int get trialDaysLeft {
     if (_trialExpires == null) return 0;
     return _trialExpires!.difference(DateTime.now()).inDays;
@@ -50,6 +52,7 @@ class AuthProvider extends ChangeNotifier {
     _parkingName = prefs.getString('parking_name') ?? '';
     _refreshToken = prefs.getString('refresh_token');
     _userId = prefs.getString('user_id');
+    _multiStaffEnabled = prefs.getBool('multi_staff_enabled') ?? false;
     final trialStr = prefs.getString('trial_expires');
     if (trialStr != null && trialStr.isNotEmpty) {
       _trialExpires = DateTime.tryParse(trialStr);
@@ -126,11 +129,16 @@ class AuthProvider extends ChangeNotifier {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['success'] == true && data['data']?['user'] != null) {
-          final newRole = data['data']['user']['role'] as String? ?? _userRole;
-          if (newRole != _userRole) {
-            _userRole = newRole;
+          final user = data['data']['user'];
+          final newRole = (user['role'] ?? user['role']) as String? ?? _userRole;
+          final newMultiStaff = user['multi_device_enabled'] == true || user['multiDeviceEnabled'] == true;
+          bool changed = false;
+          if (newRole != _userRole) { _userRole = newRole; changed = true; }
+          if (newMultiStaff != _multiStaffEnabled) { _multiStaffEnabled = newMultiStaff; changed = true; }
+          if (changed) {
             final prefs = await SharedPreferences.getInstance();
             await prefs.setString('user_role', _userRole);
+            await prefs.setBool('multi_staff_enabled', _multiStaffEnabled);
             notifyListeners();
           }
         }
@@ -170,6 +178,7 @@ class AuthProvider extends ChangeNotifier {
         _userEmail = userData['email'] ?? userData['username'] ?? '';
         _userRole = userData['role'] ?? userData['userType'] ?? 'owner';
         _parkingName = userData['parkingName'] ?? '';
+        _multiStaffEnabled = userData['multiDeviceEnabled'] == true;
         final trialStr = userData['trialExpiresAt'] ?? '';
         if (trialStr.isNotEmpty) _trialExpires = DateTime.tryParse(trialStr);
 
@@ -279,6 +288,7 @@ class AuthProvider extends ChangeNotifier {
     _parkingName = '';
     _trialExpires = null;
     _isOffline = false;
+    _multiStaffEnabled = false;
     _status = AuthStatus.unauthenticated;
     notifyListeners();
   }
@@ -314,6 +324,7 @@ class AuthProvider extends ChangeNotifier {
     await prefs.setString('user_role', _userRole);
     await prefs.setString('parking_name', _parkingName);
     await prefs.setString('trial_expires', _trialExpires?.toIso8601String() ?? '');
+    await prefs.setBool('multi_staff_enabled', _multiStaffEnabled);
   }
 
   Future<void> _clearCredentials() async {
