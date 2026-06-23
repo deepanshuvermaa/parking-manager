@@ -1156,6 +1156,87 @@ app.get('/api/parkease-admin/users/:userId/vehicles', adminGuard, async (req, re
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
+// ================================
+// ADMIN: STAFF MANAGEMENT (manage staff for any owner)
+// ================================
+
+// Get staff for a specific owner (admin view)
+app.get('/api/parkease-admin/users/:userId/staff', adminGuard, async (req, res) => {
+  try {
+    const owner = await pool.query('SELECT business_id, role FROM users WHERE id = $1', [req.params.userId]);
+    if (!owner.rows[0]) return res.status(404).json({ success: false, error: 'User not found' });
+    const businessId = owner.rows[0].business_id;
+    const staff = await pool.query(
+      'SELECT id, username, full_name, role, is_active, is_staff, phone, last_login_at, created_at FROM users WHERE business_id = $1 AND id != $2 AND is_staff = true ORDER BY created_at DESC',
+      [businessId, req.params.userId]
+    );
+    res.json({ success: true, data: { staff: staff.rows, businessId } });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// Create staff for a specific owner (admin creates on behalf)
+app.post('/api/parkease-admin/users/:userId/staff', adminGuard, async (req, res) => {
+  try {
+    const owner = await pool.query('SELECT business_id FROM users WHERE id = $1', [req.params.userId]);
+    if (!owner.rows[0]) return res.status(404).json({ success: false, error: 'Owner not found' });
+    const businessId = owner.rows[0].business_id;
+    const { username, password, fullName, full_name, role, phone } = req.body;
+    const name = fullName || full_name;
+    if (!username || !password || !name) {
+      return res.status(400).json({ success: false, error: 'username, password, fullName required' });
+    }
+    const validRoles = ['staff', 'manager'];
+    const staffRole = validRoles.includes(role) ? role : 'staff';
+    const hash = await bcrypt.hash(password, 10);
+    const result = await pool.query(
+      `INSERT INTO users (username, full_name, password_hash, user_type, role, business_id, parent_user_id, is_staff, is_active, max_devices, phone, trial_expires_at)
+       VALUES ($1, $2, $3, 'admin', $4, $5, $6, true, true, 2, $7, NOW() + INTERVAL '365 days') RETURNING id, username, full_name, role, is_staff, phone`,
+      [username, name, hash, staffRole, businessId, req.params.userId, phone || null]
+    );
+    res.json({ success: true, data: { staff: result.rows[0] } });
+  } catch (e) {
+    if (e.code === '23505') return res.status(400).json({ success: false, error: 'Username already exists' });
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// Update staff member (admin)
+app.put('/api/parkease-admin/staff/:staffId', adminGuard, async (req, res) => {
+  try {
+    const { role, is_active, full_name, phone } = req.body;
+    const updates = []; const params = []; let idx = 1;
+    if (role !== undefined) { const validRoles = ['staff', 'manager']; updates.push(`role = $${idx}`); params.push(validRoles.includes(role) ? role : 'staff'); idx++; updates.push(`is_staff = true`); }
+    if (is_active !== undefined) { updates.push(`is_active = $${idx}`); params.push(is_active); idx++; }
+    if (full_name !== undefined) { updates.push(`full_name = $${idx}`); params.push(full_name); idx++; }
+    if (phone !== undefined) { updates.push(`phone = $${idx}`); params.push(phone); idx++; }
+    if (updates.length === 0) return res.status(400).json({ success: false, error: 'No updates' });
+    params.push(req.params.staffId);
+    await pool.query(`UPDATE users SET ${updates.join(', ')} WHERE id = $${idx} AND is_staff = true`, params);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// Reset staff password (admin)
+app.post('/api/parkease-admin/staff/:staffId/reset-password', adminGuard, async (req, res) => {
+  try {
+    const { password } = req.body;
+    const newPass = password || 'Staff@123';
+    const hash = await bcrypt.hash(newPass, 10);
+    await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2 AND is_staff = true', [hash, req.params.staffId]);
+    res.json({ success: true, data: { temporaryPassword: newPass } });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// Delete staff member (admin)
+app.delete('/api/parkease-admin/staff/:staffId', adminGuard, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM devices WHERE user_id = $1', [req.params.staffId]);
+    await pool.query('DELETE FROM sessions WHERE user_id = $1', [req.params.staffId]);
+    await pool.query('DELETE FROM users WHERE id = $1 AND is_staff = true', [req.params.staffId]);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
 // Catch-all: serve landing page for non-API, non-file routes
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/')) {
