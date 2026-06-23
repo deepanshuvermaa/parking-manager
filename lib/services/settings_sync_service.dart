@@ -14,6 +14,7 @@ class SettingsSyncService {
   static const _extraKeys = [
     'vehicle_rates_v2', 'parking_zones',
     'ticket_id_prefix', 'ticket_id_serial', 'ticket_device_suffix',
+    'show_driver_name', 'show_driver_mobile', 'show_fare',
   ];
 
   static Future<void> syncToBackend(String token) async {
