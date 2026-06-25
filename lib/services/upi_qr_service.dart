@@ -34,7 +34,7 @@ class UpiQrService {
     final prefs = await SharedPreferences.getInstance();
     return {
       'vpa': prefs.getString(_upiIdKey),
-      'name': prefs.getString(_upiNameKey),
+      'name': prefs.getString(_upiNameKey) ?? prefs.getString('business_name'),
     };
   }
 

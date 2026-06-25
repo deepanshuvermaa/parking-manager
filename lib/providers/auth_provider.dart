@@ -183,6 +183,13 @@ class AuthProvider extends ChangeNotifier {
         if (trialStr.isNotEmpty) _trialExpires = DateTime.tryParse(trialStr);
 
         await _saveCredentials();
+
+        // Populate business settings from login data if empty locally
+        final prefs = await SharedPreferences.getInstance();
+        if ((prefs.getString('business_name') ?? '').isEmpty && _parkingName.isNotEmpty) {
+          await prefs.setString('business_name', _parkingName);
+        }
+
         await SimpleVehicleService.initialize(_token!);
         _status = AuthStatus.authenticated;
         _isOffline = false;
@@ -258,6 +265,16 @@ class AuthProvider extends ChangeNotifier {
         if (trialStr.isNotEmpty) _trialExpires = DateTime.tryParse(trialStr);
 
         await _saveCredentials();
+
+        // Populate business settings from signup data on first registration
+        final prefs = await SharedPreferences.getInstance();
+        if ((prefs.getString('business_name') ?? '').isEmpty && _parkingName.isNotEmpty) {
+          await prefs.setString('business_name', _parkingName);
+        }
+        if ((prefs.getString('business_phone') ?? '').isEmpty && (phone ?? '').isNotEmpty) {
+          await prefs.setString('business_phone', phone!);
+        }
+
         await SimpleVehicleService.initialize(_token!);
         _status = AuthStatus.authenticated;
         _isOffline = false;

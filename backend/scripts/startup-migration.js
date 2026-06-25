@@ -333,6 +333,55 @@ async function runStartupMigrations(pool) {
       console.log('✅ Driver/fare fields migration already applied');
     }
 
+    // ========================================
+    // MIGRATION 6: Add all settings sync columns
+    // ========================================
+    const settingsColsCheck = await pool.query(
+      "SELECT * FROM schema_migrations WHERE migration_name = 'add_settings_columns'"
+    );
+
+    if (settingsColsCheck.rows.length === 0) {
+      console.log('📦 Applying settings columns migration...');
+
+      const columns = [
+        'upi_vpa VARCHAR(255)',
+        'auto_print_exit BOOLEAN DEFAULT true',
+        'bill_show_qr_code BOOLEAN DEFAULT true',
+        'bill_show_business_name BOOLEAN DEFAULT true',
+        'bill_show_business_address BOOLEAN DEFAULT true',
+        'bill_show_business_phone BOOLEAN DEFAULT true',
+        'bill_show_gst_number BOOLEAN DEFAULT true',
+        'bill_show_rate_info BOOLEAN DEFAULT true',
+        'bill_show_notes BOOLEAN DEFAULT true',
+        'bill_show_receipt_header BOOLEAN DEFAULT true',
+        'bill_show_receipt_footer BOOLEAN DEFAULT true',
+        'show_driver_name BOOLEAN DEFAULT false',
+        'show_driver_mobile BOOLEAN DEFAULT false',
+        'show_fare BOOLEAN DEFAULT false',
+        'vehicle_rates_v2 TEXT',
+        'parking_zones TEXT',
+        'receipt_business_name_bold BOOLEAN DEFAULT true',
+        'receipt_business_name_size REAL DEFAULT 1.0',
+        'receipt_ticket_id_bold BOOLEAN DEFAULT true',
+        'receipt_ticket_id_size REAL DEFAULT 1.5',
+        'receipt_vehicle_number_bold BOOLEAN DEFAULT true',
+        'receipt_vehicle_number_size REAL DEFAULT 1.5',
+        'receipt_amount_bold BOOLEAN DEFAULT true',
+        'receipt_amount_size REAL DEFAULT 1.5',
+      ];
+
+      for (const col of columns) {
+        await pool.query('ALTER TABLE settings ADD COLUMN IF NOT EXISTS ' + col);
+      }
+
+      await pool.query(
+        "INSERT INTO schema_migrations (migration_name) VALUES ('add_settings_columns')"
+      );
+      console.log('✅ Settings columns migration applied');
+    } else {
+      console.log('✅ Settings columns migration already applied');
+    }
+
   } catch (error) {
     console.error('❌ Migration error:', error);
     console.error('⚠️ Server will continue without new features');

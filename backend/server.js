@@ -650,21 +650,32 @@ app.put('/api/settings', verifyToken, async (req, res) => {
 
     const currentSettings = currentResult.rows[0];
 
-    // Build dynamic update query
+    // Get valid column names from DB to prevent SQL errors on unknown fields
+    const colResult = await pool.query("SELECT column_name FROM information_schema.columns WHERE table_name = 'settings'");
+    const validColumns = new Set(colResult.rows.map(r => r.column_name));
+    // Exclude system columns from updates
+    ['id', 'user_id', 'created_at'].forEach(c => validColumns.delete(c));
+
+    // Build dynamic update query — only include fields that exist as columns
     const setFields = [];
     const values = [];
     let paramCount = 1;
 
     Object.keys(updateFields).forEach(field => {
-      if (updateFields[field] !== undefined) {
+      if (updateFields[field] !== undefined && validColumns.has(field)) {
+        // Convert arrays/objects to JSON string for TEXT columns
+        let val = updateFields[field];
+        if (Array.isArray(val) || (typeof val === 'object' && val !== null)) {
+          val = JSON.stringify(val);
+        }
         setFields.push(`${field} = $${paramCount}`);
-        values.push(updateFields[field]);
+        values.push(val);
         paramCount++;
       }
     });
 
     if (setFields.length === 0) {
-      return res.status(400).json({ success: false, error: 'No fields to update' });
+      return res.status(400).json({ success: false, error: 'No valid fields to update' });
     }
 
     setFields.push(`updated_at = NOW()`);
@@ -675,12 +686,13 @@ app.put('/api/settings', verifyToken, async (req, res) => {
     const result = await pool.query(query, values);
 
     if (result.rows.length === 0) {
-      // Create settings if they don't exist
+      // Create settings if they don't exist — filter to valid columns only
+      const validEntries = Object.entries(updateFields).filter(([k]) => validColumns.has(k));
       const createResult = await pool.query(
-        `INSERT INTO settings (user_id, ${Object.keys(updateFields).join(', ')})
-         VALUES ($1, ${Object.keys(updateFields).map((_, i) => `$${i + 2}`).join(', ')})
+        `INSERT INTO settings (user_id, ${validEntries.map(([k]) => k).join(', ')})
+         VALUES ($1, ${validEntries.map((_, i) => `$${i + 2}`).join(', ')})
          RETURNING *`,
-        [req.userId, ...Object.values(updateFields)]
+        [req.userId, ...validEntries.map(([, v]) => Array.isArray(v) ? JSON.stringify(v) : v)]
       );
 
       await logAudit(req.userId, 'settings_create', 'settings', createResult.rows[0].id, null, createResult.rows[0], req);
