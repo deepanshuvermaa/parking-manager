@@ -225,7 +225,7 @@ class AuthProvider extends ChangeNotifier {
       final deviceId = await DeviceService.getDeviceId();
 
       final emailToUse = (email == null || email.isEmpty)
-          ? 'guest_${deviceId.substring(0, 8)}@go2parking.temp'
+          ? 'guest_${DateTime.now().millisecondsSinceEpoch}@go2parking.temp'
           : email;
 
       final response = await http.post(

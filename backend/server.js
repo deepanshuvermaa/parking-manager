@@ -1038,8 +1038,9 @@ app.post('/api/parkease-admin/users/:userId/toggle', adminGuard, async (req, res
   try {
     const { is_active } = req.body;
     await pool.query('UPDATE users SET is_active = $1 WHERE id = $2', [is_active, req.params.userId]);
+    console.log(`✅ [ADMIN] User ${req.params.userId} toggled to is_active=${is_active}`);
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+  } catch (e) { console.error('❌ [ADMIN] Toggle error:', e.message); res.status(500).json({ success: false, error: e.message }); }
 });
 
 // Extend subscription
@@ -1055,8 +1056,9 @@ app.post('/api/parkease-admin/users/:userId/subscription', adminGuard, async (re
     if (updates.length === 0) return res.status(400).json({ success: false, error: 'No updates provided' });
     params.push(req.params.userId);
     await pool.query(`UPDATE users SET ${updates.join(', ')} WHERE id = $${idx}`, params);
+    console.log(`✅ [ADMIN] Subscription updated for ${req.params.userId}: ${JSON.stringify(req.body)}`);
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+  } catch (e) { console.error('❌ [ADMIN] Subscription error:', e.message); res.status(500).json({ success: false, error: e.message }); }
 });
 
 // Get single user details with stats
@@ -1090,8 +1092,9 @@ app.put('/api/parkease-admin/users/:userId/role', adminGuard, async (req, res) =
     const validRoles = ['owner', 'manager', 'staff'];
     if (!validRoles.includes(role)) return res.status(400).json({ success: false, error: 'Invalid role. Must be: owner, manager, or staff' });
     await pool.query('UPDATE users SET role = $1, is_staff = $2 WHERE id = $3', [role, role === 'staff', req.params.userId]);
+    console.log(`✅ [ADMIN] User ${req.params.userId} role changed to ${role}`);
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+  } catch (e) { console.error('❌ [ADMIN] Role change error:', e.message); res.status(500).json({ success: false, error: e.message }); }
 });
 
 // Update user details (name, parking_name, phone, email)
@@ -1108,8 +1111,9 @@ app.put('/api/parkease-admin/users/:userId', adminGuard, async (req, res) => {
     updates.push(`updated_at = NOW()`);
     params.push(req.params.userId);
     await pool.query(`UPDATE users SET ${updates.join(', ')} WHERE id = $${idx}`, params);
+    console.log(`✅ [ADMIN] User ${req.params.userId} updated: ${updates.join(', ')}`);
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+  } catch (e) { console.error('❌ [ADMIN] Update error:', e.message); res.status(500).json({ success: false, error: e.message }); }
 });
 
 // Reset user password
@@ -1119,8 +1123,9 @@ app.post('/api/parkease-admin/users/:userId/reset-password', adminGuard, async (
     const newPass = password || 'ParkEase@123';
     const hash = await bcrypt.hash(newPass, 10);
     await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, req.params.userId]);
+    console.log(`✅ [ADMIN] Password reset for user ${req.params.userId}`);
     res.json({ success: true, data: { temporaryPassword: newPass } });
-  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+  } catch (e) { console.error('❌ [ADMIN] Password reset error:', e.message); res.status(500).json({ success: false, error: e.message }); }
 });
 
 // Delete user (soft: disable + remove devices)
@@ -1154,6 +1159,34 @@ app.get('/api/parkease-admin/users/:userId/vehicles', adminGuard, async (req, re
     const count = await pool.query('SELECT COUNT(*) as total FROM vehicles WHERE user_id = $1', [req.params.userId]);
     res.json({ success: true, data: { vehicles: result.rows, total: parseInt(count.rows[0].total) } });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// Admin create user (bypasses device checks, no deviceId needed)
+app.post('/api/parkease-admin/users', adminGuard, async (req, res) => {
+  try {
+    const { fullName, full_name, parkingName, parking_name, email, username, password, phone } = req.body;
+    const name = fullName || full_name || 'User';
+    const pName = parkingName || parking_name || name + ' Parking';
+    const uname = email || username;
+    const pass = password || 'ParkEase@123';
+    if (!uname) return res.status(400).json({ success: false, error: 'Email/username is required' });
+    if (pass.length < 6) return res.status(400).json({ success: false, error: 'Password must be at least 6 characters' });
+
+    const hash = await bcrypt.hash(pass, 10);
+    const businessId = 'biz_' + Date.now();
+    const result = await pool.query(
+      `INSERT INTO users (username, full_name, password_hash, user_type, role, parking_name, phone, business_id, is_active, trial_starts_at, trial_expires_at)
+       VALUES ($1, $2, $3, 'guest', 'owner', $4, $5, $6, true, NOW(), NOW() + INTERVAL '7 days')
+       RETURNING id, username, full_name, role, parking_name, phone, business_id, trial_expires_at`,
+      [uname, name, hash, pName, phone || null, businessId]
+    );
+    console.log('✅ [ADMIN] Created user:', result.rows[0].username);
+    res.json({ success: true, data: { user: result.rows[0] } });
+  } catch (e) {
+    if (e.code === '23505') return res.status(409).json({ success: false, error: 'Username/email already exists' });
+    console.error('❌ [ADMIN] Create user error:', e.message);
+    res.status(500).json({ success: false, error: e.message });
+  }
 });
 
 // ================================
