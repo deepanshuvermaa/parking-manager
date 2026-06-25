@@ -269,32 +269,27 @@ app.get('/api/vehicles', verifyToken, checkTrialExpiry, async (req, res) => {
 // Add Vehicle
 app.post('/api/vehicles', verifyToken, checkTrialExpiry, async (req, res) => {
   try {
-    // Accept both camelCase and snake_case for compatibility
-    const {
-      vehicleNumber, vehicle_number,
-      vehicleType, vehicle_type,
-      entryTime, entry_time,
-      hourlyRate, hourly_rate,
-      minimumRate, minimum_rate,
-      ticketId, ticket_id,
-      notes,
-      driverName, driver_name,
-      driverMobile, driver_mobile,
-      fare
-    } = req.body;
+    // Use original body (before dataTransform) to avoid camelCase/snake_case issues
+    const b = req.originalBody || req.body;
+    const rb = req.body; // transformed version as fallback
 
-    // Normalize fields
+    // Normalize fields — check original first, then transformed
+    let vType = b.vehicleType || rb.vehicle_type || rb.vehicleType;
+    if (vType && typeof vType === 'object') vType = vType.name || vType.type || 'Car';
+
     const normalizedData = {
-      vehicleNumber: vehicleNumber || vehicle_number,
-      vehicleType: vehicleType || vehicle_type,
-      entryTime: entryTime || entry_time,
-      hourlyRate: hourlyRate || hourly_rate,
-      minimumRate: minimumRate || minimum_rate,
-      ticketId: ticketId || ticket_id,
-      notes,
-      driverName: driverName || driver_name || null,
-      driverMobile: driverMobile || driver_mobile || null,
-      fare: fare || null,
+      vehicleNumber: b.vehicleNumber || rb.vehicle_number,
+      vehicleType: vType,
+      entryTime: b.entryTime || rb.entry_time,
+      hourlyRate: b.hourlyRate || rb.hourly_rate,
+      minimumRate: b.minimumRate || rb.minimum_rate,
+      ticketId: b.ticketId || rb.ticket_id,
+      notes: b.notes || rb.notes,
+      driverName: b.driverName || rb.driver_name || null,
+      driverMobile: b.driverMobile || rb.driver_mobile || null,
+      fare: b.fare || rb.fare || null,
+      fromLocation: b.fromLocation || rb.from_location || null,
+      toLocation: b.toLocation || rb.to_location || null,
     };
 
     if (!normalizedData.vehicleNumber || !normalizedData.vehicleType) {
@@ -521,13 +516,20 @@ app.post('/api/vehicles/sync', verifyToken, checkTrialExpiry, async (req, res) =
 
       const syncedVehicles = [];
 
-      for (const v of vehicles) {
+      // Use original body if available (before dataTransform mangled it)
+      const rawVehicles = req.originalBody?.vehicles || vehicles;
+
+      for (const v of rawVehicles) {
         const vehicleNumber = v.vehicleNumber || v.vehicle_number;
-        const vehicleType = v.vehicleType || v.vehicle_type;
+        let vehicleType = v.vehicleType || v.vehicle_type;
+        // Handle vehicleType as object (from response transform round-trip)
+        if (vehicleType && typeof vehicleType === 'object') {
+          vehicleType = vehicleType.name || vehicleType.type || 'Car';
+        }
         const entryTime = v.entryTime || v.entry_time;
         const exitTime = v.exitTime || v.exit_time;
         const amount = v.amount;
-        const status = v.status;
+        const status = v.status || 'parked';
         const ticketId = v.ticketId || v.ticket_id;
         const hourlyRate = v.hourlyRate || v.hourly_rate;
         const minimumRate = v.minimumRate || v.minimum_rate;
@@ -535,6 +537,12 @@ app.post('/api/vehicles/sync', verifyToken, checkTrialExpiry, async (req, res) =
         const driverName = v.driverName || v.driver_name;
         const driverMobile = v.driverMobile || v.driver_mobile;
         const fare = v.fare;
+
+        // Skip invalid entries
+        if (!vehicleNumber || !vehicleType) {
+          console.warn('Sync: skipping vehicle with missing number/type:', JSON.stringify(v).substring(0, 100));
+          continue;
+        }
 
         // Check if vehicle already exists by ticket_id (within business scope)
         let existingVehicle = null;
