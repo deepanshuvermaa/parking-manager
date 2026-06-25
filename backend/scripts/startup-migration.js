@@ -334,6 +334,35 @@ async function runStartupMigrations(pool) {
     }
 
     // ========================================
+    // MIGRATION: Create audit_logs table
+    // ========================================
+    const auditCheck = await pool.query(
+      "SELECT * FROM schema_migrations WHERE migration_name = 'add_audit_logs'"
+    );
+    if (auditCheck.rows.length === 0) {
+      console.log('📦 Creating audit_logs table...');
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS audit_logs (
+          id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+          user_id UUID,
+          action VARCHAR(100) NOT NULL,
+          entity_type VARCHAR(100),
+          entity_id TEXT,
+          old_values JSONB,
+          new_values JSONB,
+          changes JSONB,
+          ip_address VARCHAR(100),
+          user_agent TEXT,
+          created_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id)');
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action)');
+      await pool.query("INSERT INTO schema_migrations (migration_name) VALUES ('add_audit_logs')");
+      console.log('✅ audit_logs table created');
+    }
+
+    // ========================================
     // MIGRATION 6: Add all settings sync columns
     // ========================================
     const settingsColsCheck = await pool.query(

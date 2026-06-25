@@ -521,19 +521,20 @@ app.post('/api/vehicles/sync', verifyToken, checkTrialExpiry, async (req, res) =
 
       const syncedVehicles = [];
 
-      for (const vehicle of vehicles) {
-        const {
-          vehicleNumber,
-          vehicleType,
-          entryTime,
-          exitTime,
-          amount,
-          status,
-          ticketId,
-          hourlyRate,
-          minimumRate,
-          notes
-        } = vehicle;
+      for (const v of vehicles) {
+        const vehicleNumber = v.vehicleNumber || v.vehicle_number;
+        const vehicleType = v.vehicleType || v.vehicle_type;
+        const entryTime = v.entryTime || v.entry_time;
+        const exitTime = v.exitTime || v.exit_time;
+        const amount = v.amount;
+        const status = v.status;
+        const ticketId = v.ticketId || v.ticket_id;
+        const hourlyRate = v.hourlyRate || v.hourly_rate;
+        const minimumRate = v.minimumRate || v.minimum_rate;
+        const notes = v.notes;
+        const driverName = v.driverName || v.driver_name;
+        const driverMobile = v.driverMobile || v.driver_mobile;
+        const fare = v.fare;
 
         // Check if vehicle already exists by ticket_id (within business scope)
         let existingVehicle = null;
@@ -562,12 +563,13 @@ app.post('/api/vehicles/sync', verifyToken, checkTrialExpiry, async (req, res) =
         } else {
           // Insert new vehicle with business_id
           const result = await client.query(
-            `INSERT INTO vehicles (user_id, business_id, vehicle_number, vehicle_type, entry_time, exit_time, amount, status, ticket_id, hourly_rate, minimum_rate, notes)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            `INSERT INTO vehicles (user_id, business_id, vehicle_number, vehicle_type, entry_time, exit_time, amount, status, ticket_id, hourly_rate, minimum_rate, notes, driver_name, driver_mobile, fare)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
              RETURNING *`,
             [
               req.userId, businessId, vehicleNumber, vehicleType, entryTime, exitTime,
-              amount, status, ticketId, hourlyRate, minimumRate, notes
+              amount, status, ticketId, hourlyRate, minimumRate, notes,
+              driverName || null, driverMobile || null, fare || null
             ]
           );
           syncedVehicles.push(result.rows[0]);
@@ -916,8 +918,9 @@ app.post('/api/business/staff', verifyToken, async (req, res) => {
     if (!user.rows[0] || user.rows[0].role !== 'owner') {
       return res.status(403).json({ success: false, error: 'Owner access required' });
     }
-    const { username, password, fullName, role } = req.body;
-    if (!username || !password || !fullName) {
+    const { username, password, fullName, full_name, role } = req.body;
+    const staffName = fullName || full_name;
+    if (!username || !password || !staffName) {
       return res.status(400).json({ success: false, error: 'username, password, fullName required' });
     }
     const validRoles = ['staff', 'manager'];
@@ -927,7 +930,7 @@ app.post('/api/business/staff', verifyToken, async (req, res) => {
     const result = await pool.query(
       `INSERT INTO users (username, full_name, password_hash, user_type, role, business_id, parent_user_id, is_staff, is_active, max_devices, trial_expires_at)
        VALUES ($1, $2, $3, 'admin', $4, $5, $6, true, true, 2, NOW() + INTERVAL '365 days') RETURNING id, username, full_name, role`,
-      [username, fullName, hash, staffRole, businessId, req.userId]
+      [username, staffName, hash, staffRole, businessId, req.userId]
     );
     res.json({ success: true, data: { staff: result.rows[0] } });
   } catch (e) {
