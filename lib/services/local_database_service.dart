@@ -161,41 +161,41 @@ class LocalDatabaseService {
     final db = await database;
     final now = DateTime.now().toIso8601String();
 
-    // Core fields that always exist
-    final data = <String, dynamic>{
-      'id': vehicle.id,
-      'vehicle_number': vehicle.vehicleNumber,
-      'vehicle_type': vehicle.vehicleType,
-      'entry_time': vehicle.entryTime.toIso8601String(),
-      'exit_time': vehicle.exitTime?.toIso8601String(),
-      'amount': vehicle.amount,
-      'status': vehicle.status,
-      'ticket_id': vehicle.ticketId,
-      'hourly_rate': vehicle.hourlyRate,
-      'minimum_rate': vehicle.minimumRate,
-      'notes': vehicle.notes,
-      'duration_minutes': vehicle.durationMinutes,
-      'from_location': vehicle.fromLocation,
-      'to_location': vehicle.toLocation,
-      'synced': synced ? 1 : 0,
-      'created_at': now,
-      'updated_at': now,
-    };
+    // Get actual columns from DB to know what we can write
+    final tableInfo = await db.rawQuery("PRAGMA table_info(vehicles)");
+    final existingCols = tableInfo.map((r) => r['name'] as String).toSet();
 
-    // Try with optional columns — fall back to core if DB schema is old
-    try {
-      data['driver_name'] = vehicle.driverName;
-      data['driver_mobile'] = vehicle.driverMobile;
-      data['fare'] = vehicle.fare;
-      await db.insert('vehicles', data, conflictAlgorithm: ConflictAlgorithm.replace);
-    } catch (e) {
-      // Remove optional columns and retry with core only
-      print('⚠️ saveVehicle retry without optional cols: $e');
-      data.remove('driver_name');
-      data.remove('driver_mobile');
-      data.remove('fare');
-      await db.insert('vehicles', data, conflictAlgorithm: ConflictAlgorithm.replace);
+    final data = <String, dynamic>{};
+    void addIfExists(String col, dynamic val) {
+      if (existingCols.contains(col)) data[col] = val;
     }
+
+    // Always present columns
+    data['id'] = vehicle.id;
+    data['vehicle_number'] = vehicle.vehicleNumber;
+    data['vehicle_type'] = vehicle.vehicleType;
+    data['entry_time'] = vehicle.entryTime.toIso8601String();
+    data['status'] = vehicle.status;
+    data['synced'] = synced ? 1 : 0;
+
+    // Columns that may or may not exist depending on DB version
+    addIfExists('exit_time', vehicle.exitTime?.toIso8601String());
+    addIfExists('amount', vehicle.amount);
+    addIfExists('ticket_id', vehicle.ticketId);
+    addIfExists('hourly_rate', vehicle.hourlyRate);
+    addIfExists('minimum_rate', vehicle.minimumRate);
+    addIfExists('notes', vehicle.notes);
+    addIfExists('duration_minutes', vehicle.durationMinutes);
+    addIfExists('from_location', vehicle.fromLocation);
+    addIfExists('to_location', vehicle.toLocation);
+    addIfExists('driver_name', vehicle.driverName);
+    addIfExists('driver_mobile', vehicle.driverMobile);
+    addIfExists('fare', vehicle.fare);
+    addIfExists('user_id', null);
+    addIfExists('created_at', now);
+    addIfExists('updated_at', now);
+
+    await db.insert('vehicles', data, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   /// Get all vehicles from local database
@@ -248,32 +248,32 @@ class LocalDatabaseService {
   /// Update vehicle in local database
   static Future<void> updateVehicle(SimpleVehicle vehicle, {bool synced = true}) async {
     final db = await database;
+    final tableInfo = await db.rawQuery("PRAGMA table_info(vehicles)");
+    final existingCols = tableInfo.map((r) => r['name'] as String).toSet();
 
     final data = <String, dynamic>{
-      'vehicle_number': vehicle.vehicleNumber,
-      'vehicle_type': vehicle.vehicleType,
-      'exit_time': vehicle.exitTime?.toIso8601String(),
-      'amount': vehicle.amount,
       'status': vehicle.status,
-      'notes': vehicle.notes,
-      'duration_minutes': vehicle.durationMinutes,
-      'from_location': vehicle.fromLocation,
-      'to_location': vehicle.toLocation,
       'synced': synced ? 1 : 0,
       'updated_at': DateTime.now().toIso8601String(),
     };
 
-    try {
-      data['driver_name'] = vehicle.driverName;
-      data['driver_mobile'] = vehicle.driverMobile;
-      data['fare'] = vehicle.fare;
-      await db.update('vehicles', data, where: 'id = ?', whereArgs: [vehicle.id]);
-    } catch (e) {
-      data.remove('driver_name');
-      data.remove('driver_mobile');
-      data.remove('fare');
-      await db.update('vehicles', data, where: 'id = ?', whereArgs: [vehicle.id]);
+    void addIfExists(String col, dynamic val) {
+      if (existingCols.contains(col)) data[col] = val;
     }
+
+    addIfExists('vehicle_number', vehicle.vehicleNumber);
+    addIfExists('vehicle_type', vehicle.vehicleType);
+    addIfExists('exit_time', vehicle.exitTime?.toIso8601String());
+    addIfExists('amount', vehicle.amount);
+    addIfExists('notes', vehicle.notes);
+    addIfExists('duration_minutes', vehicle.durationMinutes);
+    addIfExists('from_location', vehicle.fromLocation);
+    addIfExists('to_location', vehicle.toLocation);
+    addIfExists('driver_name', vehicle.driverName);
+    addIfExists('driver_mobile', vehicle.driverMobile);
+    addIfExists('fare', vehicle.fare);
+
+    await db.update('vehicles', data, where: 'id = ?', whereArgs: [vehicle.id]);
   }
 
   /// Get unsynced vehicles (for background sync)
