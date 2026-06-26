@@ -26,10 +26,6 @@ class LocalDatabaseService {
     return await openDatabase(
       path,
       version: 4,
-      onConfigure: (db) async {
-        // Enable WAL mode — prevents corruption on crash during writes
-        await db.execute('PRAGMA journal_mode=WAL');
-      },
       onCreate: (db, version) async {
         print('🗄️ Creating local database...');
 
