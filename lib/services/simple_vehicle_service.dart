@@ -459,19 +459,19 @@ class SimpleVehicleService {
 
   // Cached rates — allocated once, never re-allocated
   static const Map<String, Map<String, dynamic>> _defaultRates = {
-    'Car': {'hourly': 20.0, 'minimum': 20.0, 'freeMinutes': 5, 'minimumDurationMinutes': 30},
-    'Bike': {'hourly': 10.0, 'minimum': 10.0, 'freeMinutes': 5, 'minimumDurationMinutes': 30},
-    'Scooter': {'hourly': 10.0, 'minimum': 10.0, 'freeMinutes': 5, 'minimumDurationMinutes': 30},
-    'SUV': {'hourly': 30.0, 'minimum': 30.0, 'freeMinutes': 5, 'minimumDurationMinutes': 30},
-    'Van': {'hourly': 25.0, 'minimum': 25.0, 'freeMinutes': 5, 'minimumDurationMinutes': 30},
-    'Bus': {'hourly': 50.0, 'minimum': 50.0, 'freeMinutes': 5, 'minimumDurationMinutes': 30},
-    'Truck': {'hourly': 40.0, 'minimum': 40.0, 'freeMinutes': 5, 'minimumDurationMinutes': 30},
-    'Auto Rickshaw': {'hourly': 15.0, 'minimum': 15.0, 'freeMinutes': 5, 'minimumDurationMinutes': 30},
-    'E-Rickshaw': {'hourly': 12.0, 'minimum': 12.0, 'freeMinutes': 5, 'minimumDurationMinutes': 30},
-    'Cycle': {'hourly': 5.0, 'minimum': 5.0, 'freeMinutes': 5, 'minimumDurationMinutes': 30},
-    'E-Cycle': {'hourly': 8.0, 'minimum': 8.0, 'freeMinutes': 5, 'minimumDurationMinutes': 30},
-    'Tempo': {'hourly': 25.0, 'minimum': 25.0, 'freeMinutes': 5, 'minimumDurationMinutes': 30},
-    'Mini Truck': {'hourly': 30.0, 'minimum': 30.0, 'freeMinutes': 5, 'minimumDurationMinutes': 30},
+    'Car': {'hourly': 20.0, 'minimum': 20.0, 'freeMinutes': 0, 'minimumDurationMinutes': 30},
+    'Bike': {'hourly': 10.0, 'minimum': 10.0, 'freeMinutes': 0, 'minimumDurationMinutes': 30},
+    'Scooter': {'hourly': 10.0, 'minimum': 10.0, 'freeMinutes': 0, 'minimumDurationMinutes': 30},
+    'SUV': {'hourly': 30.0, 'minimum': 30.0, 'freeMinutes': 0, 'minimumDurationMinutes': 30},
+    'Van': {'hourly': 25.0, 'minimum': 25.0, 'freeMinutes': 0, 'minimumDurationMinutes': 30},
+    'Bus': {'hourly': 50.0, 'minimum': 50.0, 'freeMinutes': 0, 'minimumDurationMinutes': 30},
+    'Truck': {'hourly': 40.0, 'minimum': 40.0, 'freeMinutes': 0, 'minimumDurationMinutes': 30},
+    'Auto Rickshaw': {'hourly': 15.0, 'minimum': 15.0, 'freeMinutes': 0, 'minimumDurationMinutes': 30},
+    'E-Rickshaw': {'hourly': 12.0, 'minimum': 12.0, 'freeMinutes': 0, 'minimumDurationMinutes': 30},
+    'Cycle': {'hourly': 5.0, 'minimum': 5.0, 'freeMinutes': 0, 'minimumDurationMinutes': 30},
+    'E-Cycle': {'hourly': 8.0, 'minimum': 8.0, 'freeMinutes': 0, 'minimumDurationMinutes': 30},
+    'Tempo': {'hourly': 25.0, 'minimum': 25.0, 'freeMinutes': 0, 'minimumDurationMinutes': 30},
+    'Mini Truck': {'hourly': 30.0, 'minimum': 30.0, 'freeMinutes': 0, 'minimumDurationMinutes': 30},
   };
 
   static Map<String, dynamic> getDefaultRate(String vehicleType) {
