@@ -16,7 +16,31 @@ class LocalDatabaseService {
   }
 
   static Future<Database> _initDB() async {
-    final path = join(await getDatabasesPath(), 'parkease_v2.db');
+    final dbDir = await getDatabasesPath();
+    final path = join(dbDir, 'parkease.db');
+
+    // Delete old broken DB so onCreate runs fresh with correct schema
+    final oldFile = File(path);
+    if (await oldFile.exists()) {
+      // Check if old DB has the driver_name column — if not, it's broken
+      try {
+        final testDb = await openDatabase(path, readOnly: true);
+        final info = await testDb.rawQuery("PRAGMA table_info(vehicles)");
+        final cols = info.map((r) => r['name'] as String).toSet();
+        await testDb.close();
+        if (!cols.contains('driver_name')) {
+          await oldFile.delete();
+        }
+      } catch (_) {
+        await oldFile.delete();
+      }
+    }
+
+    // Also clean up parkease_v2.db if it exists from previous bad fix
+    try {
+      final v2File = File(join(dbDir, 'parkease_v2.db'));
+      if (await v2File.exists()) await v2File.delete();
+    } catch (_) {}
 
     return await openDatabase(
       path,
