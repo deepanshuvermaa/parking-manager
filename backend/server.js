@@ -285,6 +285,8 @@ app.post('/api/vehicles', verifyToken, checkTrialExpiry, async (req, res) => {
       minimumRate: b.minimumRate || rb.minimum_rate,
       ticketId: b.ticketId || rb.ticket_id,
       notes: b.notes || rb.notes,
+      bookedBy: b.bookedBy || rb.booked_by || null,
+      bookedByMobile: b.bookedByMobile || rb.booked_by_mobile || null,
       driverName: b.driverName || rb.driver_name || null,
       driverMobile: b.driverMobile || rb.driver_mobile || null,
       fare: b.fare || rb.fare || null,
@@ -306,8 +308,8 @@ app.post('/api/vehicles', verifyToken, checkTrialExpiry, async (req, res) => {
     const businessId = userResult.rows[0]?.business_id || null;
 
     const result = await pool.query(
-      `INSERT INTO vehicles (user_id, business_id, vehicle_number, vehicle_type, entry_time, hourly_rate, minimum_rate, ticket_id, notes, from_location, to_location, driver_name, driver_mobile, fare)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      `INSERT INTO vehicles (user_id, business_id, vehicle_number, vehicle_type, entry_time, hourly_rate, minimum_rate, ticket_id, notes, from_location, to_location, booked_by, booked_by_mobile, driver_name, driver_mobile, fare)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
        ON CONFLICT (ticket_id) DO UPDATE SET updated_at = NOW()
        RETURNING *`,
       [
@@ -320,8 +322,10 @@ app.post('/api/vehicles', verifyToken, checkTrialExpiry, async (req, res) => {
         normalizedData.minimumRate,
         normalizedData.ticketId,
         normalizedData.notes,
-        normalizedData.fromLocation || null,
-        normalizedData.toLocation || null,
+        normalizedData.fromLocation,
+        normalizedData.toLocation,
+        normalizedData.bookedBy,
+        normalizedData.bookedByMobile,
         normalizedData.driverName,
         normalizedData.driverMobile,
         normalizedData.fare,
@@ -572,12 +576,14 @@ app.post('/api/vehicles/sync', verifyToken, checkTrialExpiry, async (req, res) =
         } else {
           // Insert new vehicle with business_id
           const result = await client.query(
-            `INSERT INTO vehicles (user_id, business_id, vehicle_number, vehicle_type, entry_time, exit_time, amount, status, ticket_id, hourly_rate, minimum_rate, notes, driver_name, driver_mobile, fare)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+            `INSERT INTO vehicles (user_id, business_id, vehicle_number, vehicle_type, entry_time, exit_time, amount, status, ticket_id, hourly_rate, minimum_rate, notes, booked_by, booked_by_mobile, driver_name, driver_mobile, fare)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+             ON CONFLICT (ticket_id) DO UPDATE SET status = EXCLUDED.status, exit_time = EXCLUDED.exit_time, amount = EXCLUDED.amount, updated_at = NOW()
              RETURNING *`,
             [
               req.userId, businessId, vehicleNumber, vehicleType, entryTime, exitTime,
               amount, status, ticketId, hourlyRate, minimumRate, notes,
+              v.bookedBy || v.booked_by || null, v.bookedByMobile || v.booked_by_mobile || null,
               driverName || null, driverMobile || null, fare || null
             ]
           );

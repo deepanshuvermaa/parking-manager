@@ -47,8 +47,8 @@ class SimpleVehicleService {
     // Skip backend for offline mode
     if (token.isEmpty || token == 'offline_local_token') return;
 
-    // Background: push unsynced, then pull from backend
-    _fullSync(token);
+    // First sync: wait for it to complete so dashboard has data on first load
+    await _fullSync(token);
 
     // Start periodic sync every 2 minutes
     _startPeriodicSync(token);

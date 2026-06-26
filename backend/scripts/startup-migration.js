@@ -411,6 +411,25 @@ async function runStartupMigrations(pool) {
       console.log('✅ Settings columns migration already applied');
     }
 
+    // ========================================
+    // MIGRATION 7: Add booked_by fields + unique ticket_id
+    // ========================================
+    const bookedByCheck = await pool.query(
+      "SELECT * FROM schema_migrations WHERE migration_name = 'add_booked_by_unique_ticket'"
+    );
+    if (bookedByCheck.rows.length === 0) {
+      console.log('📦 Adding booked_by fields + unique ticket constraint...');
+      await pool.query('ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS booked_by VARCHAR(255)');
+      await pool.query('ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS booked_by_mobile VARCHAR(50)');
+      // Clean duplicates then add unique constraint
+      await pool.query('DELETE FROM vehicles a USING vehicles b WHERE a.ctid > b.ctid AND a.ticket_id = b.ticket_id AND a.ticket_id IS NOT NULL');
+      try {
+        await pool.query('ALTER TABLE vehicles ADD CONSTRAINT vehicles_ticket_id_unique UNIQUE (ticket_id)');
+      } catch (e) { /* constraint already exists */ }
+      await pool.query("INSERT INTO schema_migrations (migration_name) VALUES ('add_booked_by_unique_ticket')");
+      console.log('✅ booked_by + unique ticket constraint applied');
+    }
+
   } catch (error) {
     console.error('❌ Migration error:', error);
     console.error('⚠️ Server will continue without new features');

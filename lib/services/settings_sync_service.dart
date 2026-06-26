@@ -17,7 +17,7 @@ class SettingsSyncService {
     // Ticket counter
     'ticket_id_prefix', 'ticket_id_serial', 'ticket_device_suffix',
     // Optional entry fields
-    'show_driver_name', 'show_driver_mobile', 'show_fare',
+    'show_extra_fields', 'show_driver_name', 'show_driver_mobile', 'show_fare',
     // Receipt customization toggles
     'bill_show_business_name', 'bill_show_business_address', 'bill_show_business_phone',
     'bill_show_gst_number', 'bill_show_rate_info', 'bill_show_notes',
