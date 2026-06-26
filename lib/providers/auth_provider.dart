@@ -130,7 +130,7 @@ class AuthProvider extends ChangeNotifier {
         final data = jsonDecode(response.body);
         if (data['success'] == true && data['data']?['user'] != null) {
           final user = data['data']['user'];
-          final newRole = (user['role'] ?? user['role']) as String? ?? _userRole;
+          final newRole = (user['role'] as String?) ?? _userRole;
           final newMultiStaff = user['multi_device_enabled'] == true || user['multiDeviceEnabled'] == true;
           bool changed = false;
           if (newRole != _userRole) { _userRole = newRole; changed = true; }
@@ -261,6 +261,7 @@ class AuthProvider extends ChangeNotifier {
         _userEmail = userData['email'] ?? emailToUse;
         _userRole = userData['userType'] ?? 'guest';
         _parkingName = userData['parkingName'] ?? parkingName;
+        _multiStaffEnabled = userData['multiDeviceEnabled'] == true;
         final trialStr = userData['trialExpiresAt'] ?? '';
         if (trialStr.isNotEmpty) _trialExpires = DateTime.tryParse(trialStr);
 

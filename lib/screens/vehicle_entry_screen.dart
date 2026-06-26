@@ -69,17 +69,11 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
   void dispose() { _plateController.dispose(); _driverNameController.dispose(); _driverMobileController.dispose(); _fareController.dispose(); _hasText.dispose(); super.dispose(); }
 
   Future<void> _submit() async {
-    print('[PARK] _submit called');
     final plate = _plateController.text.trim().toUpperCase();
-    if (plate.isEmpty) {
-      print('[PARK] plate is empty, returning');
-      return;
-    }
-    print('[PARK] plate: $plate, type: $_selectedType');
+    if (plate.isEmpty) return;
 
-    // Duplicate plate detection — check if already parked
+    // Duplicate plate detection
     if (SimpleVehicleService.isVehicleParked(plate)) {
-      print('[PARK] duplicate detected for $plate');
       if (mounted) {
         final proceed = await showDialog<bool>(
           context: context,
@@ -92,20 +86,14 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
             ],
           ),
         );
-        if (proceed != true) {
-          print('[PARK] user cancelled duplicate');
-          return;
-        }
+        if (proceed != true) return;
       }
     }
 
     setState(() => _isSubmitting = true);
-    print('[PARK] submitting...');
 
     try {
       final token = context.read<AuthProvider>().token ?? '';
-      print('[PARK] token: ${token.isNotEmpty ? "present (${token.length} chars)" : "EMPTY"}');
-
       final vehicle = await SimpleVehicleService.addVehicle(
         token: token,
         vehicleNumber: plate,
@@ -116,8 +104,6 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
             ? double.tryParse(_fareController.text.trim())
             : null,
       );
-
-      print('[PARK] addVehicle returned: ${vehicle != null ? "vehicle ${vehicle.vehicleNumber}" : "NULL"}');
 
       if (vehicle != null && mounted) {
         context.read<ParkingProvider>().recordEntry();
@@ -136,9 +122,7 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
             await PlatformPrinterService.printText(receipt);
             msg = '✓ $plate parked • Receipt printed';
           }
-        } catch (printErr) {
-          print('[PARK] receipt/print error (non-fatal): $printErr');
-        }
+        } catch (_) {}
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg, style: const TextStyle(fontSize: 15)), backgroundColor: Go2Colors.success));
@@ -148,20 +132,13 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
           _fareController.clear();
           setState(() {});
         }
-        print('[PARK] SUCCESS: $plate parked');
-      } else if (vehicle == null) {
-        print('[PARK] addVehicle returned null — local save failed');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to save vehicle locally'), backgroundColor: Go2Colors.error));
-        }
+      } else if (vehicle == null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to save vehicle'), backgroundColor: Go2Colors.error));
       }
-    } catch (e, stack) {
-      print('[PARK] ERROR: $e');
-      print('[PARK] STACK: $stack');
+    } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Go2Colors.error));
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
-      print('[PARK] _isSubmitting reset to false');
     }
   }
 
@@ -308,7 +285,6 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
             height: 54,
             child: ElevatedButton(
               onPressed: _isSubmitting ? null : () {
-                print('[PARK BTN] tapped! plate="${_plateController.text}" submitting=$_isSubmitting');
                 if (_plateController.text.trim().isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter vehicle number first'), backgroundColor: Colors.orange));
                   return;
