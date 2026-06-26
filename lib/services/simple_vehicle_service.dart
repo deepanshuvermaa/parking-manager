@@ -178,9 +178,6 @@ class SimpleVehicleService {
     String? notes,
     String? fromLocation,
     String? toLocation,
-    String? driverName,
-    String? driverMobile,
-    double? fare,
   }) async {
     final ticketId = await TicketIdService.generateNextTicketId();
 
@@ -196,9 +193,6 @@ class SimpleVehicleService {
       notes: notes,
       fromLocation: fromLocation,
       toLocation: toLocation,
-      driverName: driverName?.isNotEmpty == true ? driverName : null,
-      driverMobile: driverMobile?.isNotEmpty == true ? driverMobile : null,
-      fare: fare,
     );
 
     // 1. SAVE LOCALLY FIRST (instant, guaranteed)
@@ -237,9 +231,6 @@ class SimpleVehicleService {
           'ticketId': vehicle.ticketId,
           'fromLocation': vehicle.fromLocation,
           'toLocation': vehicle.toLocation,
-          'driverName': vehicle.driverName,
-          'driverMobile': vehicle.driverMobile,
-          'fare': vehicle.fare,
         }),
       ).timeout(const Duration(seconds: 10));
 
@@ -381,9 +372,6 @@ class SimpleVehicleService {
               'ticketId': vehicle.ticketId,
               'fromLocation': vehicle.fromLocation,
               'toLocation': vehicle.toLocation,
-              'driverName': vehicle.driverName,
-              'driverMobile': vehicle.driverMobile,
-              'fare': vehicle.fare,
             }),
           ).timeout(const Duration(seconds: 10));
 

@@ -136,25 +136,6 @@ class ReceiptService {
     receipt.writeln('Type: ${vehicle.vehicleType}');
     receipt.writeln('-' * paperWidth);
 
-    // Driver / Fare details (if provided — optional fields)
-    final hasDriverInfo = (vehicle.driverName != null && vehicle.driverName!.isNotEmpty) ||
-        (vehicle.driverMobile != null && vehicle.driverMobile!.isNotEmpty) ||
-        (vehicle.fare != null && vehicle.fare! > 0);
-    if (hasDriverInfo) {
-      if (vehicle.driverName != null && vehicle.driverName!.isNotEmpty) {
-        receipt.writeln('Driver: ${vehicle.driverName}');
-      }
-      if (vehicle.driverMobile != null && vehicle.driverMobile!.isNotEmpty) {
-        receipt.writeln('Mobile: ${vehicle.driverMobile}');
-      }
-      if (vehicle.fare != null && vehicle.fare! > 0) {
-        receipt.write(ESC_BOLD_ON);
-        receipt.writeln('Fare: Rs. ${vehicle.fare!.toStringAsFixed(0)}');
-        receipt.write(ESC_BOLD_OFF);
-      }
-      receipt.writeln('-' * paperWidth);
-    }
-
     // Travel Details (if provided)
     if (vehicle.fromLocation != null && vehicle.fromLocation!.isNotEmpty ||
         vehicle.toLocation != null && vehicle.toLocation!.isNotEmpty) {
@@ -326,25 +307,6 @@ class ReceiptService {
     receipt.write(ESC_NORMAL);
     receipt.writeln('Type: ${vehicle.vehicleType}');
     receipt.writeln(dashLine);
-
-    // Driver / Fare details (if provided — optional fields)
-    final hasDriverInfo = (vehicle.driverName != null && vehicle.driverName!.isNotEmpty) ||
-        (vehicle.driverMobile != null && vehicle.driverMobile!.isNotEmpty) ||
-        (vehicle.fare != null && vehicle.fare! > 0);
-    if (hasDriverInfo) {
-      if (vehicle.driverName != null && vehicle.driverName!.isNotEmpty) {
-        receipt.writeln('Driver: ${vehicle.driverName}');
-      }
-      if (vehicle.driverMobile != null && vehicle.driverMobile!.isNotEmpty) {
-        receipt.writeln('Mobile: ${vehicle.driverMobile}');
-      }
-      if (vehicle.fare != null && vehicle.fare! > 0) {
-        receipt.write(ESC_BOLD_ON);
-        receipt.writeln('Fare: Rs. ${vehicle.fare!.toStringAsFixed(0)}');
-        receipt.write(ESC_BOLD_OFF);
-      }
-      receipt.writeln(dashLine);
-    }
 
     // Travel Details (if provided)
     if (vehicle.fromLocation != null && vehicle.fromLocation!.isNotEmpty ||

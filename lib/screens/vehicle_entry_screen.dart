@@ -19,19 +19,12 @@ class VehicleEntryScreen extends StatefulWidget {
 
 class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
   final _plateController = TextEditingController();
-  final _driverNameController = TextEditingController();
-  final _driverMobileController = TextEditingController();
-  final _fareController = TextEditingController();
   final _hasText = ValueNotifier<bool>(false);
   String _selectedType = 'Car';
   bool _isSubmitting = false;
   SimpleVehicle? _lastVehicle;
   String? _lastReceipt;
   SharedPreferences? _prefs;
-  // Optional field visibility — loaded from settings
-  bool _showDriverName = false;
-  bool _showDriverMobile = false;
-  bool _showFare = false;
 
   // Only 6 primary types - user can add more via Settings > Rates
   static const _types = [
@@ -47,32 +40,19 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
   void initState() {
     super.initState();
     _plateController.addListener(() {
-      final hasText = _plateController.text.trim().isNotEmpty;
-      if (_hasText.value != hasText) {
-        _hasText.value = hasText;
-        if (mounted) setState(() {});
-      }
+      _hasText.value = _plateController.text.trim().isNotEmpty;
     });
-    SharedPreferences.getInstance().then((p) {
-      _prefs = p;
-      if (mounted) {
-        setState(() {
-          _showDriverName = p.getBool('show_driver_name') ?? false;
-          _showDriverMobile = p.getBool('show_driver_mobile') ?? false;
-          _showFare = p.getBool('show_fare') ?? false;
-        });
-      }
-    });
+    SharedPreferences.getInstance().then((p) => _prefs = p);
   }
 
   @override
-  void dispose() { _plateController.dispose(); _driverNameController.dispose(); _driverMobileController.dispose(); _fareController.dispose(); _hasText.dispose(); super.dispose(); }
+  void dispose() { _plateController.dispose(); _hasText.dispose(); super.dispose(); }
 
   Future<void> _submit() async {
     final plate = _plateController.text.trim().toUpperCase();
     if (plate.isEmpty) return;
 
-    // Duplicate plate detection
+    // Duplicate plate detection — check if already parked
     if (SimpleVehicleService.isVehicleParked(plate)) {
       if (mounted) {
         final proceed = await showDialog<bool>(
@@ -95,45 +75,33 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
     try {
       final token = context.read<AuthProvider>().token ?? '';
       final vehicle = await SimpleVehicleService.addVehicle(
-        token: token,
-        vehicleNumber: plate,
-        vehicleType: _selectedType,
-        driverName: _showDriverName ? _driverNameController.text.trim() : null,
-        driverMobile: _showDriverMobile ? _driverMobileController.text.trim() : null,
-        fare: _showFare && _fareController.text.trim().isNotEmpty
-            ? double.tryParse(_fareController.text.trim())
-            : null,
+        token: token, vehicleNumber: plate, vehicleType: _selectedType,
       );
 
       if (vehicle != null && mounted) {
         context.read<ParkingProvider>().recordEntry();
         HapticFeedback.mediumImpact();
 
-        String msg = '✓ $plate parked';
-        try {
-          final receipt = await ReceiptService.generateEntryReceipt(vehicle);
-          _lastVehicle = vehicle;
-          _lastReceipt = receipt;
+        final receipt = await ReceiptService.generateEntryReceipt(vehicle);
+        _lastVehicle = vehicle;
+        _lastReceipt = receipt;
 
-          final prefs = _prefs ?? await SharedPreferences.getInstance();
-          final autoPrint = prefs.getBool('auto_print') ?? true;
-          final connected = await PlatformPrinterService.isConnected();
-          if (connected && autoPrint) {
-            await PlatformPrinterService.printText(receipt);
-            msg = '✓ $plate parked • Receipt printed';
-          }
-        } catch (_) {}
+        final prefs = _prefs ?? await SharedPreferences.getInstance();
+        final autoPrint = prefs.getBool('auto_print') ?? true;
+        final connected = await PlatformPrinterService.isConnected();
+        String msg;
+        if (connected && autoPrint) {
+          await PlatformPrinterService.printText(receipt);
+          msg = '✓ $plate parked • Receipt printed';
+        } else {
+          msg = '✓ $plate parked';
+        }
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg, style: const TextStyle(fontSize: 15)), backgroundColor: Go2Colors.success));
           _plateController.clear();
-          _driverNameController.clear();
-          _driverMobileController.clear();
-          _fareController.clear();
           setState(() {});
         }
-      } else if (vehicle == null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to save vehicle'), backgroundColor: Go2Colors.error));
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Go2Colors.error));
@@ -227,79 +195,25 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
             inputFormatters: [UpperCaseTextFormatter(), LengthLimitingTextInputFormatter(14)],
             onFieldSubmitted: (_) => _submit(),
           ),
-
-          // Optional fields — shown based on Settings toggles
-          if (_showDriverName || _showDriverMobile || _showFare) ...[
-            const SizedBox(height: 12),
-            if (_showDriverName)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: TextFormField(
-                  controller: _driverNameController,
-                  autocorrect: false,
-                  textCapitalization: TextCapitalization.words,
-                  style: const TextStyle(fontSize: 16),
-                  decoration: const InputDecoration(
-                    hintText: 'Driver Name',
-                    prefixIcon: Icon(Icons.person_outline, size: 20),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    isDense: true,
-                  ),
-                ),
-              ),
-            if (_showDriverMobile)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: TextFormField(
-                  controller: _driverMobileController,
-                  keyboardType: TextInputType.phone,
-                  style: const TextStyle(fontSize: 16),
-                  decoration: const InputDecoration(
-                    hintText: 'Driver Mobile',
-                    prefixIcon: Icon(Icons.phone_outlined, size: 20),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    isDense: true,
-                  ),
-                ),
-              ),
-            if (_showFare)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: TextFormField(
-                  controller: _fareController,
-                  keyboardType: TextInputType.number,
-                  style: const TextStyle(fontSize: 16),
-                  decoration: const InputDecoration(
-                    hintText: 'Fare (₹)',
-                    prefixIcon: Icon(Icons.currency_rupee_outlined, size: 20),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    isDense: true,
-                  ),
-                ),
-              ),
-          ],
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
 
           // Park button - large, prominent
           SizedBox(
             height: 54,
-            child: ElevatedButton(
-              onPressed: _isSubmitting ? null : () {
-                if (_plateController.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter vehicle number first'), backgroundColor: Colors.orange));
-                  return;
-                }
-                _submit();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Go2Colors.success,
-                foregroundColor: Colors.white,
-                textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: ValueListenableBuilder<bool>(
+              valueListenable: _hasText,
+              builder: (_, hasText, __) => ElevatedButton(
+                onPressed: _isSubmitting || !hasText ? null : _submit,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Go2Colors.success,
+                  foregroundColor: Colors.white,
+                  textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: _isSubmitting
+                    ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+                    : const Text('Park Vehicle'),
               ),
-              child: _isSubmitting
-                  ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
-                  : const Text('Park Vehicle'),
             ),
           ),
 

@@ -14,10 +14,6 @@ class SimpleVehicle {
   int? durationMinutes;
   String? fromLocation;
   String? toLocation;
-  // Optional fields — enabled per-user from Settings
-  String? driverName;
-  String? driverMobile;
-  double? fare;
 
   SimpleVehicle({
     required this.id,
@@ -34,9 +30,6 @@ class SimpleVehicle {
     this.durationMinutes,
     this.fromLocation,
     this.toLocation,
-    this.driverName,
-    this.driverMobile,
-    this.fare,
   });
 
   Duration get parkingDuration {
@@ -67,9 +60,6 @@ class SimpleVehicle {
       durationMinutes: json['duration_minutes'] ?? json['durationMinutes'],
       fromLocation: json['from_location'] ?? json['fromLocation'],
       toLocation: json['to_location'] ?? json['toLocation'],
-      driverName: json['driver_name'] ?? json['driverName'],
-      driverMobile: json['driver_mobile'] ?? json['driverMobile'],
-      fare: (json['fare'] ?? json['fare_amount'])?.toDouble(),
     );
   }
 
@@ -89,9 +79,6 @@ class SimpleVehicle {
       'duration_minutes': durationMinutes,
       'from_location': fromLocation,
       'to_location': toLocation,
-      'driver_name': driverName,
-      'driver_mobile': driverMobile,
-      'fare': fare,
     };
   }
 }
