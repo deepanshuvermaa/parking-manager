@@ -136,19 +136,28 @@ class ReceiptService {
     receipt.writeln('Type: ${vehicle.vehicleType}');
     receipt.writeln('-' * paperWidth);
 
+    // Booking & Driver details
+    if (vehicle.bookedBy != null && vehicle.bookedBy!.isNotEmpty) receipt.writeln('Booked by: ${vehicle.bookedBy}');
+    if (vehicle.bookedByMobile != null && vehicle.bookedByMobile!.isNotEmpty) receipt.writeln('Mob: ${vehicle.bookedByMobile}');
+    if (vehicle.driverName != null && vehicle.driverName!.isNotEmpty) receipt.writeln('Driver: ${vehicle.driverName}');
+    if (vehicle.driverMobile != null && vehicle.driverMobile!.isNotEmpty) receipt.writeln('Driver Mob: ${vehicle.driverMobile}');
+    if (vehicle.fare != null && vehicle.fare! > 0) {
+      receipt.write(ESC_BOLD_ON);
+      receipt.writeln('Fare: Rs. ${vehicle.fare!.toStringAsFixed(0)}');
+      receipt.write(ESC_BOLD_OFF);
+    }
+    if (vehicle.bookedBy != null || vehicle.driverName != null || (vehicle.fare != null && vehicle.fare! > 0)) {
+      receipt.writeln('-' * paperWidth);
+    }
+
     // Travel Details (if provided)
     if (vehicle.fromLocation != null && vehicle.fromLocation!.isNotEmpty ||
         vehicle.toLocation != null && vehicle.toLocation!.isNotEmpty) {
-      receipt.writeln('TRAVEL DETAILS:');
       if (vehicle.fromLocation != null && vehicle.fromLocation!.isNotEmpty) {
-        receipt.write(getSizeCommand(travelFromSize, travelFromBold));
         receipt.writeln('From: ${vehicle.fromLocation}');
-        receipt.write(ESC_NORMAL);
       }
       if (vehicle.toLocation != null && vehicle.toLocation!.isNotEmpty) {
-        receipt.write(getSizeCommand(travelToSize, travelToBold));
         receipt.writeln('To:   ${vehicle.toLocation}');
-        receipt.write(ESC_NORMAL);
       }
       receipt.writeln('-' * paperWidth);
     }
@@ -308,20 +317,25 @@ class ReceiptService {
     receipt.writeln('Type: ${vehicle.vehicleType}');
     receipt.writeln(dashLine);
 
-    // Travel Details (if provided)
+    // Booking & Driver details
+    if (vehicle.bookedBy != null && vehicle.bookedBy!.isNotEmpty) receipt.writeln('Booked by: ${vehicle.bookedBy}');
+    if (vehicle.bookedByMobile != null && vehicle.bookedByMobile!.isNotEmpty) receipt.writeln('Mob: ${vehicle.bookedByMobile}');
+    if (vehicle.driverName != null && vehicle.driverName!.isNotEmpty) receipt.writeln('Driver: ${vehicle.driverName}');
+    if (vehicle.driverMobile != null && vehicle.driverMobile!.isNotEmpty) receipt.writeln('Driver Mob: ${vehicle.driverMobile}');
+    if (vehicle.fare != null && vehicle.fare! > 0) {
+      receipt.write(ESC_BOLD_ON);
+      receipt.writeln('Fare: Rs. ${vehicle.fare!.toStringAsFixed(0)}');
+      receipt.write(ESC_BOLD_OFF);
+    }
+    if (vehicle.bookedBy != null || vehicle.driverName != null || (vehicle.fare != null && vehicle.fare! > 0)) {
+      receipt.writeln(dashLine);
+    }
+
+    // Travel Details
     if (vehicle.fromLocation != null && vehicle.fromLocation!.isNotEmpty ||
         vehicle.toLocation != null && vehicle.toLocation!.isNotEmpty) {
-      receipt.writeln('TRAVEL DETAILS:');
-      if (vehicle.fromLocation != null && vehicle.fromLocation!.isNotEmpty) {
-        receipt.write(getSizeCommand(travelFromSize, travelFromBold));
-        receipt.writeln('From: ${vehicle.fromLocation}');
-        receipt.write(ESC_NORMAL);
-      }
-      if (vehicle.toLocation != null && vehicle.toLocation!.isNotEmpty) {
-        receipt.write(getSizeCommand(travelToSize, travelToBold));
-        receipt.writeln('To:   ${vehicle.toLocation}');
-        receipt.write(ESC_NORMAL);
-      }
+      if (vehicle.fromLocation != null && vehicle.fromLocation!.isNotEmpty) receipt.writeln('From: ${vehicle.fromLocation}');
+      if (vehicle.toLocation != null && vehicle.toLocation!.isNotEmpty) receipt.writeln('To:   ${vehicle.toLocation}');
       receipt.writeln(dashLine);
     }
 

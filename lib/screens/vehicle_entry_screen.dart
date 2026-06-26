@@ -19,14 +19,22 @@ class VehicleEntryScreen extends StatefulWidget {
 
 class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
   final _plateController = TextEditingController();
+  final _bookedByController = TextEditingController();
+  final _bookedByMobileController = TextEditingController();
+  final _driverNameController = TextEditingController();
+  final _driverMobileController = TextEditingController();
+  final _fromController = TextEditingController();
+  final _toController = TextEditingController();
+  final _remarksController = TextEditingController();
+  final _fareController = TextEditingController();
   final _hasText = ValueNotifier<bool>(false);
   String _selectedType = 'Car';
   bool _isSubmitting = false;
   SimpleVehicle? _lastVehicle;
   String? _lastReceipt;
   SharedPreferences? _prefs;
+  bool _showExtra = false;
 
-  // Only 6 primary types - user can add more via Settings > Rates
   static const _types = [
     ('Car', Icons.directions_car_rounded),
     ('Bike', Icons.two_wheeler_rounded),
@@ -42,24 +50,39 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
     _plateController.addListener(() {
       _hasText.value = _plateController.text.trim().isNotEmpty;
     });
-    SharedPreferences.getInstance().then((p) => _prefs = p);
+    SharedPreferences.getInstance().then((p) {
+      _prefs = p;
+      if (mounted) setState(() => _showExtra = p.getBool('show_extra_fields') ?? false);
+    });
   }
 
   @override
-  void dispose() { _plateController.dispose(); _hasText.dispose(); super.dispose(); }
+  void dispose() {
+    _plateController.dispose(); _bookedByController.dispose(); _bookedByMobileController.dispose();
+    _driverNameController.dispose(); _driverMobileController.dispose();
+    _fromController.dispose(); _toController.dispose(); _remarksController.dispose();
+    _fareController.dispose(); _hasText.dispose();
+    super.dispose();
+  }
+
+  void _clearAll() {
+    _plateController.clear(); _bookedByController.clear(); _bookedByMobileController.clear();
+    _driverNameController.clear(); _driverMobileController.clear();
+    _fromController.clear(); _toController.clear(); _remarksController.clear();
+    _fareController.clear();
+  }
 
   Future<void> _submit() async {
     final plate = _plateController.text.trim().toUpperCase();
     if (plate.isEmpty) return;
 
-    // Duplicate plate detection — check if already parked
     if (SimpleVehicleService.isVehicleParked(plate)) {
       if (mounted) {
         final proceed = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('Vehicle Already Parked'),
-            content: Text('$plate is already parked. Do you still want to create a new entry?'),
+            content: Text('$plate is already parked. Create new entry?'),
             actions: [
               TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
               ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Park Anyway')),
@@ -75,33 +98,44 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
     try {
       final token = context.read<AuthProvider>().token ?? '';
       final vehicle = await SimpleVehicleService.addVehicle(
-        token: token, vehicleNumber: plate, vehicleType: _selectedType,
+        token: token,
+        vehicleNumber: plate,
+        vehicleType: _selectedType,
+        bookedBy: _bookedByController.text.trim(),
+        bookedByMobile: _bookedByMobileController.text.trim(),
+        driverName: _driverNameController.text.trim(),
+        driverMobile: _driverMobileController.text.trim(),
+        fromLocation: _fromController.text.trim(),
+        toLocation: _toController.text.trim(),
+        notes: _remarksController.text.trim(),
+        fare: _fareController.text.trim().isNotEmpty ? double.tryParse(_fareController.text.trim()) : null,
       );
 
       if (vehicle != null && mounted) {
         context.read<ParkingProvider>().recordEntry();
         HapticFeedback.mediumImpact();
 
-        final receipt = await ReceiptService.generateEntryReceipt(vehicle);
-        _lastVehicle = vehicle;
-        _lastReceipt = receipt;
-
-        final prefs = _prefs ?? await SharedPreferences.getInstance();
-        final autoPrint = prefs.getBool('auto_print') ?? true;
-        final connected = await PlatformPrinterService.isConnected();
-        String msg;
-        if (connected && autoPrint) {
-          await PlatformPrinterService.printText(receipt);
-          msg = '✓ $plate parked • Receipt printed';
-        } else {
-          msg = '✓ $plate parked';
-        }
+        String msg = '✓ $plate parked';
+        try {
+          final receipt = await ReceiptService.generateEntryReceipt(vehicle);
+          _lastVehicle = vehicle;
+          _lastReceipt = receipt;
+          final prefs = _prefs ?? await SharedPreferences.getInstance();
+          final autoPrint = prefs.getBool('auto_print') ?? true;
+          final connected = await PlatformPrinterService.isConnected();
+          if (connected && autoPrint) {
+            await PlatformPrinterService.printText(receipt);
+            msg = '✓ $plate parked • Receipt printed';
+          }
+        } catch (_) {}
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg, style: const TextStyle(fontSize: 15)), backgroundColor: Go2Colors.success));
-          _plateController.clear();
+          _clearAll();
           setState(() {});
         }
+      } else if (vehicle == null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to save vehicle'), backgroundColor: Go2Colors.error));
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Go2Colors.error));
@@ -121,6 +155,27 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
     }
   }
 
+  Widget _field(TextEditingController ctrl, String hint, IconData icon, {TextInputType? keyboard, TextCapitalization cap = TextCapitalization.none}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: TextFormField(
+        controller: ctrl,
+        keyboardType: keyboard,
+        textCapitalization: cap,
+        autocorrect: false,
+        style: const TextStyle(fontSize: 15),
+        decoration: InputDecoration(
+          hintText: hint,
+          prefixIcon: Icon(icon, size: 20),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          isDense: true,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Go2Colors.divider)),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Go2Colors.divider)),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final rates = SimpleVehicleService.getDefaultRate(_selectedType);
@@ -136,14 +191,11 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          // 6 vehicle types - large tiles for dark parking lot
+          // Vehicle types
           GridView.count(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 3,
-            mainAxisSpacing: 10,
-            crossAxisSpacing: 10,
-            childAspectRatio: 1.2,
+            crossAxisCount: 3, mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 1.2,
             children: _types.map((t) {
               final (type, icon) = t;
               final sel = _selectedType == type;
@@ -160,10 +212,7 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
                   child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                     Icon(icon, color: sel ? Colors.white : Go2Colors.textPrimary, size: 28),
                     const SizedBox(height: 6),
-                    Text(type, style: TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w600,
-                      color: sel ? Colors.white : Go2Colors.textPrimary,
-                    )),
+                    Text(type, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: sel ? Colors.white : Go2Colors.textPrimary)),
                   ]),
                 ),
               );
@@ -180,7 +229,7 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
           )),
           const SizedBox(height: 20),
 
-          // Plate input - LARGE for dark parking lot visibility
+          // Plate input
           TextFormField(
             controller: _plateController,
             autocorrect: false,
@@ -195,9 +244,44 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
             inputFormatters: [UpperCaseTextFormatter(), LengthLimitingTextInputFormatter(14)],
             onFieldSubmitted: (_) => _submit(),
           ),
-          const SizedBox(height: 24),
 
-          // Park button - large, prominent
+          // Extra fields (toggled from Settings)
+          if (_showExtra) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Go2Colors.skyWash,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Go2Colors.primary.withValues(alpha: 0.1)),
+              ),
+              child: Column(children: [
+                Row(children: [
+                  _expandedField(_bookedByController, 'Booked by Name', Icons.person_outline, cap: TextCapitalization.words),
+                  const SizedBox(width: 10),
+                  _expandedField(_bookedByMobileController, 'Mob. no.', Icons.phone_outlined, keyboard: TextInputType.phone),
+                ]),
+                Row(children: [
+                  _expandedField(_driverNameController, 'Driver Name', Icons.badge_outlined, cap: TextCapitalization.words),
+                  const SizedBox(width: 10),
+                  _expandedField(_driverMobileController, 'Driver Mob.', Icons.phone_android, keyboard: TextInputType.phone),
+                ]),
+                Row(children: [
+                  _expandedField(_fromController, 'From', Icons.location_on_outlined, cap: TextCapitalization.words),
+                  const SizedBox(width: 10),
+                  _expandedField(_toController, 'To', Icons.flag_outlined, cap: TextCapitalization.words),
+                ]),
+                Row(children: [
+                  _expandedField(_remarksController, 'Remarks', Icons.notes_outlined, cap: TextCapitalization.sentences),
+                  const SizedBox(width: 10),
+                  _expandedField(_fareController, 'Fare (₹)', Icons.currency_rupee_outlined, keyboard: TextInputType.number),
+                ]),
+              ]),
+            ),
+          ],
+          const SizedBox(height: 20),
+
+          // Park button
           SizedBox(
             height: 54,
             child: ValueListenableBuilder<bool>(
@@ -235,6 +319,33 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
             ),
           ],
         ]),
+      ),
+    );
+  }
+
+  Widget _expandedField(TextEditingController ctrl, String hint, IconData icon, {TextInputType? keyboard, TextCapitalization cap = TextCapitalization.none}) {
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: TextFormField(
+          controller: ctrl,
+          keyboardType: keyboard,
+          textCapitalization: cap,
+          autocorrect: false,
+          style: const TextStyle(fontSize: 13),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: const TextStyle(fontSize: 12),
+            prefixIcon: Icon(icon, size: 16),
+            prefixIconConstraints: const BoxConstraints(minWidth: 32),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+            isDense: true,
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Go2Colors.divider)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Go2Colors.divider)),
+          ),
+        ),
       ),
     );
   }
