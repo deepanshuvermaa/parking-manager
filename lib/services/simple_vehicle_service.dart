@@ -234,7 +234,7 @@ class SimpleVehicleService {
         body: jsonEncode({
           'vehicleNumber': vehicle.vehicleNumber,
           'vehicleType': vehicle.vehicleType,
-          'entryTime': vehicle.entryTime.toIso8601String(),
+          'entryTime': vehicle.entryTime.toUtc().toIso8601String(),
           'hourlyRate': vehicle.hourlyRate,
           'minimumRate': vehicle.minimumRate,
           'notes': vehicle.notes,
@@ -380,7 +380,7 @@ class SimpleVehicleService {
             body: jsonEncode({
               'vehicleNumber': vehicle.vehicleNumber,
               'vehicleType': vehicle.vehicleType,
-              'entryTime': vehicle.entryTime.toIso8601String(),
+              'entryTime': vehicle.entryTime.toUtc().toIso8601String(),
               'hourlyRate': vehicle.hourlyRate,
               'minimumRate': vehicle.minimumRate,
               'notes': vehicle.notes,

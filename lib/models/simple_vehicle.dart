@@ -49,10 +49,9 @@ class SimpleVehicle {
       id: json['id'] ?? '',
       vehicleNumber: json['vehicle_number'] ?? json['vehicleNumber'] ?? '',
       vehicleType: _str(json['vehicle_type'] ?? json['vehicleType'] ?? 'Car'),
-      entryTime: (json['entry_time'] ?? json['entryTime']) != null
-        ? DateTime.parse(json['entry_time'] ?? json['entryTime']) : DateTime.now(),
+      entryTime: _parseTime(json['entry_time'] ?? json['entryTime']),
       exitTime: (json['exit_time'] ?? json['exitTime']) != null
-        ? DateTime.parse(json['exit_time'] ?? json['exitTime']) : null,
+        ? _parseTime(json['exit_time'] ?? json['exitTime']) : null,
       status: json['status'] ?? 'parked',
       ticketId: json['ticket_id'] ?? json['ticketId'],
       hourlyRate: _toDouble(json['hourly_rate'] ?? json['hourlyRate']),
@@ -70,6 +69,13 @@ class SimpleVehicle {
     );
   }
 
+  // Parse time — always returns local time regardless of whether input is UTC or local
+  static DateTime _parseTime(dynamic v) {
+    if (v == null) return DateTime.now();
+    final dt = DateTime.parse(v.toString());
+    return dt.isUtc ? dt.toLocal() : dt;
+  }
+
   static double? _toDouble(dynamic v) {
     if (v == null) return null;
     if (v is num) return v.toDouble();
@@ -85,7 +91,7 @@ class SimpleVehicle {
 
   Map<String, dynamic> toJson() => {
     'id': id, 'vehicle_number': vehicleNumber, 'vehicle_type': vehicleType,
-    'entry_time': entryTime.toIso8601String(), 'exit_time': exitTime?.toIso8601String(),
+    'entry_time': entryTime.toUtc().toIso8601String(), 'exit_time': exitTime?.toUtc().toIso8601String(),
     'status': status, 'ticket_id': ticketId, 'hourly_rate': hourlyRate,
     'minimum_rate': minimumRate, 'amount': amount, 'notes': notes,
     'duration_minutes': durationMinutes, 'from_location': fromLocation,
