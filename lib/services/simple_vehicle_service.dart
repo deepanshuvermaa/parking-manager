@@ -253,14 +253,15 @@ class SimpleVehicleService {
         final data = jsonDecode(response.body);
         if (data['success'] == true && data['data']?['vehicle'] != null) {
           final backendVehicle = SimpleVehicle.fromJson(data['data']['vehicle']);
+          // Delete old local record then save backend one (different IDs)
+          await LocalDatabaseService.deleteVehicle(vehicle.id);
           await LocalDatabaseService.saveVehicle(backendVehicle, synced: true);
-          // Update cache
           final index = _cachedVehicles.indexWhere((v) => v.ticketId == vehicle.ticketId);
           if (index != -1) _cachedVehicles[index] = backendVehicle;
+          print('✅ Synced: ${vehicle.vehicleNumber}');
         }
       }
     } catch (e) {
-      // Will be retried by periodic syncPendingChanges
       print('⚠️ Background sync will retry: $e');
     }
   }
@@ -399,6 +400,8 @@ class SimpleVehicleService {
             final data = jsonDecode(response.body);
             if (data['success'] == true && data['data']?['vehicle'] != null) {
               final backendVehicle = SimpleVehicle.fromJson(data['data']['vehicle']);
+              // Delete old local record, save backend one
+              await LocalDatabaseService.deleteVehicle(vehicle.id);
               await LocalDatabaseService.saveVehicle(backendVehicle, synced: true);
               synced++;
             }

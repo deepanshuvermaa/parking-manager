@@ -25,7 +25,7 @@ class LocalDatabaseService {
 
     return await openDatabase(
       path,
-      version: 5,
+      version: 6,
       onCreate: (db, version) async {
         print('🗄️ Creating local database...');
 
@@ -82,10 +82,11 @@ class LocalDatabaseService {
           )
         ''');
 
-        // Create indexes for better query performance
+        // Create indexes
         await db.execute('CREATE INDEX idx_vehicles_status ON vehicles(status)');
         await db.execute('CREATE INDEX idx_vehicles_synced ON vehicles(synced)');
         await db.execute('CREATE INDEX idx_vehicles_entry_time ON vehicles(entry_time)');
+        await db.execute('CREATE UNIQUE INDEX idx_vehicles_ticket ON vehicles(ticket_id)');
 
         print('✅ Local database created successfully');
       },
@@ -112,6 +113,14 @@ class LocalDatabaseService {
           for (final col in ['booked_by TEXT', 'booked_by_mobile TEXT', 'driver_name TEXT', 'driver_mobile TEXT', 'fare REAL']) {
             try { await db.execute('ALTER TABLE vehicles ADD COLUMN $col'); } catch (_) {}
           }
+        }
+
+        if (oldVersion < 6) {
+          // Clean local duplicates and add unique ticket_id index
+          try {
+            await db.execute('DELETE FROM vehicles WHERE rowid NOT IN (SELECT MIN(rowid) FROM vehicles GROUP BY ticket_id)');
+            await db.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_vehicles_ticket ON vehicles(ticket_id)');
+          } catch (_) {}
         }
       },
     );
