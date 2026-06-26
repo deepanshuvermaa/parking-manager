@@ -33,7 +33,7 @@ class LocalDatabaseService {
       onCreate: (db, version) async {
         print('🗄️ Creating local database...');
 
-        // Vehicles table
+        // Vehicles table — includes ALL columns from all migrations
         await db.execute('''
           CREATE TABLE vehicles (
             id TEXT PRIMARY KEY,
@@ -50,6 +50,10 @@ class LocalDatabaseService {
             duration_minutes INTEGER,
             from_location TEXT,
             to_location TEXT,
+            version INTEGER DEFAULT 1,
+            driver_name TEXT,
+            driver_mobile TEXT,
+            fare REAL,
             synced INTEGER DEFAULT 0,
             user_id TEXT,
             created_at TEXT,
