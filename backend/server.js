@@ -308,6 +308,7 @@ app.post('/api/vehicles', verifyToken, checkTrialExpiry, async (req, res) => {
     const result = await pool.query(
       `INSERT INTO vehicles (user_id, business_id, vehicle_number, vehicle_type, entry_time, hourly_rate, minimum_rate, ticket_id, notes, from_location, to_location, driver_name, driver_mobile, fare)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+       ON CONFLICT (ticket_id) DO UPDATE SET updated_at = NOW()
        RETURNING *`,
       [
         req.userId,
