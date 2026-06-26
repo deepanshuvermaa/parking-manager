@@ -47,7 +47,11 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
   void initState() {
     super.initState();
     _plateController.addListener(() {
-      _hasText.value = _plateController.text.trim().isNotEmpty;
+      final hasText = _plateController.text.trim().isNotEmpty;
+      if (_hasText.value != hasText) {
+        _hasText.value = hasText;
+        if (mounted) setState(() {});
+      }
     });
     SharedPreferences.getInstance().then((p) {
       _prefs = p;
@@ -61,7 +65,6 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
     });
   }
 
-  @override
   @override
   void dispose() { _plateController.dispose(); _driverNameController.dispose(); _driverMobileController.dispose(); _fareController.dispose(); _hasText.dispose(); super.dispose(); }
 
@@ -278,20 +281,17 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
           // Park button - large, prominent
           SizedBox(
             height: 54,
-            child: ValueListenableBuilder<bool>(
-              valueListenable: _hasText,
-              builder: (_, hasText, __) => ElevatedButton(
-                onPressed: _isSubmitting || !hasText ? null : _submit,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Go2Colors.success,
-                  foregroundColor: Colors.white,
-                  textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: _isSubmitting
-                    ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
-                    : const Text('Park Vehicle'),
+            child: ElevatedButton(
+              onPressed: _isSubmitting || _plateController.text.trim().isEmpty ? null : _submit,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Go2Colors.success,
+                foregroundColor: Colors.white,
+                textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
+              child: _isSubmitting
+                  ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+                  : const Text('Park Vehicle'),
             ),
           ),
 
