@@ -1,6 +1,8 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/simple_vehicle.dart';
+import '../models/booking.dart';
 import '../utils/helpers.dart';
+import 'gst_service.dart';
 
 class ReceiptService {
   // ESC/POS Commands for formatting
@@ -217,20 +219,18 @@ class ReceiptService {
       receipt.writeln('-' * paperWidth);
     }
 
-    // GST on fare (if enabled and fare exists)
-    final enableGst = prefs.getBool('enable_gst') ?? false;
-    final gstRate = prefs.getDouble('gst_rate') ?? 18.0;
-    if (enableGst && vehicle.fare != null && vehicle.fare! > 0) {
-      final fareAmt = vehicle.fare!;
-      final gstAmt = fareAmt * gstRate / 100;
-      final total = fareAmt + gstAmt;
-      receipt.writeln('Subtotal: Rs. ${fareAmt.toStringAsFixed(0)}');
-      receipt.writeln('GST @${gstRate.toStringAsFixed(gstRate == gstRate.roundToDouble() ? 0 : 1)}%: Rs. ${gstAmt.toStringAsFixed(2)}');
+    // GST on fare (booking) — shared calculation
+    final gst = await GstService.compute(
+      amount: vehicle.fare ?? 0,
+      isBooking: vehicle.fare != null && vehicle.fare! > 0,
+    );
+    if (gst.applies) {
+      receipt.writeln('Subtotal: Rs. ${gst.subtotal.toStringAsFixed(0)}');
+      receipt.writeln('GST @${gst.rateLabel}%: Rs. ${gst.gstAmount.toStringAsFixed(2)}');
       receipt.write(ESC_BOLD_ON);
-      receipt.writeln('Total: Rs. ${total.toStringAsFixed(0)}');
+      receipt.writeln('Total: Rs. ${gst.total.toStringAsFixed(0)}');
       receipt.write(ESC_BOLD_OFF);
-      final gstin = prefs.getString('gstin_number') ?? '';
-      if (gstin.isNotEmpty) receipt.writeln('GSTIN: $gstin');
+      if (gst.gstin.isNotEmpty) receipt.writeln('GSTIN: ${gst.gstin}');
       receipt.writeln('-' * paperWidth);
     }
 
@@ -374,21 +374,20 @@ class ReceiptService {
     receipt.writeln('Duration: $durationStr');
     receipt.writeln(dashLine);
 
-    // GST calculation
-    final enableGst = prefs.getBool('enable_gst') ?? false;
-    final gstRate = prefs.getDouble('gst_rate') ?? 18.0;
-    final gstin = prefs.getString('gstin_number') ?? '';
+    // GST calculation — shared source of truth (parking vs booking toggle handled inside)
+    final gst = await GstService.compute(
+      amount: amount,
+      isBooking: vehicle.fare != null && vehicle.fare! > 0,
+    );
 
-    if (enableGst && amount > 0) {
-      final gstAmt = amount * gstRate / 100;
-      final totalWithGst = amount + gstAmt;
+    if (gst.applies) {
       receipt.writeln('');
-      receipt.writeln('Subtotal: Rs. ${amount.toStringAsFixed(0)}');
-      receipt.writeln('GST @${gstRate.toStringAsFixed(gstRate == gstRate.roundToDouble() ? 0 : 1)}%: Rs. ${gstAmt.toStringAsFixed(2)}');
+      receipt.writeln('Subtotal: Rs. ${gst.subtotal.toStringAsFixed(0)}');
+      receipt.writeln('GST @${gst.rateLabel}%: Rs. ${gst.gstAmount.toStringAsFixed(2)}');
       receipt.write(getSizeCommand(amountSize, amountBold));
-      receipt.writeln('TOTAL: Rs. ${totalWithGst.toStringAsFixed(0)}');
+      receipt.writeln('TOTAL: Rs. ${gst.total.toStringAsFixed(0)}');
       receipt.write(ESC_NORMAL);
-      if (gstin.isNotEmpty) receipt.writeln('GSTIN: $gstin');
+      if (gst.gstin.isNotEmpty) receipt.writeln('GSTIN: ${gst.gstin}');
     } else {
       receipt.writeln('');
       receipt.write(getSizeCommand(amountSize, amountBold));
@@ -399,7 +398,7 @@ class ReceiptService {
     receipt.writeln(divider);
 
     // GST number (legacy field — shown even without enable_gst for backward compat)
-    if (!enableGst && showGstNumber && gstNumber.isNotEmpty) {
+    if (!gst.applies && showGstNumber && gstNumber.isNotEmpty) {
       receipt.writeln('GST No: $gstNumber');
       receipt.writeln(dashLine);
     }
@@ -606,24 +605,20 @@ class ReceiptService {
     }
     receipt.writeln(divider);
 
-    // Fare - prominent display with optional GST
-    final enableGst = prefs.getBool('enable_gst') ?? false;
-    final gstRate = prefs.getDouble('gst_rate') ?? 18.0;
-    final gstin = prefs.getString('gstin_number') ?? '';
+    // Fare - prominent display with optional GST (taxi = booking) — shared calc
+    final gst = await GstService.compute(amount: booking.fareAmount.toDouble(), isBooking: true);
 
     receipt.writeln('');
     receipt.writeln(doubleDivider);
-    if (enableGst && booking.fareAmount > 0) {
-      final gstAmt = booking.fareAmount * gstRate / 100;
-      final totalWithGst = booking.fareAmount + gstAmt;
+    if (gst.applies) {
       receipt.writeln('Subtotal: ${Helpers.formatCurrency(booking.fareAmount)}');
-      receipt.writeln('GST @${gstRate.toStringAsFixed(gstRate == gstRate.roundToDouble() ? 0 : 1)}%: Rs. ${gstAmt.toStringAsFixed(2)}');
+      receipt.writeln('GST @${gst.rateLabel}%: Rs. ${gst.gstAmount.toStringAsFixed(2)}');
       receipt.write(getSizeCommand(amountSize, amountBold));
-      final fareText = 'TOTAL: Rs. ${totalWithGst.toStringAsFixed(0)}';
+      final fareText = 'TOTAL: Rs. ${gst.total.toStringAsFixed(0)}';
       final fareWidth = amountSize > 1.0 ? (paperWidth / amountSize).round() : paperWidth;
       receipt.writeln(centerText(fareText, fareWidth));
       receipt.write(ESC_NORMAL);
-      if (gstin.isNotEmpty) receipt.writeln('GSTIN: $gstin');
+      if (gst.gstin.isNotEmpty) receipt.writeln('GSTIN: ${gst.gstin}');
     } else {
       receipt.write(getSizeCommand(amountSize, amountBold));
       final fareText = 'FARE: ${Helpers.formatCurrency(booking.fareAmount)}';
@@ -664,6 +659,153 @@ class ReceiptService {
     receipt.writeln(centerText('Go2-Parking', paperWidth));
     receipt.writeln('');
     receipt.writeln('');
+    receipt.writeln('');
+
+    return receipt.toString();
+  }
+
+  // ============================================
+  // BOOKINGS MODULE RECEIPTS (separate — appended)
+  // ============================================
+
+  /// Booking receipt printed on creation — shows Total / Advance / Balance
+  static Future<String> generateBookingReceipt(Booking booking) async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final businessName = prefs.getString('business_name') ?? 'Go2-Parking';
+    final businessAddress = prefs.getString('business_address') ?? '';
+    final businessPhone = prefs.getString('business_phone') ?? '';
+    final paperWidth = prefs.getInt('paper_width') ?? 32;
+
+    final receipt = StringBuffer();
+    final divider = '=' * paperWidth;
+    final dashLine = '-' * paperWidth;
+
+    receipt.write(ESC_ALIGN_CENTER);
+    receipt.writeln(divider);
+    receipt.write(ESC_BOLD_ON);
+    receipt.writeln(centerText(businessName, paperWidth));
+    receipt.write(ESC_BOLD_OFF);
+    if (businessAddress.isNotEmpty) receipt.writeln(centerText(businessAddress, paperWidth));
+    if (businessPhone.isNotEmpty) receipt.writeln(centerText(businessPhone, paperWidth));
+    receipt.writeln(divider);
+    receipt.write(ESC_BOLD_ON);
+    receipt.writeln(centerText('BOOKING RECEIPT', paperWidth));
+    receipt.write(ESC_BOLD_OFF);
+    receipt.writeln(divider);
+
+    if (booking.bookingNumber != null && booking.bookingNumber!.isNotEmpty) {
+      receipt.writeln(centerText('Booking: ${booking.bookingNumber}', paperWidth));
+    }
+    receipt.writeln(centerText('Date: ${Helpers.formatDateTime(booking.bookingDate)}', paperWidth));
+    receipt.writeln(dashLine);
+
+    receipt.writeln(centerText('Customer: ${booking.customerName}', paperWidth));
+    if (booking.customerMobile != null && booking.customerMobile!.isNotEmpty) {
+      receipt.writeln(centerText('Mobile: ${booking.customerMobile}', paperWidth));
+    }
+    if (booking.vehicleNumber != null && booking.vehicleNumber!.isNotEmpty) {
+      receipt.writeln(centerText('Vehicle: ${booking.vehicleNumber}', paperWidth));
+    }
+    if (booking.vehicleType != null && booking.vehicleType!.isNotEmpty) {
+      receipt.writeln(centerText('Type: ${booking.vehicleType}', paperWidth));
+    }
+    if (booking.driverName != null && booking.driverName!.isNotEmpty) {
+      receipt.writeln(centerText('Driver: ${booking.driverName}', paperWidth));
+    }
+    if (booking.driverMobile != null && booking.driverMobile!.isNotEmpty) {
+      receipt.writeln(centerText('Driver Mob: ${booking.driverMobile}', paperWidth));
+    }
+    if ((booking.fromLocation != null && booking.fromLocation!.isNotEmpty) ||
+        (booking.toLocation != null && booking.toLocation!.isNotEmpty)) {
+      if (booking.fromLocation != null && booking.fromLocation!.isNotEmpty) {
+        receipt.writeln(centerText('From: ${booking.fromLocation}', paperWidth));
+      }
+      if (booking.toLocation != null && booking.toLocation!.isNotEmpty) {
+        receipt.writeln(centerText('To: ${booking.toLocation}', paperWidth));
+      }
+    }
+    receipt.writeln(dashLine);
+
+    receipt.writeln(centerText('Total Fare: Rs. ${booking.totalFare.toStringAsFixed(0)}', paperWidth));
+    receipt.writeln(centerText('Advance:    Rs. ${booking.amountPaid.toStringAsFixed(0)}', paperWidth));
+    receipt.write(ESC_BOLD_ON);
+    receipt.writeln(centerText('Balance:    Rs. ${booking.balance.toStringAsFixed(0)}', paperWidth));
+    receipt.write(ESC_BOLD_OFF);
+    receipt.writeln(dashLine);
+
+    if (booking.remarks != null && booking.remarks!.isNotEmpty) {
+      receipt.writeln(centerText('Remarks: ${booking.remarks}', paperWidth));
+      receipt.writeln(dashLine);
+    }
+
+    receipt.writeln(divider);
+    receipt.writeln(centerText('KEEP THIS RECEIPT SAFE', paperWidth));
+    receipt.writeln(divider);
+    receipt.writeln(centerText('Go2-Parking', paperWidth));
+    receipt.writeln('');
+
+    return receipt.toString();
+  }
+
+  /// Closing receipt printed when a booking is settled — shows Total / Paid / Balance 0 / PAID
+  static Future<String> generateBookingClosingReceipt(Booking booking) async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final businessName = prefs.getString('business_name') ?? 'Go2-Parking';
+    final businessAddress = prefs.getString('business_address') ?? '';
+    final businessPhone = prefs.getString('business_phone') ?? '';
+    final paperWidth = prefs.getInt('paper_width') ?? 32;
+
+    final receipt = StringBuffer();
+    final divider = '=' * paperWidth;
+    final dashLine = '-' * paperWidth;
+
+    receipt.write(ESC_ALIGN_CENTER);
+    receipt.writeln(divider);
+    receipt.write(ESC_BOLD_ON);
+    receipt.writeln(centerText(businessName, paperWidth));
+    receipt.write(ESC_BOLD_OFF);
+    if (businessAddress.isNotEmpty) receipt.writeln(centerText(businessAddress, paperWidth));
+    if (businessPhone.isNotEmpty) receipt.writeln(centerText(businessPhone, paperWidth));
+    receipt.writeln(divider);
+    receipt.write(ESC_BOLD_ON);
+    receipt.writeln(centerText('BOOKING CLOSING', paperWidth));
+    receipt.write(ESC_BOLD_OFF);
+    receipt.writeln(divider);
+
+    if (booking.bookingNumber != null && booking.bookingNumber!.isNotEmpty) {
+      receipt.writeln(centerText('Booking: ${booking.bookingNumber}', paperWidth));
+    }
+    receipt.writeln(centerText('Date: ${Helpers.formatDateTime(DateTime.now())}', paperWidth));
+    receipt.writeln(dashLine);
+
+    receipt.writeln(centerText('Customer: ${booking.customerName}', paperWidth));
+    if (booking.customerMobile != null && booking.customerMobile!.isNotEmpty) {
+      receipt.writeln(centerText('Mobile: ${booking.customerMobile}', paperWidth));
+    }
+    if (booking.vehicleNumber != null && booking.vehicleNumber!.isNotEmpty) {
+      receipt.writeln(centerText('Vehicle: ${booking.vehicleNumber}', paperWidth));
+    }
+    receipt.writeln(dashLine);
+
+    final balance = booking.balance < 0 ? 0.0 : booking.balance;
+    receipt.writeln(centerText('Total Fare: Rs. ${booking.totalFare.toStringAsFixed(0)}', paperWidth));
+    receipt.writeln(centerText('Paid:       Rs. ${booking.amountPaid.toStringAsFixed(0)}', paperWidth));
+    receipt.write(ESC_BOLD_ON);
+    receipt.writeln(centerText('Balance:    Rs. ${balance.toStringAsFixed(0)}', paperWidth));
+    receipt.write(ESC_BOLD_OFF);
+    receipt.writeln(dashLine);
+
+    receipt.write(ESC_SIZE_1_5X_BOLD);
+    receipt.writeln(centerText('PAID', (paperWidth / 1.5).round()));
+    receipt.write(ESC_NORMAL);
+    receipt.writeln(dashLine);
+
+    receipt.writeln(divider);
+    receipt.writeln(centerText('THANK YOU! VISIT AGAIN', paperWidth));
+    receipt.writeln(divider);
+    receipt.writeln(centerText('Go2-Parking', paperWidth));
     receipt.writeln('');
 
     return receipt.toString();

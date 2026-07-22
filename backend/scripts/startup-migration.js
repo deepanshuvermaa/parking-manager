@@ -451,6 +451,65 @@ async function runStartupMigrations(pool) {
       console.log('✅ GST settings columns added');
     }
 
+    // ========================================
+    // MIGRATION 9: Add separate GST toggle columns (parking vs booking)
+    // ========================================
+    const gstToggleCheck = await pool.query(
+      "SELECT * FROM schema_migrations WHERE migration_name = 'add_gst_toggles'"
+    );
+    if (gstToggleCheck.rows.length === 0) {
+      console.log('📦 Adding GST toggle columns...');
+      await pool.query('ALTER TABLE settings ADD COLUMN IF NOT EXISTS gst_on_parking BOOLEAN DEFAULT true');
+      await pool.query('ALTER TABLE settings ADD COLUMN IF NOT EXISTS gst_on_booking BOOLEAN DEFAULT true');
+      await pool.query("INSERT INTO schema_migrations (migration_name) VALUES ('add_gst_toggles')");
+      console.log('✅ GST toggle columns added');
+    }
+
+    // ========================================
+    // MIGRATION 10: Bookings module (separate from vehicles/parking)
+    // ========================================
+    const bookingsCheck = await pool.query(
+      "SELECT * FROM schema_migrations WHERE migration_name = 'add_bookings'"
+    );
+    if (bookingsCheck.rows.length === 0) {
+      console.log('📦 Creating bookings tables...');
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS bookings (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id UUID NOT NULL,
+          booking_number VARCHAR(50),
+          customer_name VARCHAR(255),
+          customer_mobile VARCHAR(20),
+          vehicle_number VARCHAR(50),
+          vehicle_type VARCHAR(50),
+          driver_name VARCHAR(255),
+          driver_mobile VARCHAR(20),
+          from_location VARCHAR(255),
+          to_location VARCHAR(255),
+          total_fare NUMERIC(12,2) DEFAULT 0,
+          amount_paid NUMERIC(12,2) DEFAULT 0,
+          status VARCHAR(20) DEFAULT 'partial',
+          remarks TEXT,
+          booking_date TIMESTAMP DEFAULT NOW(),
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS booking_payments (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+          amount NUMERIC(12,2) NOT NULL,
+          note VARCHAR(255),
+          paid_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_bookings_user ON bookings(user_id)');
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_bpay_booking ON booking_payments(booking_id)');
+      await pool.query("INSERT INTO schema_migrations (migration_name) VALUES ('add_bookings')");
+      console.log('✅ Bookings tables created');
+    }
+
   } catch (error) {
     console.error('❌ Migration error:', error);
     console.error('⚠️ Server will continue without new features');

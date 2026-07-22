@@ -6,6 +6,7 @@ import '../providers/parking_provider.dart';
 import '../services/simple_vehicle_service.dart';
 import '../services/platform_printer_service.dart';
 import '../services/receipt_service.dart';
+import '../services/gst_service.dart';
 import '../models/simple_vehicle.dart';
 import '../theme/app_theme.dart';
 
@@ -266,7 +267,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Container(width: 0.5, height: 32, color: Go2Colors.divider),
               Expanded(child: Column(children: [
                 Text('₹${amount.toStringAsFixed(0)}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Go2Colors.primary)),
-                Text('Amount', style: TextStyle(fontSize: 11, color: Go2Colors.textHint)),
+                Text(isBooking ? 'Fare' : 'Amount', style: TextStyle(fontSize: 11, color: Go2Colors.textHint)),
               ])),
             ]),
           ),
@@ -291,11 +292,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _confirmAndExit(SimpleVehicle v, double amount) async {
+    final isBooking = v.fare != null && v.fare! > 0;
+    final gst = await GstService.compute(amount: amount, isBooking: isBooking);
+    if (!mounted) return;
+
+    final dur = DateTime.now().difference(v.entryTime);
+    final durStr = '${dur.inHours}h ${dur.inMinutes.remainder(60)}m';
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('Exit ${v.vehicleNumber}?'),
-        content: Text('Duration: ${DateTime.now().difference(v.entryTime).inHours}h ${DateTime.now().difference(v.entryTime).inMinutes.remainder(60)}m\nAmount: ₹${amount.toStringAsFixed(0)}\n\nReceipt will be printed automatically.'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Duration: $durStr'),
+            const SizedBox(height: 10),
+            if (gst.applies) ...[
+              _amountRow(isBooking ? 'Fare' : 'Subtotal', '₹${gst.subtotal.toStringAsFixed(0)}'),
+              const SizedBox(height: 4),
+              _amountRow('GST @${gst.rateLabel}%', '₹${gst.gstAmount.toStringAsFixed(2)}'),
+              const Padding(padding: EdgeInsets.symmetric(vertical: 6), child: Divider(height: 1)),
+              _amountRow('Total Payable', '₹${gst.total.toStringAsFixed(0)}', bold: true),
+            ] else
+              _amountRow(isBooking ? 'Fare' : 'Amount', '₹${amount.toStringAsFixed(0)}', bold: true),
+            const SizedBox(height: 12),
+            const Text('Receipt will be printed automatically.', style: TextStyle(fontSize: 12, color: Go2Colors.textHint)),
+          ],
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
           ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Confirm & Print')),
@@ -329,6 +354,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _loadData();
     }
   }
+
+  Widget _amountRow(String label, String value, {bool bold = false}) => Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Text(label, style: TextStyle(fontSize: bold ? 15 : 13, fontWeight: bold ? FontWeight.w700 : FontWeight.w400)),
+      Text(value, style: TextStyle(fontSize: bold ? 17 : 13, fontWeight: bold ? FontWeight.w700 : FontWeight.w500, color: bold ? Go2Colors.primary : Go2Colors.textPrimary)),
+    ],
+  );
 
   String _formatTime(DateTime dt) => '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
 

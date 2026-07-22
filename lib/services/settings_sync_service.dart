@@ -20,6 +20,7 @@ class SettingsSyncService {
     'show_extra_fields', 'show_driver_name', 'show_driver_mobile', 'show_fare',
     // GST / Tax
     'enable_gst', 'gst_rate', 'gstin_number',
+    'gst_on_parking', 'gst_on_booking',
     // Receipt customization toggles
     'bill_show_business_name', 'bill_show_business_address', 'bill_show_business_phone',
     'bill_show_gst_number', 'bill_show_rate_info', 'bill_show_notes',
@@ -40,6 +41,21 @@ class SettingsSyncService {
     if (parts.length <= 1) return s;
     return parts.first + parts.skip(1).map((p) => p.isEmpty ? '' : p[0].toUpperCase() + p.substring(1)).join();
   }
+
+  /// Keys that MUST be stored as double in SharedPreferences.
+  /// JSON delivers whole numbers as int (e.g. 18, not 18.0), so without this
+  /// they'd be setInt() and then getDouble() returns null -> silent reset.
+  static const _doubleKeys = {
+    'gst_rate',
+    'receipt_business_name_size', 'receipt_business_address_size', 'receipt_business_phone_size',
+    'receipt_ticket_id_size', 'receipt_vehicle_number_size', 'receipt_vehicle_type_size',
+    'receipt_amount_size',
+  };
+
+  /// Keys that MUST be stored as int.
+  static const _intKeys = {
+    'paper_width', 'ticket_id_serial',
+  };
 
   static Future<void> syncToBackend(String token) async {
     try {
@@ -81,12 +97,25 @@ class SettingsSyncService {
       for (final key in [..._keys, ..._extraKeys]) {
         final v = data[key] ?? data[_snakeToCamel(key)];
         if (v == null) continue;
-        if (v is String) await prefs.setString(key, v);
-        else if (v is int) await prefs.setInt(key, v);
-        else if (v is bool) await prefs.setBool(key, v);
-        else if (v is double) await prefs.setDouble(key, v);
-        else if (v is num) await prefs.setDouble(key, v.toDouble());
-        else if (v is List) await prefs.setStringList(key, v.cast<String>());
+        // Type-aware storage — numeric keys forced to the type the app reads them with,
+        // because JSON delivers 18 as int and 18.0 as double interchangeably.
+        if (v is bool) {
+          await prefs.setBool(key, v);
+        } else if (_doubleKeys.contains(key) && v is num) {
+          await prefs.setDouble(key, v.toDouble());
+        } else if (_intKeys.contains(key) && v is num) {
+          await prefs.setInt(key, v.toInt());
+        } else if (v is String) {
+          await prefs.setString(key, v);
+        } else if (v is int) {
+          await prefs.setInt(key, v);
+        } else if (v is double) {
+          await prefs.setDouble(key, v);
+        } else if (v is num) {
+          await prefs.setDouble(key, v.toDouble());
+        } else if (v is List) {
+          await prefs.setStringList(key, v.cast<String>());
+        }
       }
     } catch (e) {
       print('⚠️ Settings load from backend failed: $e');

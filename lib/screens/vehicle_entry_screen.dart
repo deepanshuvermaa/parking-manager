@@ -271,11 +271,45 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
                   const SizedBox(width: 10),
                   _expandedField(_toController, 'To', Icons.flag_outlined, cap: TextCapitalization.words),
                 ]),
-                Row(children: [
-                  _expandedField(_remarksController, 'Remarks', Icons.notes_outlined, cap: TextCapitalization.sentences),
-                  const SizedBox(width: 10),
-                  _expandedField(_fareController, 'Fare (₹)', Icons.currency_rupee_outlined, keyboard: TextInputType.number),
+                _expandedField(_remarksController, 'Remarks', Icons.notes_outlined, cap: TextCapitalization.sentences, fullWidth: true),
+              ]),
+            ),
+            const SizedBox(height: 12),
+            // Booking Fare — prominent & full-width so it's never confused with other fields.
+            // A non-empty fare turns this entry into a fixed-price booking (overrides hourly rate).
+            Container(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+              decoration: BoxDecoration(
+                color: Go2Colors.success.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Go2Colors.success.withValues(alpha: 0.4), width: 1.5),
+              ),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: const [
+                  Icon(Icons.local_taxi_rounded, size: 18, color: Go2Colors.success),
+                  SizedBox(width: 6),
+                  Text('Booking Fare', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Go2Colors.textPrimary)),
                 ]),
+                const SizedBox(height: 2),
+                const Text('Fixed price for this trip — overrides hourly rate on exit. Leave blank for normal parking.',
+                    style: TextStyle(fontSize: 11, color: Go2Colors.textHint)),
+                const SizedBox(height: 10),
+                TextFormField(
+                  controller: _fareController,
+                  keyboardType: TextInputType.number,
+                  autocorrect: false,
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                  decoration: InputDecoration(
+                    hintText: '0',
+                    prefixIcon: const Icon(Icons.currency_rupee_rounded, size: 22, color: Go2Colors.success),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    isDense: true,
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Go2Colors.divider)),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Go2Colors.divider)),
+                  ),
+                ),
               ]),
             ),
           ],
@@ -323,31 +357,30 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
     );
   }
 
-  Widget _expandedField(TextEditingController ctrl, String hint, IconData icon, {TextInputType? keyboard, TextCapitalization cap = TextCapitalization.none}) {
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: TextFormField(
-          controller: ctrl,
-          keyboardType: keyboard,
-          textCapitalization: cap,
-          autocorrect: false,
-          style: const TextStyle(fontSize: 13),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: const TextStyle(fontSize: 12),
-            prefixIcon: Icon(icon, size: 16),
-            prefixIconConstraints: const BoxConstraints(minWidth: 32),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-            isDense: true,
-            filled: true,
-            fillColor: Colors.white,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Go2Colors.divider)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Go2Colors.divider)),
-          ),
+  Widget _expandedField(TextEditingController ctrl, String hint, IconData icon, {TextInputType? keyboard, TextCapitalization cap = TextCapitalization.none, bool fullWidth = false}) {
+    final field = Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: TextFormField(
+        controller: ctrl,
+        keyboardType: keyboard,
+        textCapitalization: cap,
+        autocorrect: false,
+        style: const TextStyle(fontSize: 13),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: const TextStyle(fontSize: 12),
+          prefixIcon: Icon(icon, size: 16),
+          prefixIconConstraints: const BoxConstraints(minWidth: 32),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+          isDense: true,
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Go2Colors.divider)),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Go2Colors.divider)),
         ),
       ),
     );
+    return fullWidth ? field : Expanded(child: field);
   }
 }
 

@@ -3,8 +3,10 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/simple_vehicle_service.dart';
+import '../services/booking_service.dart';
 import '../services/platform_printer_service.dart';
 import '../models/simple_vehicle.dart';
+import '../models/booking.dart';
 import '../theme/app_theme.dart';
 
 class ReportsScreen extends StatefulWidget {
@@ -18,13 +20,14 @@ class _ReportsScreenState extends State<ReportsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   List<SimpleVehicle> _vehicles = [];
+  List<Booking> _bookings = [];
   bool _isLoading = true;
   DateTimeRange? _customRange;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _loadData();
   }
 
@@ -41,10 +44,21 @@ class _ReportsScreenState extends State<ReportsScreen>
     } catch (e) {
       print('Reports load error: $e');
     }
+    try {
+      final token = context.read<AuthProvider>().token ?? '';
+      _bookings = await BookingService.getBookings(token);
+    } catch (e) {
+      print('Bookings report load error: $e');
+    }
     if (mounted) setState(() => _isLoading = false);
   }
 
   Future<void> _printReport() async {
+    // Bookings tab has its own summary report
+    if (_tabController.index == 4) {
+      await _printBookingsReport();
+      return;
+    }
     final period = ['Today', 'This Week', 'This Month', 'Custom'][_tabController.index];
     final vehicles = [_getExitedToday(), _getExitedThisWeek(), _getExitedThisMonth(), _getExitedCustom()][_tabController.index];
     final revenue = vehicles.fold<double>(0, (sum, v) => sum + (v.amount ?? 0));
@@ -192,11 +206,13 @@ class _ReportsScreenState extends State<ReportsScreen>
           indicatorColor: Go2Colors.primary,
           labelColor: Go2Colors.primary,
           unselectedLabelColor: Go2Colors.textHint,
+          isScrollable: true,
           tabs: const [
             Tab(text: 'Today'),
             Tab(text: 'Week'),
             Tab(text: 'Month'),
             Tab(text: 'Custom'),
+            Tab(text: 'Bookings'),
           ],
         ),
       ),
@@ -209,6 +225,7 @@ class _ReportsScreenState extends State<ReportsScreen>
                 _buildReportTab(_getExitedThisWeek(), 'week'),
                 _buildReportTab(_getExitedThisMonth(), 'month'),
                 _buildCustomReportTab(),
+                _buildBookingsReportTab(),
               ],
             ),
     );
@@ -251,6 +268,134 @@ class _ReportsScreenState extends State<ReportsScreen>
           ),
         ),
         Expanded(child: _buildReportTab(vehicles, 'custom')),
+      ],
+    );
+  }
+
+  // ============================================
+  // BOOKINGS REPORT (separate module)
+  // ============================================
+
+  double get _bookingsBooked => _bookings.fold(0.0, (s, b) => s + b.totalFare);
+  double get _bookingsCollected => _bookings.fold(0.0, (s, b) => s + b.amountPaid);
+  double get _bookingsOutstanding =>
+      _bookings.fold(0.0, (s, b) => s + (b.balance > 0 ? b.balance : 0));
+
+  Future<void> _printBookingsReport() async {
+    final report = StringBuffer();
+    report.writeln('================================');
+    report.writeln('       BOOKINGS REPORT');
+    report.writeln('================================');
+    report.writeln('Date: ${DateTime.now().toString().substring(0, 16)}');
+    report.writeln('--------------------------------');
+    report.writeln('Total Bookings: ${_bookings.length}');
+    report.writeln('Booked:      Rs. ${_bookingsBooked.toStringAsFixed(0)}');
+    report.writeln('Collected:   Rs. ${_bookingsCollected.toStringAsFixed(0)}');
+    report.writeln('Outstanding: Rs. ${_bookingsOutstanding.toStringAsFixed(0)}');
+    report.writeln('================================');
+    report.writeln('');
+
+    final connected = await PlatformPrinterService.isConnected();
+    if (connected) {
+      await PlatformPrinterService.printText(report.toString());
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✓ Report printed'), backgroundColor: Go2Colors.success));
+    } else {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Printer not connected'), backgroundColor: Go2Colors.error));
+    }
+  }
+
+  Widget _buildBookingsReportTab() {
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: ListView(
+        padding: const EdgeInsets.all(Go2Spacing.lg),
+        children: [
+          Row(
+            children: [
+              _bookingSummaryCard('Booked', _bookingsBooked, Go2Colors.primary),
+              const SizedBox(width: 8),
+              _bookingSummaryCard('Collected', _bookingsCollected, Go2Colors.success),
+              const SizedBox(width: 8),
+              _bookingSummaryCard('Outstanding', _bookingsOutstanding, Go2Colors.error),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (_bookings.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 48),
+              child: Center(
+                child: Text('No bookings yet',
+                    style: TextStyle(color: Go2Colors.textHint, fontSize: 14)),
+              ),
+            )
+          else
+            ..._bookings.map(_bookingReportRow),
+        ],
+      ),
+    );
+  }
+
+  Widget _bookingSummaryCard(String label, double value, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+        decoration: BoxDecoration(
+          color: Go2Colors.surface,
+          borderRadius: BorderRadius.circular(Go2Radius.md),
+          border: Border.all(color: Go2Colors.divider),
+        ),
+        child: Column(
+          children: [
+            Text(label, style: const TextStyle(fontSize: 11, color: Go2Colors.textSecondary)),
+            const SizedBox(height: 4),
+            Text('Rs. ${value.toStringAsFixed(0)}',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: color)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _bookingReportRow(Booking b) {
+    final balance = b.balance < 0 ? 0.0 : b.balance;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Go2Radius.md)),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(b.customerName.isEmpty ? 'Customer' : b.customerName,
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+            if (b.vehicleNumber != null && b.vehicleNumber!.isNotEmpty)
+              Text(b.vehicleNumber!,
+                  style: const TextStyle(fontSize: 12, color: Go2Colors.textSecondary)),
+            const Divider(height: 14),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _miniAmount('Total', b.totalFare, Go2Colors.textPrimary),
+                _miniAmount('Paid', b.amountPaid, Go2Colors.success),
+                _miniAmount('Balance', balance,
+                    b.isPaid ? Go2Colors.success : Go2Colors.error),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _miniAmount(String label, double value, Color color) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 11, color: Go2Colors.textHint)),
+        const SizedBox(height: 2),
+        Text('Rs. ${value.toStringAsFixed(0)}',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: color)),
       ],
     );
   }

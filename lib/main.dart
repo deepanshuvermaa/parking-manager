@@ -15,6 +15,7 @@ import 'screens/vehicle_entry_screen.dart';
 import 'screens/vehicle_exit_screen.dart';
 import 'screens/slot_management_screen.dart';
 import 'screens/reports_screen.dart';
+import 'screens/bookings_screen.dart';
 import 'screens/subscription_screen.dart';
 import 'screens/simple_settings_screen.dart';
 import 'screens/simple_printer_settings_screen.dart';
@@ -96,34 +97,26 @@ class MainNavScreenState extends State<MainNavScreen> {
     final role = context.watch<AuthProvider>().userRole;
     final isStaffOnly = role == 'staff';
 
-    final maxIndex = isStaffOnly ? 2 : 3;
-    final safeIndex = _currentIndex.clamp(0, maxIndex);
+    // Build aligned parallel lists so indices always match the nav items.
+    // Home/Entry/Exit stay at 0/1/2 (dashboard cards reference those indices).
+    final List<Widget> screens = [
+      DashboardScreen(onTabSwitch: switchToTab),
+      const VehicleEntryScreen(),
+      const VehicleExitScreen(),
+      if (!isStaffOnly) const ReportsScreen(),
+      const BookingsScreen(),
+    ];
 
-    // Only build the active screen - no IndexedStack
-    Widget body;
-    switch (safeIndex) {
-      case 0:
-        body = DashboardScreen(onTabSwitch: switchToTab);
-        break;
-      case 1:
-        body = const VehicleEntryScreen();
-        break;
-      case 2:
-        body = const VehicleExitScreen();
-        break;
-      case 3:
-        body = const ReportsScreen();
-        break;
-      default:
-        body = DashboardScreen(onTabSwitch: switchToTab);
-    }
-
-    final navItems = [
+    final navItems = <BottomNavigationBarItem>[
       const BottomNavigationBarItem(icon: Icon(Icons.home_rounded, size: 22), label: 'Home'),
       const BottomNavigationBarItem(icon: Icon(Icons.add_circle_rounded, size: 28), label: 'Entry'),
       const BottomNavigationBarItem(icon: Icon(Icons.exit_to_app_rounded, size: 22), label: 'Exit'),
       if (!isStaffOnly) const BottomNavigationBarItem(icon: Icon(Icons.bar_chart_rounded, size: 22), label: 'Reports'),
+      const BottomNavigationBarItem(icon: Icon(Icons.event_note_rounded, size: 22), label: 'Bookings'),
     ];
+
+    final safeIndex = _currentIndex.clamp(0, screens.length - 1);
+    final Widget body = screens[safeIndex];
 
     return Scaffold(
       body: body,
@@ -133,6 +126,7 @@ class MainNavScreenState extends State<MainNavScreen> {
           border: Border(top: BorderSide(color: Go2Colors.divider, width: 0.5)),
         ),
         child: BottomNavigationBar(
+          type: BottomNavigationBarType.fixed,
           currentIndex: safeIndex,
           onTap: switchToTab,
           items: navItems,

@@ -33,6 +33,8 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
   bool _saved = false;
   bool _showExtraFields = false;
   bool _enableGst = false;
+  bool _gstOnParking = true;
+  bool _gstOnBooking = true;
   double _gstRate = 18.0;
   final _gstinCtrl = TextEditingController();
   final _gstRateCtrl = TextEditingController(text: '18');
@@ -41,6 +43,22 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  /// Read a double safely — legacy builds may have stored some numeric keys as int,
+  /// and getDouble() throws a type-cast error on those. Fall back to int, then default.
+  double _safeDouble(SharedPreferences p, String key, double fallback) {
+    final v = p.get(key);
+    if (v is double) return v;
+    if (v is int) return v.toDouble();
+    return fallback;
+  }
+
+  int _safeInt(SharedPreferences p, String key, int fallback) {
+    final v = p.get(key);
+    if (v is int) return v;
+    if (v is double) return v.toInt();
+    return fallback;
   }
 
   Future<void> _load() async {
@@ -54,10 +72,12 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
       _autoPrint = p.getBool('auto_print') ?? true;
       _autoPrintExit = p.getBool('auto_print_exit') ?? true;
       _showQr = p.getBool('bill_show_qr_code') ?? true;
-      _paperWidth = p.getInt('paper_width') ?? 32;
+      _paperWidth = _safeInt(p, 'paper_width', 32);
       _showExtraFields = p.getBool('show_extra_fields') ?? false;
       _enableGst = p.getBool('enable_gst') ?? false;
-      _gstRate = p.getDouble('gst_rate') ?? 18.0;
+      _gstOnParking = p.getBool('gst_on_parking') ?? true;
+      _gstOnBooking = p.getBool('gst_on_booking') ?? true;
+      _gstRate = _safeDouble(p, 'gst_rate', 18.0);
       _gstRateCtrl.text = _gstRate.toStringAsFixed(_gstRate == _gstRate.roundToDouble() ? 0 : 1);
       _gstinCtrl.text = p.getString('gstin_number') ?? '';
     });
@@ -76,6 +96,8 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
     await p.setInt('paper_width', _paperWidth);
     await p.setBool('show_extra_fields', _showExtraFields);
     await p.setBool('enable_gst', _enableGst);
+    await p.setBool('gst_on_parking', _gstOnParking);
+    await p.setBool('gst_on_booking', _gstOnBooking);
     await p.setDouble('gst_rate', _gstRate);
     await p.setString('gstin_number', _gstinCtrl.text.trim());
     SettingsSyncService.syncToBackend(widget.token);
@@ -189,6 +211,22 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
               onChanged: (v) { setState(() => _enableGst = v); _save(); },
             ),
             if (_enableGst) ...[
+              const Divider(height: 1),
+              SwitchListTile(
+                dense: true, activeColor: Go2Colors.primary,
+                title: const Text('Apply on Parking'),
+                subtitle: const Text('GST on hourly parking charges'),
+                value: _gstOnParking,
+                onChanged: (v) { setState(() => _gstOnParking = v); _save(); },
+              ),
+              const Divider(height: 1),
+              SwitchListTile(
+                dense: true, activeColor: Go2Colors.primary,
+                title: const Text('Apply on Booking'),
+                subtitle: const Text('GST on booking fare'),
+                value: _gstOnBooking,
+                onChanged: (v) { setState(() => _gstOnBooking = v); _save(); },
+              ),
               const Divider(height: 1),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

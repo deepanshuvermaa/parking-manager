@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../providers/auth_provider.dart';
@@ -11,6 +10,7 @@ import '../services/simple_vehicle_service.dart';
 import '../services/simple_bluetooth_service.dart';
 import '../services/platform_printer_service.dart';
 import '../services/receipt_service.dart';
+import '../services/gst_service.dart';
 import '../services/upi_qr_service.dart';
 import '../models/simple_vehicle.dart';
 import '../theme/app_theme.dart';
@@ -72,7 +72,7 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
     });
   }
 
-  void _showExitConfirmation(SimpleVehicle vehicle) {
+  Future<void> _showExitConfirmation(SimpleVehicle vehicle) async {
     final duration = DateTime.now().difference(vehicle.entryTime);
     final hours = duration.inHours;
     final mins = duration.inMinutes.remainder(60);
@@ -87,6 +87,14 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
             minimumRate: vehicle.minimumRate,
           );
 
+    // GST — single source of truth shared with dashboard + receipts
+    final gst = await GstService.compute(amount: amount, isBooking: isBooking);
+    final applyGst = gst.applies;
+    final gstRate = gst.rate;
+    final gstAmount = gst.gstAmount;
+    final totalWithGst = gst.total;
+
+    if (!mounted) return;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -151,9 +159,32 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
                 ],
               ),
             ),
+
+            // GST breakdown — shown only when GST applies, mirrors the receipt
+            if (applyGst) ...[
+              const SizedBox(height: Go2Spacing.md),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: Go2Spacing.lg, vertical: Go2Spacing.md),
+                decoration: BoxDecoration(
+                  color: Go2Colors.surface,
+                  borderRadius: BorderRadius.circular(Go2Radius.md),
+                  border: Border.all(color: Go2Colors.divider),
+                ),
+                child: Column(children: [
+                  _gstRow('Subtotal', '₹${amount.toStringAsFixed(0)}'),
+                  const SizedBox(height: 6),
+                  _gstRow('GST @${gstRate.toStringAsFixed(gstRate == gstRate.roundToDouble() ? 0 : 1)}%', '₹${gstAmount.toStringAsFixed(2)}'),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Divider(height: 1),
+                  ),
+                  _gstRow('Total Payable', '₹${totalWithGst.toStringAsFixed(0)}', bold: true),
+                ]),
+              ),
+            ],
             const SizedBox(height: Go2Spacing.xl),
 
-            // UPI QR Code (if configured)
+            // UPI QR Code (if configured) — charge the GST-inclusive total
             FutureBuilder<Map<String, String?>>(
               future: UpiQrService.getConfig(),
               builder: (context, snapshot) {
@@ -164,7 +195,7 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
                     UpiQrService.buildPaymentQR(
                       vpa: snapshot.data!['vpa']!,
                       merchantName: snapshot.data!['name'] ?? 'Go2-Parking',
-                      amount: amount,
+                      amount: totalWithGst,
                       vehicleNumber: vehicle.vehicleNumber,
                       size: 120,
                     ),
@@ -257,6 +288,24 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
         );
       }
     }
+  }
+
+  Widget _gstRow(String label, String value, {bool bold = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: TextStyle(
+          fontSize: bold ? 15 : 13,
+          fontWeight: bold ? FontWeight.w700 : FontWeight.w400,
+          color: bold ? Go2Colors.textPrimary : Go2Colors.textSecondary,
+        )),
+        Text(value, style: TextStyle(
+          fontSize: bold ? 18 : 13,
+          fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
+          color: bold ? Go2Colors.primary : Go2Colors.textPrimary,
+        )),
+      ],
+    );
   }
 
   IconData _vehicleIcon(String type) {

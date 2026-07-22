@@ -3,6 +3,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'dart:convert';
 import '../models/simple_vehicle.dart';
+import '../models/booking.dart';
 
 /// Local SQLite database service for offline data persistence
 /// Stores vehicles, settings, and sync queue for offline functionality
@@ -25,7 +26,7 @@ class LocalDatabaseService {
 
     return await openDatabase(
       path,
-      version: 6,
+      version: 7,
       onCreate: (db, version) async {
         print('🗄️ Creating local database...');
 
@@ -82,6 +83,9 @@ class LocalDatabaseService {
           )
         ''');
 
+        // Bookings table (separate module — not related to parking/vehicles)
+        await _createBookingsTable(db);
+
         // Create indexes
         await db.execute('CREATE INDEX idx_vehicles_status ON vehicles(status)');
         await db.execute('CREATE INDEX idx_vehicles_synced ON vehicles(synced)');
@@ -122,8 +126,52 @@ class LocalDatabaseService {
             await db.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_vehicles_ticket ON vehicles(ticket_id)');
           } catch (_) {}
         }
+
+        if (oldVersion < 7) {
+          // Bookings module — separate tables
+          try { await _createBookingsTable(db); } catch (_) {}
+        }
       },
     );
+  }
+
+  /// Create the bookings + booking_payments tables (offline mirror of backend)
+  static Future<void> _createBookingsTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS bookings (
+        id TEXT PRIMARY KEY,
+        user_id TEXT,
+        booking_number TEXT,
+        customer_name TEXT,
+        customer_mobile TEXT,
+        vehicle_number TEXT,
+        vehicle_type TEXT,
+        driver_name TEXT,
+        driver_mobile TEXT,
+        from_location TEXT,
+        to_location TEXT,
+        total_fare REAL DEFAULT 0,
+        amount_paid REAL DEFAULT 0,
+        status TEXT DEFAULT 'partial',
+        remarks TEXT,
+        booking_date TEXT,
+        synced INTEGER DEFAULT 0,
+        created_at TEXT,
+        updated_at TEXT
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS booking_payments (
+        id TEXT PRIMARY KEY,
+        booking_id TEXT NOT NULL,
+        amount REAL NOT NULL,
+        note TEXT,
+        paid_at TEXT,
+        synced INTEGER DEFAULT 0
+      )
+    ''');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_bookings_synced ON bookings(synced)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_bpay_booking ON booking_payments(booking_id)');
   }
 
   /// Create a backup copy of the database before any migration
@@ -467,6 +515,169 @@ class LocalDatabaseService {
   }
 
   // ============================================
+  // BOOKING OPERATIONS (separate module)
+  // ============================================
+
+  /// Save (insert or replace) a booking locally
+  static Future<void> saveBooking(Booking booking, {bool synced = true}) async {
+    final db = await database;
+    final now = DateTime.now().toIso8601String();
+    await db.insert(
+      'bookings',
+      {
+        'id': booking.id,
+        'user_id': booking.userId,
+        'booking_number': booking.bookingNumber,
+        'customer_name': booking.customerName,
+        'customer_mobile': booking.customerMobile,
+        'vehicle_number': booking.vehicleNumber,
+        'vehicle_type': booking.vehicleType,
+        'driver_name': booking.driverName,
+        'driver_mobile': booking.driverMobile,
+        'from_location': booking.fromLocation,
+        'to_location': booking.toLocation,
+        'total_fare': booking.totalFare,
+        'amount_paid': booking.amountPaid,
+        'status': booking.status,
+        'remarks': booking.remarks,
+        'booking_date': booking.bookingDate.toIso8601String(),
+        'synced': synced ? 1 : 0,
+        'created_at': now,
+        'updated_at': now,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  /// Batch save bookings in a single transaction (backend pull)
+  static Future<void> batchSaveBookings(List<Booking> bookings, {bool synced = true}) async {
+    final db = await database;
+    final batch = db.batch();
+    final now = DateTime.now().toIso8601String();
+    for (var b in bookings) {
+      batch.insert(
+        'bookings',
+        {
+          'id': b.id,
+          'user_id': b.userId,
+          'booking_number': b.bookingNumber,
+          'customer_name': b.customerName,
+          'customer_mobile': b.customerMobile,
+          'vehicle_number': b.vehicleNumber,
+          'vehicle_type': b.vehicleType,
+          'driver_name': b.driverName,
+          'driver_mobile': b.driverMobile,
+          'from_location': b.fromLocation,
+          'to_location': b.toLocation,
+          'total_fare': b.totalFare,
+          'amount_paid': b.amountPaid,
+          'status': b.status,
+          'remarks': b.remarks,
+          'booking_date': b.bookingDate.toIso8601String(),
+          'synced': synced ? 1 : 0,
+          'created_at': now,
+          'updated_at': now,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+    await batch.commit(noResult: true);
+  }
+
+  /// Update a booking's payment/status fields locally
+  static Future<void> updateBooking(Booking booking, {bool synced = true}) async {
+    final db = await database;
+    await db.update(
+      'bookings',
+      {
+        'total_fare': booking.totalFare,
+        'amount_paid': booking.amountPaid,
+        'status': booking.status,
+        'synced': synced ? 1 : 0,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [booking.id],
+    );
+  }
+
+  /// Get all bookings (most recent first)
+  static Future<List<Booking>> getBookings() async {
+    final db = await database;
+    final maps = await db.query('bookings', orderBy: 'booking_date DESC');
+    return maps.map(_mapToBooking).toList();
+  }
+
+  /// Get unsynced bookings (for background push)
+  static Future<List<Booking>> getUnsyncedBookings() async {
+    final db = await database;
+    final maps = await db.query('bookings',
+        where: 'synced = ?', whereArgs: [0], orderBy: 'created_at ASC');
+    return maps.map(_mapToBooking).toList();
+  }
+
+  /// Mark a booking as synced
+  static Future<void> markBookingSynced(String bookingId) async {
+    final db = await database;
+    await db.update('bookings', {'synced': 1},
+        where: 'id = ?', whereArgs: [bookingId]);
+  }
+
+  /// Delete a booking (used when swapping local id → backend id)
+  static Future<void> deleteBooking(String bookingId) async {
+    final db = await database;
+    await db.delete('bookings', where: 'id = ?', whereArgs: [bookingId]);
+    await db.delete('booking_payments', where: 'booking_id = ?', whereArgs: [bookingId]);
+  }
+
+  /// Insert a payment row locally
+  static Future<void> insertBookingPayment({
+    required String id,
+    required String bookingId,
+    required double amount,
+    String? note,
+    bool synced = false,
+  }) async {
+    final db = await database;
+    await db.insert(
+      'booking_payments',
+      {
+        'id': id,
+        'booking_id': bookingId,
+        'amount': amount,
+        'note': note,
+        'paid_at': DateTime.now().toIso8601String(),
+        'synced': synced ? 1 : 0,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  /// Convert a DB map to a Booking
+  static Booking _mapToBooking(Map<String, dynamic> m) {
+    return Booking(
+      id: m['id']?.toString() ?? '',
+      userId: m['user_id']?.toString(),
+      bookingNumber: m['booking_number'],
+      customerName: m['customer_name'] ?? '',
+      customerMobile: m['customer_mobile'],
+      vehicleNumber: m['vehicle_number'],
+      vehicleType: m['vehicle_type'],
+      driverName: m['driver_name'],
+      driverMobile: m['driver_mobile'],
+      fromLocation: m['from_location'],
+      toLocation: m['to_location'],
+      totalFare: (m['total_fare'] as num?)?.toDouble() ?? 0,
+      amountPaid: (m['amount_paid'] as num?)?.toDouble() ?? 0,
+      status: m['status'] ?? 'partial',
+      remarks: m['remarks'],
+      bookingDate: m['booking_date'] != null
+          ? DateTime.parse(m['booking_date'])
+          : DateTime.now(),
+    );
+  }
+
+  // ============================================
   // SYNC QUEUE OPERATIONS
   // ============================================
 
@@ -583,6 +794,8 @@ class LocalDatabaseService {
     await db.delete('vehicles');
     await db.delete('sync_queue');
     await db.delete('user_settings');
+    try { await db.delete('bookings'); } catch (_) {}
+    try { await db.delete('booking_payments'); } catch (_) {}
     print('🗑️ All local data cleared');
   }
 

@@ -615,6 +615,155 @@ app.post('/api/vehicles/sync', verifyToken, checkTrialExpiry, async (req, res) =
 });
 
 // ================================
+// BOOKINGS MANAGEMENT ENDPOINTS (separate module — not parking/vehicles)
+// ================================
+
+// Get Bookings
+app.get('/api/bookings', verifyToken, checkTrialExpiry, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM bookings WHERE user_id = $1 ORDER BY booking_date DESC LIMIT 500',
+      [req.userId]
+    );
+    res.json({
+      success: true,
+      data: { bookings: result.rows },
+      message: 'Bookings retrieved successfully'
+    });
+  } catch (error) {
+    console.error('Get bookings error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// Create Booking
+app.post('/api/bookings', verifyToken, checkTrialExpiry, async (req, res) => {
+  try {
+    const b = req.originalBody || req.body;
+    const rb = req.body;
+
+    const data = {
+      bookingNumber: b.bookingNumber || rb.booking_number || null,
+      customerName: b.customerName || rb.customer_name || null,
+      customerMobile: b.customerMobile || rb.customer_mobile || null,
+      vehicleNumber: b.vehicleNumber || rb.vehicle_number || null,
+      vehicleType: b.vehicleType || rb.vehicle_type || null,
+      driverName: b.driverName || rb.driver_name || null,
+      driverMobile: b.driverMobile || rb.driver_mobile || null,
+      fromLocation: b.fromLocation || rb.from_location || null,
+      toLocation: b.toLocation || rb.to_location || null,
+      totalFare: b.totalFare != null ? b.totalFare : (rb.total_fare != null ? rb.total_fare : 0),
+      amountPaid: b.amountPaid != null ? b.amountPaid : (rb.amount_paid != null ? rb.amount_paid : 0),
+      status: b.status || rb.status || 'partial',
+      remarks: b.remarks || rb.remarks || null,
+      bookingDate: b.bookingDate || rb.booking_date || new Date(),
+    };
+
+    if (!data.customerName) {
+      return res.status(400).json({ success: false, error: 'Customer name is required' });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO bookings (user_id, booking_number, customer_name, customer_mobile, vehicle_number, vehicle_type, driver_name, driver_mobile, from_location, to_location, total_fare, amount_paid, status, remarks, booking_date)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+       RETURNING *`,
+      [
+        req.userId,
+        data.bookingNumber,
+        data.customerName,
+        data.customerMobile,
+        data.vehicleNumber,
+        data.vehicleType,
+        data.driverName,
+        data.driverMobile,
+        data.fromLocation,
+        data.toLocation,
+        data.totalFare,
+        data.amountPaid,
+        data.status,
+        data.remarks,
+        data.bookingDate,
+      ]
+    );
+
+    const booking = result.rows[0];
+
+    // Record the advance as the first payment (if any)
+    if (Number(data.amountPaid) > 0) {
+      await pool.query(
+        'INSERT INTO booking_payments (booking_id, amount, note) VALUES ($1, $2, $3)',
+        [booking.id, data.amountPaid, 'Advance']
+      );
+    }
+
+    await logAudit(req.userId, 'booking_create', 'booking', booking.id, null, booking, req);
+
+    res.status(201).json({
+      success: true,
+      data: { booking },
+      message: 'Booking created successfully'
+    });
+  } catch (error) {
+    console.error('Create booking error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// Add Payment to a Booking (multi-payment)
+app.post('/api/bookings/:id/payments', verifyToken, checkTrialExpiry, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const b = req.originalBody || req.body;
+    const rb = req.body;
+    const amount = Number(b.amount != null ? b.amount : rb.amount);
+    const note = b.note || rb.note || null;
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ success: false, error: 'Valid payment amount is required' });
+    }
+
+    // Ensure booking belongs to the user
+    const bookingResult = await pool.query(
+      'SELECT * FROM bookings WHERE id = $1 AND user_id = $2',
+      [id, req.userId]
+    );
+    if (bookingResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Booking not found' });
+    }
+
+    // Insert payment row
+    await pool.query(
+      'INSERT INTO booking_payments (booking_id, amount, note) VALUES ($1, $2, $3)',
+      [id, amount, note]
+    );
+
+    // Increment amount_paid and recompute status
+    const result = await pool.query(
+      `UPDATE bookings
+       SET amount_paid = amount_paid + $1,
+           status = CASE WHEN (amount_paid + $1) >= total_fare AND total_fare > 0 THEN 'paid' ELSE 'partial' END,
+           updated_at = NOW()
+       WHERE id = $2
+       RETURNING *`,
+      [amount, id]
+    );
+
+    const booking = result.rows[0];
+
+    await logAudit(req.userId, 'booking_payment', 'booking', id, bookingResult.rows[0], booking, req);
+
+    res.json({
+      success: true,
+      data: { booking },
+      message: 'Payment recorded successfully'
+    });
+  } catch (error) {
+    console.error('Add booking payment error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// ================================
 // SETTINGS MANAGEMENT ENDPOINTS
 // ================================
 
