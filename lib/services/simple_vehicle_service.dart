@@ -503,6 +503,11 @@ class SimpleVehicleService {
         .fold(0.0, (sum, v) => sum + (v.amount ?? 0));
   }
 
+  /// Get ALL exited vehicles from DB (for reports — full history)
+  static Future<List<SimpleVehicle>> getAllExitedVehicles() async {
+    return await LocalDatabaseService.getAllExitedVehicles();
+  }
+
   /// Get vehicles for reports with date range filter (from DB, not cache)
   static Future<List<SimpleVehicle>> getVehiclesForReport({
     required DateTime startDate,

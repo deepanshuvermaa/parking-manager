@@ -386,6 +386,15 @@ class LocalDatabaseService {
     return _mapsToVehicles(maps);
   }
 
+  /// Get ALL exited vehicles from DB (for reports — no date limit)
+  static Future<List<SimpleVehicle>> getAllExitedVehicles() async {
+    final db = await database;
+    final maps = await db.rawQuery(
+      "SELECT * FROM vehicles WHERE status = 'exited' ORDER BY entry_time DESC"
+    );
+    return _mapsToVehicles(maps);
+  }
+
   /// Get vehicles by date range (for reports — queries DB directly)
   static Future<List<SimpleVehicle>> getVehiclesByDateRange({
     required DateTime startDate,

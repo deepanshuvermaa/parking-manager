@@ -430,6 +430,27 @@ async function runStartupMigrations(pool) {
       console.log('✅ booked_by + unique ticket constraint applied');
     }
 
+    // ========================================
+    // MIGRATION 8: Add GST settings columns + show_extra_fields
+    // ========================================
+    const gstCheck = await pool.query(
+      "SELECT * FROM schema_migrations WHERE migration_name = 'add_gst_settings'"
+    );
+    if (gstCheck.rows.length === 0) {
+      console.log('📦 Adding GST settings columns...');
+      const gstCols = [
+        'enable_gst BOOLEAN DEFAULT false',
+        'gst_rate REAL DEFAULT 18.0',
+        'gstin_number VARCHAR(50)',
+        'show_extra_fields BOOLEAN DEFAULT false',
+      ];
+      for (const col of gstCols) {
+        await pool.query('ALTER TABLE settings ADD COLUMN IF NOT EXISTS ' + col);
+      }
+      await pool.query("INSERT INTO schema_migrations (migration_name) VALUES ('add_gst_settings')");
+      console.log('✅ GST settings columns added');
+    }
+
   } catch (error) {
     console.error('❌ Migration error:', error);
     console.error('⚠️ Server will continue without new features');

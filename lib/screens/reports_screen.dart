@@ -19,11 +19,12 @@ class _ReportsScreenState extends State<ReportsScreen>
   late TabController _tabController;
   List<SimpleVehicle> _vehicles = [];
   bool _isLoading = true;
+  DateTimeRange? _customRange;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _loadData();
   }
 
@@ -36,9 +37,7 @@ class _ReportsScreenState extends State<ReportsScreen>
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      final token = context.read<AuthProvider>().token ?? '';
-      final all = await SimpleVehicleService.getVehicles(token);
-      _vehicles = all.where((v) => v.status == 'exited').toList();
+      _vehicles = await SimpleVehicleService.getAllExitedVehicles();
     } catch (e) {
       print('Reports load error: $e');
     }
@@ -46,8 +45,8 @@ class _ReportsScreenState extends State<ReportsScreen>
   }
 
   Future<void> _printReport() async {
-    final period = ['Today', 'This Week', 'This Month'][_tabController.index];
-    final vehicles = [_getExitedToday(), _getExitedThisWeek(), _getExitedThisMonth()][_tabController.index];
+    final period = ['Today', 'This Week', 'This Month', 'Custom'][_tabController.index];
+    final vehicles = [_getExitedToday(), _getExitedThisWeek(), _getExitedThisMonth(), _getExitedCustom()][_tabController.index];
     final revenue = vehicles.fold<double>(0, (sum, v) => sum + (v.amount ?? 0));
     final count = vehicles.length;
 
@@ -108,6 +107,41 @@ class _ReportsScreenState extends State<ReportsScreen>
         v.exitTime!.month == now.month).toList();
   }
 
+  List<SimpleVehicle> _getExitedCustom() {
+    if (_customRange == null) return _vehicles.where((v) => v.status == 'exited').toList();
+    final start = DateTime(_customRange!.start.year, _customRange!.start.month, _customRange!.start.day);
+    final end = DateTime(_customRange!.end.year, _customRange!.end.month, _customRange!.end.day, 23, 59, 59);
+    return _vehicles.where((v) =>
+        v.status == 'exited' &&
+        v.exitTime != null &&
+        v.exitTime!.isAfter(start) &&
+        v.exitTime!.isBefore(end)).toList();
+  }
+
+  Future<void> _pickDateRange() async {
+    final now = DateTime.now();
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2024),
+      lastDate: now,
+      initialDateRange: _customRange ?? DateTimeRange(
+        start: now.subtract(const Duration(days: 30)),
+        end: now,
+      ),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(context).colorScheme.copyWith(primary: Go2Colors.primary),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() => _customRange = picked);
+    }
+  }
+
   double _totalRevenue(List<SimpleVehicle> vehicles) =>
       vehicles.fold(0, (sum, v) => sum + (v.amount ?? 0));
 
@@ -162,6 +196,7 @@ class _ReportsScreenState extends State<ReportsScreen>
             Tab(text: 'Today'),
             Tab(text: 'Week'),
             Tab(text: 'Month'),
+            Tab(text: 'Custom'),
           ],
         ),
       ),
@@ -173,8 +208,50 @@ class _ReportsScreenState extends State<ReportsScreen>
                 _buildReportTab(_getExitedToday(), 'today'),
                 _buildReportTab(_getExitedThisWeek(), 'week'),
                 _buildReportTab(_getExitedThisMonth(), 'month'),
+                _buildCustomReportTab(),
               ],
             ),
+    );
+  }
+
+  Widget _buildCustomReportTab() {
+    final vehicles = _getExitedCustom();
+    final hasRange = _customRange != null;
+    final rangeLabel = hasRange
+        ? '${_customRange!.start.day}/${_customRange!.start.month}/${_customRange!.start.year} - ${_customRange!.end.day}/${_customRange!.end.month}/${_customRange!.end.year}'
+        : 'All Time';
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _pickDateRange,
+                  icon: const Icon(Icons.date_range, size: 18),
+                  label: Text(rangeLabel, style: const TextStyle(fontSize: 13)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Go2Colors.primary,
+                    side: const BorderSide(color: Go2Colors.primary),
+                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                  ),
+                ),
+              ),
+              if (hasRange) ...[
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.clear, size: 20),
+                  tooltip: 'Show All Time',
+                  onPressed: () => setState(() => _customRange = null),
+                ),
+              ],
+            ],
+          ),
+        ),
+        Expanded(child: _buildReportTab(vehicles, 'custom')),
+      ],
     );
   }
 
@@ -259,7 +336,7 @@ class _ReportsScreenState extends State<ReportsScreen>
           const SizedBox(height: Go2Spacing.xl),
 
           // Peak hours
-          if (period == 'today' || period == 'week') ...[
+          if (period == 'today' || period == 'week' || period == 'custom') ...[
             Text('Peak Hours', style: theme.textTheme.titleMedium),
             const SizedBox(height: Go2Spacing.md),
             Card(

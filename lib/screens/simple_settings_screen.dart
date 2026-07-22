@@ -32,6 +32,10 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
   int _paperWidth = 32;
   bool _saved = false;
   bool _showExtraFields = false;
+  bool _enableGst = false;
+  double _gstRate = 18.0;
+  final _gstinCtrl = TextEditingController();
+  final _gstRateCtrl = TextEditingController(text: '18');
 
   @override
   void initState() {
@@ -52,6 +56,10 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
       _showQr = p.getBool('bill_show_qr_code') ?? true;
       _paperWidth = p.getInt('paper_width') ?? 32;
       _showExtraFields = p.getBool('show_extra_fields') ?? false;
+      _enableGst = p.getBool('enable_gst') ?? false;
+      _gstRate = p.getDouble('gst_rate') ?? 18.0;
+      _gstRateCtrl.text = _gstRate.toStringAsFixed(_gstRate == _gstRate.roundToDouble() ? 0 : 1);
+      _gstinCtrl.text = p.getString('gstin_number') ?? '';
     });
   }
 
@@ -67,6 +75,9 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
     await p.setBool('bill_show_qr_code', _showQr);
     await p.setInt('paper_width', _paperWidth);
     await p.setBool('show_extra_fields', _showExtraFields);
+    await p.setBool('enable_gst', _enableGst);
+    await p.setDouble('gst_rate', _gstRate);
+    await p.setString('gstin_number', _gstinCtrl.text.trim());
     SettingsSyncService.syncToBackend(widget.token);
     setState(() => _saved = true);
     Future.delayed(const Duration(seconds: 2), () { if (mounted) setState(() => _saved = false); });
@@ -165,6 +176,65 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
               value: _showExtraFields,
               onChanged: (v) { setState(() => _showExtraFields = v); _save(); },
             ),
+          ]),
+
+          // Tax / GST
+          _section('Tax / GST'),
+          _card([
+            SwitchListTile(
+              dense: true, activeColor: Go2Colors.primary,
+              title: const Text('Enable GST'),
+              subtitle: const Text('Add GST to parking charges & booking fare'),
+              value: _enableGst,
+              onChanged: (v) { setState(() => _enableGst = v); _save(); },
+            ),
+            if (_enableGst) ...[
+              const Divider(height: 1),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                child: Row(children: [
+                  const Text('GST Rate:', style: TextStyle(fontSize: 14)),
+                  const SizedBox(width: 12),
+                  ...([5.0, 12.0, 18.0, 28.0].map((rate) => Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: ChoiceChip(
+                      label: Text('${rate.toInt()}%', style: const TextStyle(fontSize: 12)),
+                      selected: _gstRate == rate,
+                      selectedColor: Go2Colors.primary.withValues(alpha: 0.2),
+                      onSelected: (sel) {
+                        if (sel) {
+                          setState(() { _gstRate = rate; _gstRateCtrl.text = '${rate.toInt()}'; });
+                          _save();
+                        }
+                      },
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ))),
+                ]),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                child: TextField(
+                  controller: _gstRateCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Custom GST %', isDense: true,
+                    prefixIcon: Icon(Icons.percent, size: 18),
+                    border: InputBorder.none, enabledBorder: InputBorder.none,
+                    focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Go2Colors.primary)),
+                  ),
+                  onChanged: (v) {
+                    final parsed = double.tryParse(v);
+                    if (parsed != null && parsed > 0 && parsed <= 100) {
+                      _gstRate = parsed;
+                    }
+                  },
+                  onEditingComplete: _save,
+                ),
+              ),
+              const Divider(height: 1),
+              _input('GSTIN Number', _gstinCtrl, Icons.assignment_outlined),
+            ],
           ]),
 
           // Rates
@@ -276,5 +346,5 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
   );
 
   @override
-  void dispose() { _nameCtrl.dispose(); _addressCtrl.dispose(); _phoneCtrl.dispose(); _gstCtrl.dispose(); _upiCtrl.dispose(); super.dispose(); }
+  void dispose() { _nameCtrl.dispose(); _addressCtrl.dispose(); _phoneCtrl.dispose(); _gstCtrl.dispose(); _upiCtrl.dispose(); _gstinCtrl.dispose(); _gstRateCtrl.dispose(); super.dispose(); }
 }
