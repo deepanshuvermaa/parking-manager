@@ -35,6 +35,12 @@ class SettingsSyncService {
     'receipt_header', 'receipt_footer',
   ];
 
+  static String _snakeToCamel(String s) {
+    final parts = s.split('_');
+    if (parts.length <= 1) return s;
+    return parts.first + parts.skip(1).map((p) => p.isEmpty ? '' : p[0].toUpperCase() + p.substring(1)).join();
+  }
+
   static Future<void> syncToBackend(String token) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -71,13 +77,15 @@ class SettingsSyncService {
 
       final prefs = await SharedPreferences.getInstance();
       // Only restore keys we care about
+      // Backend dataTransform middleware returns camelCase, so check both forms
       for (final key in [..._keys, ..._extraKeys]) {
-        final v = data[key];
+        final v = data[key] ?? data[_snakeToCamel(key)];
         if (v == null) continue;
         if (v is String) await prefs.setString(key, v);
         else if (v is int) await prefs.setInt(key, v);
         else if (v is bool) await prefs.setBool(key, v);
         else if (v is double) await prefs.setDouble(key, v);
+        else if (v is num) await prefs.setDouble(key, v.toDouble());
         else if (v is List) await prefs.setStringList(key, v.cast<String>());
       }
     } catch (e) {

@@ -7,6 +7,10 @@ class ReceiptService {
   static const String ESC_BOLD_ON = '\x1B\x45\x01';
   static const String ESC_BOLD_OFF = '\x1B\x45\x00';
 
+  // Alignment commands
+  static const String ESC_ALIGN_CENTER = '\x1B\x61\x01';
+  static const String ESC_ALIGN_LEFT = '\x1B\x61\x00';
+
   // Size commands - ALL OPTIONS for complete customization
   static const String ESC_SIZE_NORMAL = '\x1D\x21\x00';           // 1x (normal)
   static const String ESC_SIZE_1_2X = '\x1D\x21\x10';            // 1.2x width only
@@ -93,6 +97,9 @@ class ReceiptService {
     // Build receipt
     final receipt = StringBuffer();
     final divider = '=' * paperWidth;
+
+    // Center-align entire receipt
+    receipt.write(ESC_ALIGN_CENTER);
 
     // Header - normal size
     receipt.writeln(divider);
@@ -296,6 +303,9 @@ class ReceiptService {
     final receipt = StringBuffer();
     final divider = '=' * paperWidth;
     final dashLine = '-' * paperWidth;
+
+    // Center-align entire receipt
+    receipt.write(ESC_ALIGN_CENTER);
 
     // Header
     receipt.writeln(divider);
@@ -505,6 +515,9 @@ class ReceiptService {
     final receipt = StringBuffer();
     final divider = '-' * paperWidth;
     final doubleDivider = '=' * paperWidth;
+
+    // Center-align entire receipt
+    receipt.write(ESC_ALIGN_CENTER);
 
     // Header - apply size AFTER centering, with adjusted width
     receipt.writeln(doubleDivider);
