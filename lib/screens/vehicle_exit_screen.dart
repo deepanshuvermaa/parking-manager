@@ -76,13 +76,16 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
     final duration = DateTime.now().difference(vehicle.entryTime);
     final hours = duration.inHours;
     final mins = duration.inMinutes.remainder(60);
-    final amount = SimpleVehicleService.calculateFee(
-      entryTime: vehicle.entryTime,
-      vehicleType: vehicle.vehicleType,
-      exitTime: DateTime.now(),
-      hourlyRate: vehicle.hourlyRate,
-      minimumRate: vehicle.minimumRate,
-    );
+    final isBooking = vehicle.fare != null && vehicle.fare! > 0;
+    final amount = isBooking
+        ? vehicle.fare!
+        : SimpleVehicleService.calculateFee(
+            entryTime: vehicle.entryTime,
+            vehicleType: vehicle.vehicleType,
+            exitTime: DateTime.now(),
+            hourlyRate: vehicle.hourlyRate,
+            minimumRate: vehicle.minimumRate,
+          );
 
     showModalBottomSheet(
       context: context,
@@ -137,13 +140,13 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
                   ])),
                   Container(width: 0.5, height: 40, color: Go2Colors.divider),
                   Expanded(child: Column(children: [
-                    const Icon(Icons.currency_rupee_rounded, color: Go2Colors.primary, size: 20),
+                    Icon(isBooking ? Icons.local_taxi_rounded : Icons.currency_rupee_rounded, color: Go2Colors.primary, size: 20),
                     const SizedBox(height: 4),
                     Text(
                       '₹${amount.toStringAsFixed(0)}',
                       style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Go2Colors.primary),
                     ),
-                    const Text('Amount', style: TextStyle(fontSize: 11, color: Go2Colors.textHint)),
+                    Text(isBooking ? 'Fare' : 'Amount', style: const TextStyle(fontSize: 11, color: Go2Colors.textHint)),
                   ])),
                 ],
               ),

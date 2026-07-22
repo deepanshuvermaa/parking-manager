@@ -235,8 +235,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final duration = DateTime.now().difference(v.entryTime);
     final h = duration.inHours;
     final m = duration.inMinutes.remainder(60);
+    final isBooking = v.fare != null && v.fare! > 0;
     final fee = (v.hourlyRate ?? 20) * (h + (m > 0 ? 1 : 0));
-    final amount = fee < (v.minimumRate ?? 20) ? (v.minimumRate ?? 20) : fee;
+    final amount = isBooking ? v.fare! : (fee < (v.minimumRate ?? 20) ? (v.minimumRate ?? 20) : fee);
 
     showModalBottomSheet(
       context: context,

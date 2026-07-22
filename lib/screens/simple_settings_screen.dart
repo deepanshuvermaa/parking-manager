@@ -192,24 +192,21 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
               const Divider(height: 1),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                child: Row(children: [
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   const Text('GST Rate:', style: TextStyle(fontSize: 14)),
-                  const SizedBox(width: 12),
-                  ...([5.0, 12.0, 18.0, 28.0].map((rate) => Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: ChoiceChip(
-                      label: Text('${rate.toInt()}%', style: const TextStyle(fontSize: 12)),
-                      selected: _gstRate == rate,
-                      selectedColor: Go2Colors.primary.withValues(alpha: 0.2),
-                      onSelected: (sel) {
-                        if (sel) {
-                          setState(() { _gstRate = rate; _gstRateCtrl.text = '${rate.toInt()}'; });
-                          _save();
-                        }
-                      },
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ))),
+                  const SizedBox(height: 8),
+                  Wrap(spacing: 6, runSpacing: 4, children: [5.0, 12.0, 18.0, 28.0].map((rate) => ChoiceChip(
+                    label: Text('${rate.toInt()}%', style: const TextStyle(fontSize: 12)),
+                    selected: _gstRate == rate,
+                    selectedColor: Go2Colors.primary.withValues(alpha: 0.2),
+                    onSelected: (sel) {
+                      if (sel) {
+                        setState(() { _gstRate = rate; _gstRateCtrl.text = '${rate.toInt()}'; });
+                        _save();
+                      }
+                    },
+                    visualDensity: VisualDensity.compact,
+                  )).toList()),
                 ]),
               ),
               Padding(
