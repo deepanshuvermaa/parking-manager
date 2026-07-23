@@ -24,7 +24,7 @@ class SettingsSyncService {
     // Receipt customization toggles
     'bill_show_business_name', 'bill_show_business_address', 'bill_show_business_phone',
     'bill_show_gst_number', 'bill_show_rate_info', 'bill_show_notes',
-    'bill_show_receipt_header', 'bill_show_receipt_footer',
+    'bill_show_receipt_header', 'bill_show_receipt_footer', 'bill_show_branding',
     // Receipt formatting (bold/size)
     'receipt_business_name_bold', 'receipt_business_name_size',
     'receipt_business_address_bold', 'receipt_business_address_size',

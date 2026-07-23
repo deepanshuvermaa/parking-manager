@@ -28,6 +28,9 @@ class ReceiptService {
   static const String ESC_SIZE_2X_BOLD = '\x1D\x21\x22\x1B\x45\x01';
   static const String ESC_NORMAL = '\x1D\x21\x00\x1B\x45\x00';   // Reset to normal
 
+  /// Branding text printed at the very bottom of receipts (when enabled).
+  static const String brandingText = 'Go2-Parkingsoftware';
+
   /// Get ESC/POS command based on size and bold settings
   static String getSizeCommand(double size, bool bold) {
     if (size >= 2.0) {
@@ -68,29 +71,17 @@ class ReceiptService {
     final showReceiptFooter = prefs.getBool('bill_show_receipt_footer') ?? true;
     final showRateInfo = prefs.getBool('bill_show_rate_info') ?? true;
     final showNotes = prefs.getBool('bill_show_notes') ?? true;
+    final showBranding = prefs.getBool('bill_show_branding') ?? true;
 
     // Get receipt customization settings
     final businessNameBold = prefs.getBool('receipt_business_name_bold') ?? true;
     final businessNameSize = prefs.getDouble('receipt_business_name_size') ?? 1.0;
-    final businessAddressBold = prefs.getBool('receipt_business_address_bold') ?? false;
-    final businessAddressSize = prefs.getDouble('receipt_business_address_size') ?? 1.0;
-    final businessPhoneBold = prefs.getBool('receipt_business_phone_bold') ?? false;
-    final businessPhoneSize = prefs.getDouble('receipt_business_phone_size') ?? 1.0;
 
     final ticketIdBold = prefs.getBool('receipt_ticket_id_bold') ?? true;
     final ticketIdSize = prefs.getDouble('receipt_ticket_id_size') ?? 1.5;
 
     final vehicleNumberBold = prefs.getBool('receipt_vehicle_number_bold') ?? true;
     final vehicleNumberSize = prefs.getDouble('receipt_vehicle_number_size') ?? 1.5;
-    final vehicleTypeBold = prefs.getBool('receipt_vehicle_type_bold') ?? true;
-    final vehicleTypeSize = prefs.getDouble('receipt_vehicle_type_size') ?? 1.0;
-
-    final travelHeaderBold = prefs.getBool('receipt_travel_header_bold') ?? true;
-    final travelHeaderSize = prefs.getDouble('receipt_travel_header_size') ?? 1.25;
-    final travelFromBold = prefs.getBool('receipt_travel_from_bold') ?? false;
-    final travelFromSize = prefs.getDouble('receipt_travel_from_size') ?? 1.0;
-    final travelToBold = prefs.getBool('receipt_travel_to_bold') ?? false;
-    final travelToSize = prefs.getDouble('receipt_travel_to_size') ?? 1.0;
 
     // Get rate info
     final hourlyRate = vehicle.hourlyRate ?? 0;
@@ -100,25 +91,25 @@ class ReceiptService {
     final receipt = StringBuffer();
     final divider = '=' * paperWidth;
 
-    // Center-align entire receipt
+    // Center-align entire receipt (hardware centering)
     receipt.write(ESC_ALIGN_CENTER);
 
     // Header - normal size
     receipt.writeln(divider);
     if (showBusinessName) {
       receipt.write(getSizeCommand(businessNameSize, businessNameBold));
-      receipt.writeln(centerText(businessName, paperWidth));
+      receipt.writeln(businessName);
       receipt.write(ESC_NORMAL);
     }
     if (showBusinessAddress && businessAddress.isNotEmpty) {
-      receipt.writeln(centerText(businessAddress, paperWidth));
+      receipt.writeln(businessAddress);
     }
     if (showBusinessPhone && businessPhone.isNotEmpty) {
-      receipt.writeln(centerText(businessPhone, paperWidth));
+      receipt.writeln(businessPhone);
     }
     receipt.writeln(divider);
     receipt.write(ESC_BOLD_ON);
-    receipt.writeln(centerText('PARKING RECEIPT', paperWidth));
+    receipt.writeln('PARKING RECEIPT');
     receipt.write(ESC_NORMAL);
     receipt.writeln(divider);
 
@@ -209,7 +200,7 @@ class ReceiptService {
     // QR Code - actual ESC/POS QR code for scanning
     final showQr = prefs.getBool('bill_show_qr_code') ?? true;
     if (showQr && vehicle.ticketId != null) {
-      receipt.writeln(centerText('SCAN TO EXIT', paperWidth));
+      receipt.writeln('SCAN TO EXIT');
       final qrData = '${vehicle.ticketId}|${vehicle.vehicleNumber}';
       receipt.write(_generateQrEscPos(qrData));
       receipt.writeln('');
@@ -235,9 +226,9 @@ class ReceiptService {
     }
 
     receipt.writeln(divider);
-    receipt.writeln(centerText('KEEP THIS RECEIPT SAFE', paperWidth));
+    receipt.writeln('KEEP THIS RECEIPT SAFE');
     receipt.writeln(divider);
-    receipt.writeln(centerText('Go2-Parking', paperWidth));
+    if (showBranding) receipt.writeln(brandingText);
     receipt.writeln('');
 
     return receipt.toString();
@@ -265,6 +256,7 @@ class ReceiptService {
     final showBusinessPhone = prefs.getBool('bill_show_business_phone') ?? true;
     final showGstNumber = prefs.getBool('bill_show_gst_number') ?? true;
     final showReceiptFooter = prefs.getBool('bill_show_receipt_footer') ?? true;
+    final showBranding = prefs.getBool('bill_show_branding') ?? true;
 
     // Get receipt customization settings
     final businessNameBold = prefs.getBool('receipt_business_name_bold') ?? true;
@@ -279,15 +271,6 @@ class ReceiptService {
 
     final vehicleNumberBold = prefs.getBool('receipt_vehicle_number_bold') ?? true;
     final vehicleNumberSize = prefs.getDouble('receipt_vehicle_number_size') ?? 1.5;
-    final vehicleTypeBold = prefs.getBool('receipt_vehicle_type_bold') ?? true;
-    final vehicleTypeSize = prefs.getDouble('receipt_vehicle_type_size') ?? 1.0;
-
-    final travelHeaderBold = prefs.getBool('receipt_travel_header_bold') ?? true;
-    final travelHeaderSize = prefs.getDouble('receipt_travel_header_size') ?? 1.25;
-    final travelFromBold = prefs.getBool('receipt_travel_from_bold') ?? false;
-    final travelFromSize = prefs.getDouble('receipt_travel_from_size') ?? 1.0;
-    final travelToBold = prefs.getBool('receipt_travel_to_bold') ?? false;
-    final travelToSize = prefs.getDouble('receipt_travel_to_size') ?? 1.0;
 
     final amountBold = prefs.getBool('receipt_amount_bold') ?? true;
     final amountSize = prefs.getDouble('receipt_amount_size') ?? 1.5;
@@ -304,29 +287,29 @@ class ReceiptService {
     final divider = '=' * paperWidth;
     final dashLine = '-' * paperWidth;
 
-    // Center-align entire receipt
+    // Center-align entire receipt (hardware centering)
     receipt.write(ESC_ALIGN_CENTER);
 
     // Header
     receipt.writeln(divider);
     if (showBusinessName) {
       receipt.write(getSizeCommand(businessNameSize, businessNameBold));
-      receipt.writeln(centerText(businessName, paperWidth));
+      receipt.writeln(businessName);
       receipt.write(ESC_NORMAL);
     }
     if (showBusinessAddress && businessAddress.isNotEmpty) {
       receipt.write(getSizeCommand(businessAddressSize, businessAddressBold));
-      receipt.writeln(centerText(businessAddress, paperWidth));
+      receipt.writeln(businessAddress);
       receipt.write(ESC_NORMAL);
     }
     if (showBusinessPhone && businessPhone.isNotEmpty) {
       receipt.write(getSizeCommand(businessPhoneSize, businessPhoneBold));
-      receipt.writeln(centerText(businessPhone, paperWidth));
+      receipt.writeln(businessPhone);
       receipt.write(ESC_NORMAL);
     }
     receipt.writeln(divider);
     receipt.write(ESC_BOLD_ON);
-    receipt.writeln(centerText('EXIT RECEIPT', paperWidth));
+    receipt.writeln('EXIT RECEIPT');
     receipt.write(ESC_NORMAL);
     receipt.writeln(divider);
 
@@ -404,16 +387,16 @@ class ReceiptService {
     }
 
     // Footer
-    receipt.writeln(centerText('PAID', paperWidth));
+    receipt.writeln('PAID');
     receipt.writeln(dashLine);
     if (showReceiptFooter && receiptFooter.isNotEmpty) {
       receipt.writeln(wrapText(receiptFooter, paperWidth));
       receipt.writeln(dashLine);
     }
     receipt.writeln(divider);
-    receipt.writeln(centerText('THANK YOU! VISIT AGAIN', paperWidth));
+    receipt.writeln('THANK YOU! VISIT AGAIN');
     receipt.writeln(divider);
-    receipt.writeln(centerText('Go2-Parking', paperWidth));
+    if (showBranding) receipt.writeln(brandingText);
     receipt.writeln('');
 
     return receipt.toString();
@@ -500,6 +483,7 @@ class ReceiptService {
     final businessPhone = prefs.getString('business_phone') ?? '';
     final receiptFooter = prefs.getString('receipt_footer') ?? 'Have a safe journey!';
     final paperWidth = prefs.getInt('paper_width') ?? 32;
+    final showBranding = prefs.getBool('bill_show_branding') ?? true;
 
     // Get taxi receipt customization settings (use same as parking for now)
     final businessNameBold = prefs.getBool('receipt_business_name_bold') ?? true;
@@ -515,27 +499,23 @@ class ReceiptService {
     final divider = '-' * paperWidth;
     final doubleDivider = '=' * paperWidth;
 
-    // Center-align entire receipt
+    // Center-align entire receipt (hardware centering)
     receipt.write(ESC_ALIGN_CENTER);
 
-    // Header - apply size AFTER centering, with adjusted width
+    // Header
     receipt.writeln(doubleDivider);
     receipt.write(getSizeCommand(businessNameSize, businessNameBold));
-    // Adjust centering width based on size multiplier
-    final businessNameWidth = businessNameSize > 1.0 ? (paperWidth / businessNameSize).round() : paperWidth;
-    receipt.writeln(centerText(businessName, businessNameWidth));
+    receipt.writeln(businessName);
     receipt.write(ESC_NORMAL);
     if (businessAddress.isNotEmpty) {
-      receipt.writeln(centerText(businessAddress, paperWidth));
+      receipt.writeln(businessAddress);
     }
     if (businessPhone.isNotEmpty) {
-      receipt.writeln(centerText('Tel: $businessPhone', paperWidth));
+      receipt.writeln('Tel: $businessPhone');
     }
     receipt.writeln('');
     receipt.write(getSizeCommand(1.2, true));
-    // Adjust centering width for 1.2x text size
-    final taxiBookingWidth = (paperWidth / 1.2).round();
-    receipt.writeln(centerText('TAXI BOOKING', taxiBookingWidth));
+    receipt.writeln('TAXI BOOKING');
     receipt.write(ESC_NORMAL);
     receipt.writeln(doubleDivider);
 
@@ -614,16 +594,12 @@ class ReceiptService {
       receipt.writeln('Subtotal: ${Helpers.formatCurrency(booking.fareAmount)}');
       receipt.writeln('GST @${gst.rateLabel}%: Rs. ${gst.gstAmount.toStringAsFixed(2)}');
       receipt.write(getSizeCommand(amountSize, amountBold));
-      final fareText = 'TOTAL: Rs. ${gst.total.toStringAsFixed(0)}';
-      final fareWidth = amountSize > 1.0 ? (paperWidth / amountSize).round() : paperWidth;
-      receipt.writeln(centerText(fareText, fareWidth));
+      receipt.writeln('TOTAL: Rs. ${gst.total.toStringAsFixed(0)}');
       receipt.write(ESC_NORMAL);
       if (gst.gstin.isNotEmpty) receipt.writeln('GSTIN: ${gst.gstin}');
     } else {
       receipt.write(getSizeCommand(amountSize, amountBold));
-      final fareText = 'FARE: ${Helpers.formatCurrency(booking.fareAmount)}';
-      final fareWidth = amountSize > 1.0 ? (paperWidth / amountSize).round() : paperWidth;
-      receipt.writeln(centerText(fareText, fareWidth));
+      receipt.writeln('FARE: ${Helpers.formatCurrency(booking.fareAmount)}');
       receipt.write(ESC_NORMAL);
     }
     receipt.writeln(doubleDivider);
@@ -652,11 +628,11 @@ class ReceiptService {
     // Footer
     receipt.writeln('');
     if (receiptFooter.isNotEmpty) {
-      receipt.writeln(centerText(receiptFooter, paperWidth));
+      receipt.writeln(receiptFooter);
     }
-    receipt.writeln(centerText('Thank You!', paperWidth));
+    receipt.writeln('Thank You!');
     receipt.writeln(doubleDivider);
-    receipt.writeln(centerText('Go2-Parking', paperWidth));
+    if (showBranding) receipt.writeln(brandingText);
     receipt.writeln('');
     receipt.writeln('');
     receipt.writeln('');
@@ -676,6 +652,7 @@ class ReceiptService {
     final businessAddress = prefs.getString('business_address') ?? '';
     final businessPhone = prefs.getString('business_phone') ?? '';
     final paperWidth = prefs.getInt('paper_width') ?? 32;
+    final showBranding = prefs.getBool('bill_show_branding') ?? true;
 
     final receipt = StringBuffer();
     final divider = '=' * paperWidth;
@@ -684,65 +661,76 @@ class ReceiptService {
     receipt.write(ESC_ALIGN_CENTER);
     receipt.writeln(divider);
     receipt.write(ESC_BOLD_ON);
-    receipt.writeln(centerText(businessName, paperWidth));
+    receipt.writeln(businessName);
     receipt.write(ESC_BOLD_OFF);
-    if (businessAddress.isNotEmpty) receipt.writeln(centerText(businessAddress, paperWidth));
-    if (businessPhone.isNotEmpty) receipt.writeln(centerText(businessPhone, paperWidth));
+    if (businessAddress.isNotEmpty) receipt.writeln(businessAddress);
+    if (businessPhone.isNotEmpty) receipt.writeln(businessPhone);
     receipt.writeln(divider);
     receipt.write(ESC_BOLD_ON);
-    receipt.writeln(centerText('BOOKING RECEIPT', paperWidth));
+    receipt.writeln('BOOKING RECEIPT');
     receipt.write(ESC_BOLD_OFF);
     receipt.writeln(divider);
 
     if (booking.bookingNumber != null && booking.bookingNumber!.isNotEmpty) {
-      receipt.writeln(centerText('Booking: ${booking.bookingNumber}', paperWidth));
+      receipt.writeln('Booking: ${booking.bookingNumber}');
     }
-    receipt.writeln(centerText('Date: ${Helpers.formatDateTime(booking.bookingDate)}', paperWidth));
+    receipt.writeln('Date: ${Helpers.formatDateTime(booking.bookingDate)}');
     receipt.writeln(dashLine);
 
-    receipt.writeln(centerText('Customer: ${booking.customerName}', paperWidth));
+    receipt.writeln('Customer: ${booking.customerName}');
     if (booking.customerMobile != null && booking.customerMobile!.isNotEmpty) {
-      receipt.writeln(centerText('Mobile: ${booking.customerMobile}', paperWidth));
+      receipt.writeln('Mobile: ${booking.customerMobile}');
     }
     if (booking.vehicleNumber != null && booking.vehicleNumber!.isNotEmpty) {
-      receipt.writeln(centerText('Vehicle: ${booking.vehicleNumber}', paperWidth));
+      receipt.writeln('Vehicle: ${booking.vehicleNumber}');
     }
     if (booking.vehicleType != null && booking.vehicleType!.isNotEmpty) {
-      receipt.writeln(centerText('Type: ${booking.vehicleType}', paperWidth));
+      receipt.writeln('Type: ${booking.vehicleType}');
     }
     if (booking.driverName != null && booking.driverName!.isNotEmpty) {
-      receipt.writeln(centerText('Driver: ${booking.driverName}', paperWidth));
+      receipt.writeln('Driver: ${booking.driverName}');
     }
     if (booking.driverMobile != null && booking.driverMobile!.isNotEmpty) {
-      receipt.writeln(centerText('Driver Mob: ${booking.driverMobile}', paperWidth));
+      receipt.writeln('Driver Mob: ${booking.driverMobile}');
     }
     if ((booking.fromLocation != null && booking.fromLocation!.isNotEmpty) ||
         (booking.toLocation != null && booking.toLocation!.isNotEmpty)) {
       if (booking.fromLocation != null && booking.fromLocation!.isNotEmpty) {
-        receipt.writeln(centerText('From: ${booking.fromLocation}', paperWidth));
+        receipt.writeln('From: ${booking.fromLocation}');
       }
       if (booking.toLocation != null && booking.toLocation!.isNotEmpty) {
-        receipt.writeln(centerText('To: ${booking.toLocation}', paperWidth));
+        receipt.writeln('To: ${booking.toLocation}');
       }
     }
     receipt.writeln(dashLine);
 
-    receipt.writeln(centerText('Total Fare: Rs. ${booking.totalFare.toStringAsFixed(0)}', paperWidth));
-    receipt.writeln(centerText('Advance:    Rs. ${booking.amountPaid.toStringAsFixed(0)}', paperWidth));
+    // GST on the booking fare (booking = true) — shared calc
+    final gst = await GstService.compute(amount: booking.totalFare, isBooking: true);
+    if (gst.applies) {
+      receipt.writeln('Subtotal:   Rs. ${gst.subtotal.toStringAsFixed(0)}');
+      receipt.writeln('GST @${gst.rateLabel}%: Rs. ${gst.gstAmount.toStringAsFixed(2)}');
+      receipt.write(ESC_BOLD_ON);
+      receipt.writeln('Total Fare: Rs. ${gst.total.toStringAsFixed(0)}');
+      receipt.write(ESC_BOLD_OFF);
+      if (gst.gstin.isNotEmpty) receipt.writeln('GSTIN: ${gst.gstin}');
+    } else {
+      receipt.writeln('Total Fare: Rs. ${booking.totalFare.toStringAsFixed(0)}');
+    }
+    receipt.writeln('Advance:    Rs. ${booking.amountPaid.toStringAsFixed(0)}');
     receipt.write(ESC_BOLD_ON);
-    receipt.writeln(centerText('Balance:    Rs. ${booking.balance.toStringAsFixed(0)}', paperWidth));
+    receipt.writeln('Balance:    Rs. ${booking.balance.toStringAsFixed(0)}');
     receipt.write(ESC_BOLD_OFF);
     receipt.writeln(dashLine);
 
     if (booking.remarks != null && booking.remarks!.isNotEmpty) {
-      receipt.writeln(centerText('Remarks: ${booking.remarks}', paperWidth));
+      receipt.writeln('Remarks: ${booking.remarks}');
       receipt.writeln(dashLine);
     }
 
     receipt.writeln(divider);
-    receipt.writeln(centerText('KEEP THIS RECEIPT SAFE', paperWidth));
+    receipt.writeln('KEEP THIS RECEIPT SAFE');
     receipt.writeln(divider);
-    receipt.writeln(centerText('Go2-Parking', paperWidth));
+    if (showBranding) receipt.writeln(brandingText);
     receipt.writeln('');
 
     return receipt.toString();
@@ -756,6 +744,7 @@ class ReceiptService {
     final businessAddress = prefs.getString('business_address') ?? '';
     final businessPhone = prefs.getString('business_phone') ?? '';
     final paperWidth = prefs.getInt('paper_width') ?? 32;
+    final showBranding = prefs.getBool('bill_show_branding') ?? true;
 
     final receipt = StringBuffer();
     final divider = '=' * paperWidth;
@@ -764,48 +753,60 @@ class ReceiptService {
     receipt.write(ESC_ALIGN_CENTER);
     receipt.writeln(divider);
     receipt.write(ESC_BOLD_ON);
-    receipt.writeln(centerText(businessName, paperWidth));
+    receipt.writeln(businessName);
     receipt.write(ESC_BOLD_OFF);
-    if (businessAddress.isNotEmpty) receipt.writeln(centerText(businessAddress, paperWidth));
-    if (businessPhone.isNotEmpty) receipt.writeln(centerText(businessPhone, paperWidth));
+    if (businessAddress.isNotEmpty) receipt.writeln(businessAddress);
+    if (businessPhone.isNotEmpty) receipt.writeln(businessPhone);
     receipt.writeln(divider);
     receipt.write(ESC_BOLD_ON);
-    receipt.writeln(centerText('BOOKING CLOSING', paperWidth));
+    receipt.writeln('BOOKING CLOSING');
     receipt.write(ESC_BOLD_OFF);
     receipt.writeln(divider);
 
     if (booking.bookingNumber != null && booking.bookingNumber!.isNotEmpty) {
-      receipt.writeln(centerText('Booking: ${booking.bookingNumber}', paperWidth));
+      receipt.writeln('Booking: ${booking.bookingNumber}');
     }
-    receipt.writeln(centerText('Date: ${Helpers.formatDateTime(DateTime.now())}', paperWidth));
+    receipt.writeln('Date: ${Helpers.formatDateTime(DateTime.now())}');
     receipt.writeln(dashLine);
 
-    receipt.writeln(centerText('Customer: ${booking.customerName}', paperWidth));
+    receipt.writeln('Customer: ${booking.customerName}');
     if (booking.customerMobile != null && booking.customerMobile!.isNotEmpty) {
-      receipt.writeln(centerText('Mobile: ${booking.customerMobile}', paperWidth));
+      receipt.writeln('Mobile: ${booking.customerMobile}');
     }
     if (booking.vehicleNumber != null && booking.vehicleNumber!.isNotEmpty) {
-      receipt.writeln(centerText('Vehicle: ${booking.vehicleNumber}', paperWidth));
+      receipt.writeln('Vehicle: ${booking.vehicleNumber}');
     }
     receipt.writeln(dashLine);
 
     final balance = booking.balance < 0 ? 0.0 : booking.balance;
-    receipt.writeln(centerText('Total Fare: Rs. ${booking.totalFare.toStringAsFixed(0)}', paperWidth));
-    receipt.writeln(centerText('Paid:       Rs. ${booking.amountPaid.toStringAsFixed(0)}', paperWidth));
+
+    // GST on the booking fare (booking = true) — shared calc
+    final gst = await GstService.compute(amount: booking.totalFare, isBooking: true);
+    if (gst.applies) {
+      receipt.writeln('Subtotal:   Rs. ${gst.subtotal.toStringAsFixed(0)}');
+      receipt.writeln('GST @${gst.rateLabel}%: Rs. ${gst.gstAmount.toStringAsFixed(2)}');
+      receipt.write(ESC_BOLD_ON);
+      receipt.writeln('Total Fare: Rs. ${gst.total.toStringAsFixed(0)}');
+      receipt.write(ESC_BOLD_OFF);
+      if (gst.gstin.isNotEmpty) receipt.writeln('GSTIN: ${gst.gstin}');
+    } else {
+      receipt.writeln('Total Fare: Rs. ${booking.totalFare.toStringAsFixed(0)}');
+    }
+    receipt.writeln('Paid:       Rs. ${booking.amountPaid.toStringAsFixed(0)}');
     receipt.write(ESC_BOLD_ON);
-    receipt.writeln(centerText('Balance:    Rs. ${balance.toStringAsFixed(0)}', paperWidth));
+    receipt.writeln('Balance:    Rs. ${balance.toStringAsFixed(0)}');
     receipt.write(ESC_BOLD_OFF);
     receipt.writeln(dashLine);
 
     receipt.write(ESC_SIZE_1_5X_BOLD);
-    receipt.writeln(centerText('PAID', (paperWidth / 1.5).round()));
+    receipt.writeln('PAID');
     receipt.write(ESC_NORMAL);
     receipt.writeln(dashLine);
 
     receipt.writeln(divider);
-    receipt.writeln(centerText('THANK YOU! VISIT AGAIN', paperWidth));
+    receipt.writeln('THANK YOU! VISIT AGAIN');
     receipt.writeln(divider);
-    receipt.writeln(centerText('Go2-Parking', paperWidth));
+    if (showBranding) receipt.writeln(brandingText);
     receipt.writeln('');
 
     return receipt.toString();

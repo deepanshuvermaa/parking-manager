@@ -5,6 +5,7 @@ import '../providers/auth_provider.dart';
 import '../services/simple_vehicle_service.dart';
 import '../services/booking_service.dart';
 import '../services/platform_printer_service.dart';
+import '../services/receipt_service.dart';
 import '../models/simple_vehicle.dart';
 import '../models/booking.dart';
 import '../theme/app_theme.dart';
@@ -560,14 +561,17 @@ class _ReportsScreenState extends State<ReportsScreen>
                   Text('${vehicles.length} total', style: const TextStyle(fontSize: 11, color: Go2Colors.textHint)),
                 ]),
                 const SizedBox(height: 8),
-                ...vehicles.take(20).map((v) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 3),
-                  child: Row(children: [
-                    Expanded(flex: 3, child: Text(v.vehicleNumber, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))),
-                    Expanded(flex: 2, child: Text(v.vehicleType, style: const TextStyle(fontSize: 11, color: Go2Colors.textHint))),
-                    Expanded(flex: 2, child: Text(v.exitTime != null ? '${v.exitTime!.hour}:${v.exitTime!.minute.toString().padLeft(2, '0')}' : '-', style: const TextStyle(fontSize: 11, color: Go2Colors.textSecondary), textAlign: TextAlign.center)),
-                    Expanded(flex: 1, child: Text('₹${(v.amount ?? 0).toStringAsFixed(0)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Go2Colors.success), textAlign: TextAlign.right)),
-                  ]),
+                ...vehicles.take(20).map((v) => InkWell(
+                  onTap: () => _showReprintExitSheet(v),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Row(children: [
+                      Expanded(flex: 3, child: Text(v.vehicleNumber, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))),
+                      Expanded(flex: 2, child: Text(v.vehicleType, style: const TextStyle(fontSize: 11, color: Go2Colors.textHint))),
+                      Expanded(flex: 2, child: Text(v.exitTime != null ? '${v.exitTime!.hour}:${v.exitTime!.minute.toString().padLeft(2, '0')}' : '-', style: const TextStyle(fontSize: 11, color: Go2Colors.textSecondary), textAlign: TextAlign.center)),
+                      Expanded(flex: 1, child: Text('₹${(v.amount ?? 0).toStringAsFixed(0)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Go2Colors.success), textAlign: TextAlign.right)),
+                    ]),
+                  ),
                 )),
                 if (vehicles.length > 20) Padding(
                   padding: const EdgeInsets.only(top: 8),
@@ -578,6 +582,43 @@ class _ReportsScreenState extends State<ReportsScreen>
           ],
           const SizedBox(height: 32),
         ],
+      ),
+    );
+  }
+
+  void _showReprintExitSheet(SimpleVehicle v) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Go2Colors.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(v.vehicleNumber, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            Text('${v.vehicleType} • ₹${(v.amount ?? 0).toStringAsFixed(0)}', style: TextStyle(fontSize: 13, color: Go2Colors.textHint)),
+            const SizedBox(height: 20),
+            SizedBox(width: double.infinity, child: ElevatedButton.icon(
+              onPressed: () async {
+                final connected = await PlatformPrinterService.isConnected();
+                final exit = v.exitTime ?? DateTime.now();
+                final duration = exit.difference(v.entryTime);
+                final receipt = await ReceiptService.generateExitReceipt(v, v.amount ?? 0, duration);
+                await PlatformPrinterService.printText(receipt);
+                if (ctx.mounted) Navigator.pop(ctx);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text(connected ? '✓ Exit receipt reprinted' : 'Sent to printer (not connected)'),
+                    backgroundColor: connected ? Go2Colors.success : Go2Colors.textHint,
+                  ));
+                }
+              },
+              icon: const Icon(Icons.print_rounded, size: 18),
+              label: const Text('Reprint Exit Receipt'),
+            )),
+            const SizedBox(height: 8),
+          ]),
+        ),
       ),
     );
   }

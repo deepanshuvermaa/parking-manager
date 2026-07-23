@@ -259,7 +259,9 @@ class _BookingsScreenState extends State<BookingsScreen> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx, setSheet) {
-            return Padding(
+            return SafeArea(
+              top: false,
+              child: Padding(
               padding: EdgeInsets.only(
                 left: 16, right: 16, top: 16,
                 bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
@@ -342,6 +344,7 @@ class _BookingsScreenState extends State<BookingsScreen> {
                   ],
                 ),
               ),
+            ),
             );
           },
         );

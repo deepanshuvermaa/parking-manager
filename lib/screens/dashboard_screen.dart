@@ -277,6 +277,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
             if (v.ticketId != null) Text('Ticket: ${v.ticketId}', style: TextStyle(fontSize: 12, color: Go2Colors.textHint)),
           ]),
           const SizedBox(height: 20),
+          SizedBox(width: double.infinity, child: OutlinedButton.icon(
+            onPressed: () async {
+              final connected = await PlatformPrinterService.isConnected();
+              final receipt = await ReceiptService.generateEntryReceipt(v);
+              await PlatformPrinterService.printText(receipt);
+              if (ctx.mounted) Navigator.pop(ctx);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(connected ? '✓ Entry receipt reprinted' : 'Sent to printer (not connected)'),
+                  backgroundColor: connected ? Go2Colors.success : Go2Colors.textHint,
+                ));
+              }
+            },
+            icon: const Icon(Icons.print_rounded, size: 18),
+            label: const Text('Reprint Entry Receipt'),
+          )),
+          const SizedBox(height: 10),
           SizedBox(width: double.infinity, child: ElevatedButton(
             onPressed: () async {
               Navigator.pop(ctx);

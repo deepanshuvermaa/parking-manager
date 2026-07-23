@@ -29,6 +29,7 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
   bool _autoPrint = true;
   bool _autoPrintExit = true;
   bool _showQr = true;
+  bool _showBranding = true;
   int _paperWidth = 32;
   bool _saved = false;
   bool _showExtraFields = false;
@@ -72,6 +73,7 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
       _autoPrint = p.getBool('auto_print') ?? true;
       _autoPrintExit = p.getBool('auto_print_exit') ?? true;
       _showQr = p.getBool('bill_show_qr_code') ?? true;
+      _showBranding = p.getBool('bill_show_branding') ?? true;
       _paperWidth = _safeInt(p, 'paper_width', 32);
       _showExtraFields = p.getBool('show_extra_fields') ?? false;
       _enableGst = p.getBool('enable_gst') ?? false;
@@ -93,6 +95,7 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
     await p.setBool('auto_print', _autoPrint);
     await p.setBool('auto_print_exit', _autoPrintExit);
     await p.setBool('bill_show_qr_code', _showQr);
+    await p.setBool('bill_show_branding', _showBranding);
     await p.setInt('paper_width', _paperWidth);
     await p.setBool('show_extra_fields', _showExtraFields);
     await p.setBool('enable_gst', _enableGst);
@@ -158,6 +161,14 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
               subtitle: const Text('Ticket ID for scanning at exit'),
               value: _showQr,
               onChanged: (v) { setState(() => _showQr = v); _save(); },
+            ),
+            const Divider(height: 1),
+            SwitchListTile(
+              dense: true, activeColor: Go2Colors.primary,
+              title: const Text('Show Branding'),
+              subtitle: const Text('Print Go2-Parkingsoftware at bottom'),
+              value: _showBranding,
+              onChanged: (v) { setState(() => _showBranding = v); _save(); },
             ),
             const Divider(height: 1),
             ListTile(
