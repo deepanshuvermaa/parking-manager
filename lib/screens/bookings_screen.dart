@@ -378,86 +378,95 @@ class _BookingsScreenState extends State<BookingsScreen> {
   void _openBookingSheet(Booking b) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Go2Colors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) {
-        return Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(b.customerName,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-              if (b.bookingNumber != null)
-                Text(b.bookingNumber!,
-                    style: const TextStyle(fontSize: 12, color: Go2Colors.textHint)),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: 16, right: 16, top: 16,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _amountBlock('Total', b.grandTotal, Go2Colors.textPrimary),
-                  _amountBlock('Paid', b.amountPaid, Go2Colors.success),
-                  _amountBlock('Balance', b.balance < 0 ? 0 : b.balance,
-                      b.isPaid ? Go2Colors.success : Go2Colors.error),
+                  Text(b.customerName,
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                  if (b.bookingNumber != null)
+                    Text(b.bookingNumber!,
+                        style: const TextStyle(fontSize: 12, color: Go2Colors.textHint)),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _amountBlock('Total', b.grandTotal, Go2Colors.textPrimary),
+                      _amountBlock('Paid', b.amountPaid, Go2Colors.success),
+                      _amountBlock('Balance', b.balance < 0 ? 0 : b.balance,
+                          b.isPaid ? Go2Colors.success : Go2Colors.error),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  if (!b.isPaid)
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _openPaymentDialog(b);
+                        },
+                        icon: const Icon(Icons.payments_rounded, size: 18),
+                        label: const Text('Record Payment'),
+                      ),
+                    ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        await _closeBooking(b);
+                      },
+                      icon: const Icon(Icons.check_circle_rounded, size: 18),
+                      label: Text(b.isPaid ? 'Print Closing Receipt' : 'Close (Pay Balance)'),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        final receipt = await ReceiptService.generateBookingReceipt(b);
+                        await _printSilently(receipt, '✓ Booking receipt reprinted');
+                      },
+                      icon: const Icon(Icons.print_rounded, size: 18),
+                      label: const Text('Reprint Booking Receipt'),
+                    ),
+                  ),
+                  if (b.isPaid) ...[
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          Navigator.pop(ctx);
+                          final receipt = await ReceiptService.generateBookingClosingReceipt(b);
+                          await _printSilently(receipt, '✓ Closing receipt reprinted');
+                        },
+                        icon: const Icon(Icons.print_rounded, size: 18),
+                        label: const Text('Reprint Closing Receipt'),
+                      ),
+                    ),
+                  ],
                 ],
               ),
-              const SizedBox(height: 20),
-              if (!b.isPaid)
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      _openPaymentDialog(b);
-                    },
-                    icon: const Icon(Icons.payments_rounded, size: 18),
-                    label: const Text('Record Payment'),
-                  ),
-                ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () async {
-                    Navigator.pop(ctx);
-                    await _closeBooking(b);
-                  },
-                  icon: const Icon(Icons.check_circle_rounded, size: 18),
-                  label: Text(b.isPaid ? 'Print Closing Receipt' : 'Close (Pay Balance)'),
-                ),
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () async {
-                    Navigator.pop(ctx);
-                    final receipt = await ReceiptService.generateBookingReceipt(b);
-                    await _printSilently(receipt, '✓ Booking receipt reprinted');
-                  },
-                  icon: const Icon(Icons.print_rounded, size: 18),
-                  label: const Text('Reprint Booking Receipt'),
-                ),
-              ),
-              if (b.isPaid) ...[
-                const SizedBox(height: 8),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () async {
-                      Navigator.pop(ctx);
-                      final receipt = await ReceiptService.generateBookingClosingReceipt(b);
-                      await _printSilently(receipt, '✓ Closing receipt reprinted');
-                    },
-                    icon: const Icon(Icons.print_rounded, size: 18),
-                    label: const Text('Reprint Closing Receipt'),
-                  ),
-                ),
-              ],
-            ],
+            ),
           ),
         );
       },
