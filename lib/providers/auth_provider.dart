@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
 import '../services/device_service.dart';
 import '../services/simple_vehicle_service.dart';
+import '../services/booking_service.dart';
 import '../services/settings_sync_service.dart';
 
 enum AuthStatus { uninitialized, authenticated, unauthenticated, loading }
@@ -88,6 +89,8 @@ class AuthProvider extends ChangeNotifier {
 
     // Initialize vehicle service (loads from local DB first, syncs in background)
     await SimpleVehicleService.initialize(_token!);
+    // Initialize bookings service (offline-first; starts its own retry loop)
+    BookingService.initialize(_token!);
 
     // Sync settings from backend
     SettingsSyncService.loadFromBackend(_token!);
@@ -191,6 +194,7 @@ class AuthProvider extends ChangeNotifier {
         }
 
         await SimpleVehicleService.initialize(_token!);
+        BookingService.initialize(_token!);
         _status = AuthStatus.authenticated;
         _isOffline = false;
         notifyListeners();
@@ -277,6 +281,7 @@ class AuthProvider extends ChangeNotifier {
         }
 
         await SimpleVehicleService.initialize(_token!);
+        BookingService.initialize(_token!);
         _status = AuthStatus.authenticated;
         _isOffline = false;
         notifyListeners();
@@ -296,6 +301,7 @@ class AuthProvider extends ChangeNotifier {
   /// Logout
   Future<void> logout() async {
     SimpleVehicleService.stopPeriodicSync();
+    BookingService.stopPeriodicSync();
     await _clearCredentials();
     _token = null;
     _refreshToken = null;

@@ -23,6 +23,7 @@ class SimpleSettingsScreen extends StatefulWidget {
 class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
   final _nameCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
+  final _address2Ctrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _gstCtrl = TextEditingController();
   final _upiCtrl = TextEditingController();
@@ -67,6 +68,7 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
     setState(() {
       _nameCtrl.text = p.getString('business_name') ?? '';
       _addressCtrl.text = p.getString('business_address') ?? '';
+      _address2Ctrl.text = p.getString('business_address2') ?? '';
       _phoneCtrl.text = p.getString('business_phone') ?? '';
       _gstCtrl.text = p.getString('gst_number') ?? '';
       _upiCtrl.text = p.getString('upi_vpa') ?? '';
@@ -89,6 +91,7 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
     final p = await SharedPreferences.getInstance();
     await p.setString('business_name', _nameCtrl.text.trim());
     await p.setString('business_address', _addressCtrl.text.trim());
+    await p.setString('business_address2', _address2Ctrl.text.trim());
     await p.setString('business_phone', _phoneCtrl.text.trim());
     await p.setString('gst_number', _gstCtrl.text.trim());
     await p.setString('upi_vpa', _upiCtrl.text.trim());
@@ -131,6 +134,7 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
           _card([
             _input('Business Name', _nameCtrl, Icons.store_rounded),
             _input('Address', _addressCtrl, Icons.location_on_outlined),
+            _input('Address Line 2', _address2Ctrl, Icons.location_on_outlined),
             _input('Phone', _phoneCtrl, Icons.phone_outlined, keyboard: TextInputType.phone),
             _input('GST Number', _gstCtrl, Icons.receipt_outlined),
             _input('UPI ID (for QR payments)', _upiCtrl, Icons.qr_code_rounded),
@@ -392,5 +396,5 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
   );
 
   @override
-  void dispose() { _nameCtrl.dispose(); _addressCtrl.dispose(); _phoneCtrl.dispose(); _gstCtrl.dispose(); _upiCtrl.dispose(); _gstinCtrl.dispose(); _gstRateCtrl.dispose(); super.dispose(); }
+  void dispose() { _nameCtrl.dispose(); _addressCtrl.dispose(); _address2Ctrl.dispose(); _phoneCtrl.dispose(); _gstCtrl.dispose(); _upiCtrl.dispose(); _gstinCtrl.dispose(); _gstRateCtrl.dispose(); super.dispose(); }
 }

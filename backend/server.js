@@ -663,37 +663,52 @@ app.post('/api/bookings', verifyToken, checkTrialExpiry, async (req, res) => {
       return res.status(400).json({ success: false, error: 'Customer name is required' });
     }
 
-    const result = await pool.query(
-      `INSERT INTO bookings (user_id, booking_number, customer_name, customer_mobile, vehicle_number, vehicle_type, driver_name, driver_mobile, from_location, to_location, total_fare, amount_paid, status, remarks, booking_date)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-       RETURNING *`,
-      [
-        req.userId,
-        data.bookingNumber,
-        data.customerName,
-        data.customerMobile,
-        data.vehicleNumber,
-        data.vehicleType,
-        data.driverName,
-        data.driverMobile,
-        data.fromLocation,
-        data.toLocation,
-        data.totalFare,
-        data.amountPaid,
-        data.status,
-        data.remarks,
-        data.bookingDate,
-      ]
-    );
+    // Wrap booking insert + advance payment in a single transaction so
+    // amount_paid and the payment ledger row can never desync.
+    const client = await pool.connect();
+    let booking;
+    try {
+      await client.query('BEGIN');
 
-    const booking = result.rows[0];
-
-    // Record the advance as the first payment (if any)
-    if (Number(data.amountPaid) > 0) {
-      await pool.query(
-        'INSERT INTO booking_payments (booking_id, amount, note) VALUES ($1, $2, $3)',
-        [booking.id, data.amountPaid, 'Advance']
+      const result = await client.query(
+        `INSERT INTO bookings (user_id, booking_number, customer_name, customer_mobile, vehicle_number, vehicle_type, driver_name, driver_mobile, from_location, to_location, total_fare, amount_paid, status, remarks, booking_date)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+         RETURNING *`,
+        [
+          req.userId,
+          data.bookingNumber,
+          data.customerName,
+          data.customerMobile,
+          data.vehicleNumber,
+          data.vehicleType,
+          data.driverName,
+          data.driverMobile,
+          data.fromLocation,
+          data.toLocation,
+          data.totalFare,
+          data.amountPaid,
+          data.status,
+          data.remarks,
+          data.bookingDate,
+        ]
       );
+
+      booking = result.rows[0];
+
+      // Record the advance as the first payment (if any)
+      if (Number(data.amountPaid) > 0) {
+        await client.query(
+          'INSERT INTO booking_payments (booking_id, amount, note) VALUES ($1, $2, $3)',
+          [booking.id, data.amountPaid, 'Advance']
+        );
+      }
+
+      await client.query('COMMIT');
+    } catch (txError) {
+      await client.query('ROLLBACK');
+      throw txError;
+    } finally {
+      client.release();
     }
 
     await logAudit(req.userId, 'booking_create', 'booking', booking.id, null, booking, req);
@@ -731,24 +746,39 @@ app.post('/api/bookings/:id/payments', verifyToken, checkTrialExpiry, async (req
       return res.status(404).json({ success: false, error: 'Booking not found' });
     }
 
-    // Insert payment row
-    await pool.query(
-      'INSERT INTO booking_payments (booking_id, amount, note) VALUES ($1, $2, $3)',
-      [id, amount, note]
-    );
+    // Wrap payment insert + amount_paid update in a single transaction so the
+    // ledger row and amount_paid can never desync.
+    const client = await pool.connect();
+    let booking;
+    try {
+      await client.query('BEGIN');
 
-    // Increment amount_paid and recompute status
-    const result = await pool.query(
-      `UPDATE bookings
-       SET amount_paid = amount_paid + $1,
-           status = CASE WHEN (amount_paid + $1) >= total_fare AND total_fare > 0 THEN 'paid' ELSE 'partial' END,
-           updated_at = NOW()
-       WHERE id = $2
-       RETURNING *`,
-      [amount, id]
-    );
+      // Insert payment row
+      await client.query(
+        'INSERT INTO booking_payments (booking_id, amount, note) VALUES ($1, $2, $3)',
+        [id, amount, note]
+      );
 
-    const booking = result.rows[0];
+      // Increment amount_paid and recompute status
+      const result = await client.query(
+        `UPDATE bookings
+         SET amount_paid = amount_paid + $1,
+             status = CASE WHEN (amount_paid + $1) >= total_fare AND total_fare > 0 THEN 'paid' ELSE 'partial' END,
+             updated_at = NOW()
+         WHERE id = $2
+         RETURNING *`,
+        [amount, id]
+      );
+
+      booking = result.rows[0];
+
+      await client.query('COMMIT');
+    } catch (txError) {
+      await client.query('ROLLBACK');
+      throw txError;
+    } finally {
+      client.release();
+    }
 
     await logAudit(req.userId, 'booking_payment', 'booking', id, bookingResult.rows[0], booking, req);
 

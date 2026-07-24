@@ -1,3 +1,5 @@
+import '../services/gst_service.dart';
+
 class Booking {
   final String id;
   final String? userId;
@@ -35,11 +37,20 @@ class Booking {
     required this.bookingDate,
   });
 
-  // Balance remaining on the booking
-  double get balance => totalFare - amountPaid;
+  // GST-inclusive grand total — what the customer actually pays.
+  // Uses the cached booking-GST config (GstService.refreshBookingGst()).
+  double get grandTotal {
+    if (GstService.bookingGstApplies && totalFare > 0) {
+      return totalFare + totalFare * GstService.bookingGstRate / 100;
+    }
+    return totalFare;
+  }
+
+  // Balance remaining on the booking (GST-inclusive)
+  double get balance => grandTotal - amountPaid;
 
   // Fully paid when nothing (or less) is left to collect
-  bool get isPaid => balance <= 0;
+  bool get isPaid => balance <= 0.01;
 
   factory Booking.fromJson(Map<String, dynamic> json) {
     return Booking(

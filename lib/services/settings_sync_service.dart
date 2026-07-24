@@ -5,7 +5,7 @@ import '../config/api_config.dart';
 
 class SettingsSyncService {
   static const _keys = [
-    'business_name', 'business_address', 'business_phone',
+    'business_name', 'business_address', 'business_address2', 'business_phone',
     'gst_number', 'upi_vpa', 'auto_print', 'auto_print_exit',
     'paper_width', 'bill_show_qr_code',
   ];

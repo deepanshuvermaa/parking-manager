@@ -15,17 +15,24 @@ class TaxiController {
   async generateTicketNumber() {
     const date = new Date();
     const dateStr = date.toISOString().split('T')[0].replace(/-/g, '');
+    const prefix = `TAXI-${dateStr}-`;
 
-    // Get count of bookings today
+    // Derive the next serial from the MAX existing serial for today's prefix
+    // rather than COUNT(*). COUNT is deletion-unsafe: deleting a booking would
+    // let the count drop and re-issue an already-used number, colliding with
+    // the UNIQUE(ticket_number) constraint. MAX+1 only ever moves forward.
     const result = await this.pool.query(
-      `SELECT COUNT(*) as count FROM taxi_bookings
-       WHERE DATE(booking_date) = CURRENT_DATE`
+      `SELECT ticket_number FROM taxi_bookings WHERE ticket_number LIKE $1`,
+      [`${prefix}%`]
     );
 
-    const count = parseInt(result.rows[0].count) + 1;
-    const ticketNum = `TAXI-${dateStr}-${String(count).padStart(4, '0')}`;
+    let maxSerial = 0;
+    for (const row of result.rows) {
+      const n = parseInt(String(row.ticket_number).slice(prefix.length), 10);
+      if (!isNaN(n) && n > maxSerial) maxSerial = n;
+    }
 
-    return ticketNum;
+    return `${prefix}${String(maxSerial + 1).padStart(4, '0')}`;
   }
 
   /**
@@ -77,25 +84,36 @@ class TaxiController {
         });
       }
 
-      // Generate ticket number
-      const ticketNumber = await this.generateTicketNumber();
-
-      // Insert booking
-      const result = await this.pool.query(
-        `INSERT INTO taxi_bookings (
-          user_id, ticket_number, customer_name, customer_mobile,
-          vehicle_name, vehicle_number, from_location, to_location,
-          fare_amount, start_time, remarks_1, remarks_2, remarks_3,
-          driver_name, driver_mobile, status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-        RETURNING *`,
-        [
-          userId, ticketNumber, customerName, customerMobile,
-          vehicleName, vehicleNumber, fromLocation, toLocation,
-          fareAmount, startTime || null, remarks1 || null, remarks2 || null, remarks3 || null,
-          driverName, driverMobile, 'booked'
-        ]
-      );
+      // Generate ticket number + insert, retrying on a unique-violation so two
+      // concurrent bookings that computed the same serial don't 500 — the loser
+      // simply recomputes MAX+1 and retries.
+      let result;
+      let ticketNumber;
+      for (let attempt = 0; attempt < 5; attempt++) {
+        ticketNumber = await this.generateTicketNumber();
+        try {
+          result = await this.pool.query(
+            `INSERT INTO taxi_bookings (
+              user_id, ticket_number, customer_name, customer_mobile,
+              vehicle_name, vehicle_number, from_location, to_location,
+              fare_amount, start_time, remarks_1, remarks_2, remarks_3,
+              driver_name, driver_mobile, status
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+            RETURNING *`,
+            [
+              userId, ticketNumber, customerName, customerMobile,
+              vehicleName, vehicleNumber, fromLocation, toLocation,
+              fareAmount, startTime || null, remarks1 || null, remarks2 || null, remarks3 || null,
+              driverName, driverMobile, 'booked'
+            ]
+          );
+          break;
+        } catch (e) {
+          // 23505 = unique_violation on ticket_number; retry with a fresh serial.
+          if (e.code === '23505' && attempt < 4) continue;
+          throw e;
+        }
+      }
 
       // Audit log
       await this.pool.query(

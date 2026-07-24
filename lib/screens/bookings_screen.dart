@@ -43,7 +43,7 @@ class _BookingsScreenState extends State<BookingsScreen> {
     if (mounted) setState(() => _isLoading = false);
   }
 
-  double get _totalBooked => _bookings.fold(0.0, (s, b) => s + b.totalFare);
+  double get _totalBooked => _bookings.fold(0.0, (s, b) => s + b.grandTotal);
   double get _totalCollected => _bookings.fold(0.0, (s, b) => s + b.amountPaid);
   double get _totalOutstanding =>
       _bookings.fold(0.0, (s, b) => s + (b.balance > 0 ? b.balance : 0));
@@ -192,7 +192,7 @@ class _BookingsScreenState extends State<BookingsScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _amountBlock('Total', b.totalFare, Go2Colors.textPrimary),
+                  _amountBlock('Total', b.grandTotal, Go2Colors.textPrimary),
                   _amountBlock('Paid', b.amountPaid, Go2Colors.success),
                   _amountBlock('Balance', b.balance < 0 ? 0 : b.balance,
                       isPaid ? Go2Colors.success : Go2Colors.error),
@@ -398,7 +398,7 @@ class _BookingsScreenState extends State<BookingsScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _amountBlock('Total', b.totalFare, Go2Colors.textPrimary),
+                  _amountBlock('Total', b.grandTotal, Go2Colors.textPrimary),
                   _amountBlock('Paid', b.amountPaid, Go2Colors.success),
                   _amountBlock('Balance', b.balance < 0 ? 0 : b.balance,
                       b.isPaid ? Go2Colors.success : Go2Colors.error),
@@ -429,6 +429,34 @@ class _BookingsScreenState extends State<BookingsScreen> {
                   label: Text(b.isPaid ? 'Print Closing Receipt' : 'Close (Pay Balance)'),
                 ),
               ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    final receipt = await ReceiptService.generateBookingReceipt(b);
+                    await _printSilently(receipt, '✓ Booking receipt reprinted');
+                  },
+                  icon: const Icon(Icons.print_rounded, size: 18),
+                  label: const Text('Reprint Booking Receipt'),
+                ),
+              ),
+              if (b.isPaid) ...[
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      Navigator.pop(ctx);
+                      final receipt = await ReceiptService.generateBookingClosingReceipt(b);
+                      await _printSilently(receipt, '✓ Closing receipt reprinted');
+                    },
+                    icon: const Icon(Icons.print_rounded, size: 18),
+                    label: const Text('Reprint Closing Receipt'),
+                  ),
+                ),
+              ],
             ],
           ),
         );

@@ -477,6 +477,44 @@ class LocalDatabaseService {
     return (result.first['total'] as num?)?.toDouble() ?? 0.0;
   }
 
+  /// Highest trailing serial among ticket_ids that begin with [fullPrefix]
+  /// (e.g. 'PT0910A'). Used to RESUME the ticket counter after SharedPreferences
+  /// is lost (reinstall / clearAllData) so serials never reset to 1 and collide
+  /// with tickets already present in the local DB. Gap-safe: returns 0 if none.
+  static Future<int> getMaxTicketSerial(String fullPrefix) async {
+    final db = await database;
+    final maps = await db.rawQuery(
+      'SELECT ticket_id FROM vehicles WHERE ticket_id LIKE ?',
+      ['$fullPrefix%'],
+    );
+    int maxSerial = 0;
+    for (final m in maps) {
+      final tid = m['ticket_id'] as String?;
+      if (tid == null || !tid.startsWith(fullPrefix)) continue;
+      final n = int.tryParse(tid.substring(fullPrefix.length));
+      if (n != null && n > maxSerial) maxSerial = n;
+    }
+    return maxSerial;
+  }
+
+  /// Highest trailing serial among booking_numbers that begin with [fullPrefix]
+  /// (e.g. 'BK20260723A'). Same purpose as [getMaxTicketSerial] for bookings.
+  static Future<int> getMaxBookingSerial(String fullPrefix) async {
+    final db = await database;
+    final maps = await db.rawQuery(
+      'SELECT booking_number FROM bookings WHERE booking_number LIKE ?',
+      ['$fullPrefix%'],
+    );
+    int maxSerial = 0;
+    for (final m in maps) {
+      final bn = m['booking_number'] as String?;
+      if (bn == null || !bn.startsWith(fullPrefix)) continue;
+      final n = int.tryParse(bn.substring(fullPrefix.length));
+      if (n != null && n > maxSerial) maxSerial = n;
+    }
+    return maxSerial;
+  }
+
   /// Check if a plate is currently parked (for duplicate detection)
   static Future<bool> isPlateParked(String plateNumber) async {
     final db = await database;
@@ -651,6 +689,24 @@ class LocalDatabaseService {
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+  }
+
+  /// Get unsynced payment rows for a booking (for offline payment replay)
+  static Future<List<Map<String, dynamic>>> getUnsyncedPaymentsForBooking(String bookingId) async {
+    final db = await database;
+    return db.query(
+      'booking_payments',
+      where: 'booking_id = ? AND synced = ?',
+      whereArgs: [bookingId, 0],
+      orderBy: 'paid_at ASC',
+    );
+  }
+
+  /// Mark a single payment row as synced
+  static Future<void> markPaymentSynced(String paymentId) async {
+    final db = await database;
+    await db.update('booking_payments', {'synced': 1},
+        where: 'id = ?', whereArgs: [paymentId]);
   }
 
   /// Convert a DB map to a Booking

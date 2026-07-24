@@ -277,23 +277,53 @@ class _ReportsScreenState extends State<ReportsScreen>
   // BOOKINGS REPORT (separate module)
   // ============================================
 
-  double get _bookingsBooked => _bookings.fold(0.0, (s, b) => s + b.totalFare);
+  double get _bookingsBooked => _bookings.fold(0.0, (s, b) => s + b.grandTotal);
   double get _bookingsCollected => _bookings.fold(0.0, (s, b) => s + b.amountPaid);
   double get _bookingsOutstanding =>
       _bookings.fold(0.0, (s, b) => s + (b.balance > 0 ? b.balance : 0));
 
   Future<void> _printBookingsReport() async {
     final report = StringBuffer();
-    report.writeln('================================');
+    final divider = '=' * 32;
+    final dashLine = '-' * 32;
+
+    report.writeln(divider);
     report.writeln('       BOOKINGS REPORT');
-    report.writeln('================================');
+    report.writeln(divider);
     report.writeln('Date: ${DateTime.now().toString().substring(0, 16)}');
-    report.writeln('--------------------------------');
+    report.writeln(dashLine);
     report.writeln('Total Bookings: ${_bookings.length}');
     report.writeln('Booked:      Rs. ${_bookingsBooked.toStringAsFixed(0)}');
     report.writeln('Collected:   Rs. ${_bookingsCollected.toStringAsFixed(0)}');
     report.writeln('Outstanding: Rs. ${_bookingsOutstanding.toStringAsFixed(0)}');
-    report.writeln('================================');
+    report.writeln(divider);
+    report.writeln('');
+
+    // Add per-booking details
+    for (final booking in _bookings) {
+      report.writeln('Booking: ${booking.bookingNumber ?? booking.id}');
+      report.writeln('Customer: ${booking.customerName}');
+      if (booking.vehicleNumber != null && booking.vehicleNumber!.isNotEmpty) {
+        report.writeln('Vehicle: ${booking.vehicleNumber}');
+      }
+      report.writeln(dashLine);
+      report.writeln('Total Fare (incl GST): Rs. ${booking.grandTotal.toStringAsFixed(0)}');
+      report.writeln('');
+      report.writeln('PAYMENT LEDGER:');
+      report.writeln('Initial:  Rs. ${booking.totalFare.toStringAsFixed(0)}');
+      if (booking.amountPaid > 0) {
+        report.writeln('Paid:     Rs. ${booking.amountPaid.toStringAsFixed(0)}');
+      }
+      report.writeln('Balance:  Rs. ${(booking.balance < 0 ? 0 : booking.balance).toStringAsFixed(0)}');
+      report.writeln('');
+      report.writeln('Status: ${booking.isPaid ? "PAID" : "PARTIAL"}');
+      report.writeln(dashLine);
+      report.writeln('');
+    }
+
+    report.writeln(divider);
+    report.writeln('THANK YOU!');
+    report.writeln(divider);
     report.writeln('');
 
     final connected = await PlatformPrinterService.isConnected();
@@ -305,12 +335,186 @@ class _ReportsScreenState extends State<ReportsScreen>
     }
   }
 
+  void _showBookingLedgerSheet(Booking b) {
+    final balance = b.balance < 0 ? 0.0 : b.balance;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Go2Colors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(b.bookingNumber ?? 'Booking',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              Text(b.customerName,
+                  style: const TextStyle(fontSize: 13, color: Go2Colors.textSecondary)),
+              if (b.vehicleNumber != null && b.vehicleNumber!.isNotEmpty)
+                Text(b.vehicleNumber!,
+                    style: const TextStyle(fontSize: 12, color: Go2Colors.textHint)),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Go2Colors.skyWash,
+                  borderRadius: BorderRadius.circular(Go2Radius.md),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('PAYMENT LEDGER',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Go2Colors.primary)),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        const Expanded(flex: 3, child: Text('Item', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600))),
+                        Expanded(flex: 2, child: Text('Amount', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Go2Colors.textSecondary), textAlign: TextAlign.right)),
+                      ],
+                    ),
+                    const Divider(height: 12),
+                    Row(
+                      children: [
+                        const Expanded(flex: 3, child: Text('Total Fare (incl GST)', style: TextStyle(fontSize: 11))),
+                        Expanded(flex: 2, child: Text('Rs. ${b.grandTotal.toStringAsFixed(0)}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Go2Colors.success), textAlign: TextAlign.right)),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Expanded(flex: 3, child: Text('Amount Paid', style: TextStyle(fontSize: 11))),
+                        Expanded(flex: 2, child: Text('Rs. ${b.amountPaid.toStringAsFixed(0)}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Go2Colors.textSecondary), textAlign: TextAlign.right)),
+                      ],
+                    ),
+                    const Divider(height: 12),
+                    Row(
+                      children: [
+                        const Expanded(flex: 3, child: Text('Balance Due', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700))),
+                        Expanded(flex: 2, child: Text('Rs. ${balance.toStringAsFixed(0)}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: b.isPaid ? Go2Colors.success : Go2Colors.error), textAlign: TextAlign.right)),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        const Expanded(flex: 3, child: Text('Status', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600))),
+                        Expanded(
+                          flex: 2,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: b.isPaid ? Go2Colors.success : Go2Colors.warning,
+                              borderRadius: BorderRadius.circular(Go2Radius.sm),
+                            ),
+                            child: Text(
+                              b.isPaid ? 'PAID' : 'PARTIAL',
+                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    await _printSingleBookingReport(b);
+                  },
+                  icon: const Icon(Icons.print_rounded, size: 18),
+                  label: const Text('Print This Booking'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _printSingleBookingReport(Booking b) async {
+    final divider = '=' * 32;
+    final dashLine = '-' * 32;
+    final report = StringBuffer();
+
+    report.writeln(divider);
+    report.writeln('       BOOKING REPORT');
+    report.writeln(divider);
+    report.writeln('Date: ${DateTime.now().toString().substring(0, 16)}');
+    report.writeln(dashLine);
+
+    report.writeln('Booking: ${b.bookingNumber ?? b.id}');
+    report.writeln('Customer: ${b.customerName}');
+    if (b.customerMobile != null && b.customerMobile!.isNotEmpty) {
+      report.writeln('Mobile: ${b.customerMobile}');
+    }
+    if (b.vehicleNumber != null && b.vehicleNumber!.isNotEmpty) {
+      report.writeln('Vehicle: ${b.vehicleNumber}');
+    }
+    if (b.vehicleType != null && b.vehicleType!.isNotEmpty) {
+      report.writeln('Type: ${b.vehicleType}');
+    }
+    report.writeln(dashLine);
+
+    report.writeln('Total Fare (incl GST): Rs. ${b.grandTotal.toStringAsFixed(0)}');
+    report.writeln('');
+    report.writeln('PAYMENT LEDGER:');
+    report.writeln('Initial:  Rs. ${b.totalFare.toStringAsFixed(0)}');
+    if (b.amountPaid > 0) {
+      report.writeln('Paid:     Rs. ${b.amountPaid.toStringAsFixed(0)}');
+    }
+    final balance = b.balance < 0 ? 0.0 : b.balance;
+    report.writeln('Balance:  Rs. ${balance.toStringAsFixed(0)}');
+    report.writeln('');
+    report.writeln('Status: ${b.isPaid ? "PAID" : "PARTIAL"}');
+    report.writeln(dashLine);
+
+    report.writeln(divider);
+    report.writeln('THANK YOU!');
+    report.writeln(divider);
+    report.writeln('');
+
+    final connected = await PlatformPrinterService.isConnected();
+    if (connected) {
+      await PlatformPrinterService.printText(report.toString());
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('✓ Booking report printed'), backgroundColor: Go2Colors.success),
+        );
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Printer not connected'), backgroundColor: Go2Colors.error),
+        );
+      }
+    }
+  }
+
   Widget _buildBookingsReportTab() {
     return RefreshIndicator(
       onRefresh: _loadData,
       child: ListView(
         padding: const EdgeInsets.all(Go2Spacing.lg),
         children: [
+          // Section header — bookings data only (bookings table), GST-inclusive
+          Row(
+            children: const [
+              Icon(Icons.event_note_rounded, size: 18, color: Go2Colors.primary),
+              SizedBox(width: 6),
+              Text('BOOKINGS (GST incl.)',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: Go2Colors.primary)),
+            ],
+          ),
+          const SizedBox(height: Go2Spacing.md),
           Row(
             children: [
               _bookingSummaryCard('Booked', _bookingsBooked, Go2Colors.primary),
@@ -363,27 +567,31 @@ class _ReportsScreenState extends State<ReportsScreen>
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Go2Radius.md)),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(b.customerName.isEmpty ? 'Customer' : b.customerName,
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-            if (b.vehicleNumber != null && b.vehicleNumber!.isNotEmpty)
-              Text(b.vehicleNumber!,
-                  style: const TextStyle(fontSize: 12, color: Go2Colors.textSecondary)),
-            const Divider(height: 14),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _miniAmount('Total', b.totalFare, Go2Colors.textPrimary),
-                _miniAmount('Paid', b.amountPaid, Go2Colors.success),
-                _miniAmount('Balance', balance,
-                    b.isPaid ? Go2Colors.success : Go2Colors.error),
-              ],
-            ),
-          ],
+      child: InkWell(
+        borderRadius: BorderRadius.circular(Go2Radius.md),
+        onTap: () => _showBookingLedgerSheet(b),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(b.customerName.isEmpty ? 'Customer' : b.customerName,
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+              if (b.vehicleNumber != null && b.vehicleNumber!.isNotEmpty)
+                Text(b.vehicleNumber!,
+                    style: const TextStyle(fontSize: 12, color: Go2Colors.textSecondary)),
+              const Divider(height: 14),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _miniAmount('Total', b.grandTotal, Go2Colors.textPrimary),
+                  _miniAmount('Paid', b.amountPaid, Go2Colors.success),
+                  _miniAmount('Balance', balance,
+                      b.isPaid ? Go2Colors.success : Go2Colors.error),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -411,6 +619,16 @@ class _ReportsScreenState extends State<ReportsScreen>
       child: ListView(
         padding: const EdgeInsets.all(Go2Spacing.lg),
         children: [
+          // Section header — parking data only (vehicles table)
+          Row(
+            children: const [
+              Icon(Icons.local_parking_rounded, size: 18, color: Go2Colors.primary),
+              SizedBox(width: 6),
+              Text('PARKING',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: Go2Colors.primary)),
+            ],
+          ),
+          const SizedBox(height: Go2Spacing.md),
           // Summary cards
           Row(
             children: [

@@ -30,6 +30,26 @@ class GstService {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Cached booking GST config for SYNCHRONOUS balance math in models & UI.
+  // Booking.balance / isPaid getters and the on-screen summaries must all return
+  // ONE consistent GST-inclusive number without doing async prefs reads inside a
+  // getter. [refreshBookingGst] is called whenever bookings are loaded/created so
+  // these stay current.
+  // ---------------------------------------------------------------------------
+  static bool bookingGstApplies = false;
+  static double bookingGstRate = 18.0;
+
+  /// Refresh the cached booking-GST config from prefs. Call before using
+  /// Booking.grandTotal / balance / isPaid so they reflect current settings.
+  static Future<void> refreshBookingGst() async {
+    final p = await SharedPreferences.getInstance();
+    final enabled = p.getBool('enable_gst') ?? false;
+    final onBooking = p.getBool('gst_on_booking') ?? true;
+    bookingGstApplies = enabled && onBooking;
+    bookingGstRate = _d(p, 'gst_rate', 18.0);
+  }
+
   /// Read a double safely — legacy prefs may hold an int for a numeric key,
   /// and getDouble() throws a type-cast error on those.
   static double _d(SharedPreferences p, String key, double fallback) {

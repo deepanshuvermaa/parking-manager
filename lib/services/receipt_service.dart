@@ -58,7 +58,9 @@ class ReceiptService {
     // Get business details
     final businessName = prefs.getString('business_name') ?? 'ParkEase Parking';
     final businessAddress = prefs.getString('business_address') ?? '';
+    final businessAddress2 = prefs.getString('business_address2') ?? '';
     final businessPhone = prefs.getString('business_phone') ?? '';
+    final headerGstin = prefs.getString('gstin_number') ?? '';
     final receiptHeader = prefs.getString('receipt_header') ?? 'Welcome to $businessName';
     final receiptFooter = prefs.getString('receipt_footer') ?? 'Thank you, $businessName!';
     final paperWidth = prefs.getInt('paper_width') ?? 32; // Default 2" paper
@@ -104,8 +106,14 @@ class ReceiptService {
     if (showBusinessAddress && businessAddress.isNotEmpty) {
       receipt.writeln(businessAddress);
     }
+    if (showBusinessAddress && businessAddress2.isNotEmpty) {
+      receipt.writeln(businessAddress2);
+    }
     if (showBusinessPhone && businessPhone.isNotEmpty) {
       receipt.writeln(businessPhone);
+    }
+    if (headerGstin.isNotEmpty) {
+      receipt.writeln('GSTIN: $headerGstin');
     }
     receipt.writeln(divider);
     receipt.write(ESC_BOLD_ON);
@@ -245,7 +253,9 @@ class ReceiptService {
     // Get business details
     final businessName = prefs.getString('business_name') ?? 'ParkEase Parking';
     final businessAddress = prefs.getString('business_address') ?? '';
+    final businessAddress2 = prefs.getString('business_address2') ?? '';
     final businessPhone = prefs.getString('business_phone') ?? '';
+    final headerGstin = prefs.getString('gstin_number') ?? '';
     final gstNumber = prefs.getString('gst_number') ?? '';
     final receiptFooter = prefs.getString('receipt_footer') ?? 'Thank you, $businessName!';
     final paperWidth = prefs.getInt('paper_width') ?? 32; // Default 2" paper
@@ -302,10 +312,18 @@ class ReceiptService {
       receipt.writeln(businessAddress);
       receipt.write(ESC_NORMAL);
     }
+    if (showBusinessAddress && businessAddress2.isNotEmpty) {
+      receipt.write(getSizeCommand(businessAddressSize, businessAddressBold));
+      receipt.writeln(businessAddress2);
+      receipt.write(ESC_NORMAL);
+    }
     if (showBusinessPhone && businessPhone.isNotEmpty) {
       receipt.write(getSizeCommand(businessPhoneSize, businessPhoneBold));
       receipt.writeln(businessPhone);
       receipt.write(ESC_NORMAL);
+    }
+    if (headerGstin.isNotEmpty) {
+      receipt.writeln('GSTIN: $headerGstin');
     }
     receipt.writeln(divider);
     receipt.write(ESC_BOLD_ON);
@@ -480,7 +498,9 @@ class ReceiptService {
     // Get business details
     final businessName = prefs.getString('business_name') ?? 'ParkEase Parking';
     final businessAddress = prefs.getString('business_address') ?? '';
+    final businessAddress2 = prefs.getString('business_address2') ?? '';
     final businessPhone = prefs.getString('business_phone') ?? '';
+    final headerGstin = prefs.getString('gstin_number') ?? '';
     final receiptFooter = prefs.getString('receipt_footer') ?? 'Have a safe journey!';
     final paperWidth = prefs.getInt('paper_width') ?? 32;
     final showBranding = prefs.getBool('bill_show_branding') ?? true;
@@ -510,8 +530,14 @@ class ReceiptService {
     if (businessAddress.isNotEmpty) {
       receipt.writeln(businessAddress);
     }
+    if (businessAddress2.isNotEmpty) {
+      receipt.writeln(businessAddress2);
+    }
     if (businessPhone.isNotEmpty) {
       receipt.writeln('Tel: $businessPhone');
+    }
+    if (headerGstin.isNotEmpty) {
+      receipt.writeln('GSTIN: $headerGstin');
     }
     receipt.writeln('');
     receipt.write(getSizeCommand(1.2, true));
@@ -650,7 +676,9 @@ class ReceiptService {
 
     final businessName = prefs.getString('business_name') ?? 'Go2-Parking';
     final businessAddress = prefs.getString('business_address') ?? '';
+    final businessAddress2 = prefs.getString('business_address2') ?? '';
     final businessPhone = prefs.getString('business_phone') ?? '';
+    final headerGstin = prefs.getString('gstin_number') ?? '';
     final paperWidth = prefs.getInt('paper_width') ?? 32;
     final showBranding = prefs.getBool('bill_show_branding') ?? true;
 
@@ -664,7 +692,9 @@ class ReceiptService {
     receipt.writeln(businessName);
     receipt.write(ESC_BOLD_OFF);
     if (businessAddress.isNotEmpty) receipt.writeln(businessAddress);
+    if (businessAddress2.isNotEmpty) receipt.writeln(businessAddress2);
     if (businessPhone.isNotEmpty) receipt.writeln(businessPhone);
+    if (headerGstin.isNotEmpty) receipt.writeln('GSTIN: $headerGstin');
     receipt.writeln(divider);
     receipt.write(ESC_BOLD_ON);
     receipt.writeln('BOOKING RECEIPT');
@@ -716,9 +746,11 @@ class ReceiptService {
     } else {
       receipt.writeln('Total Fare: Rs. ${booking.totalFare.toStringAsFixed(0)}');
     }
+    // Balance is on the GST-inclusive grand total (what the customer pays)
+    final grandTotal = gst.applies ? gst.total : booking.totalFare;
     receipt.writeln('Advance:    Rs. ${booking.amountPaid.toStringAsFixed(0)}');
     receipt.write(ESC_BOLD_ON);
-    receipt.writeln('Balance:    Rs. ${booking.balance.toStringAsFixed(0)}');
+    receipt.writeln('Balance:    Rs. ${(grandTotal - booking.amountPaid).toStringAsFixed(0)}');
     receipt.write(ESC_BOLD_OFF);
     receipt.writeln(dashLine);
 
@@ -742,7 +774,9 @@ class ReceiptService {
 
     final businessName = prefs.getString('business_name') ?? 'Go2-Parking';
     final businessAddress = prefs.getString('business_address') ?? '';
+    final businessAddress2 = prefs.getString('business_address2') ?? '';
     final businessPhone = prefs.getString('business_phone') ?? '';
+    final headerGstin = prefs.getString('gstin_number') ?? '';
     final paperWidth = prefs.getInt('paper_width') ?? 32;
     final showBranding = prefs.getBool('bill_show_branding') ?? true;
 
@@ -756,7 +790,9 @@ class ReceiptService {
     receipt.writeln(businessName);
     receipt.write(ESC_BOLD_OFF);
     if (businessAddress.isNotEmpty) receipt.writeln(businessAddress);
+    if (businessAddress2.isNotEmpty) receipt.writeln(businessAddress2);
     if (businessPhone.isNotEmpty) receipt.writeln(businessPhone);
+    if (headerGstin.isNotEmpty) receipt.writeln('GSTIN: $headerGstin');
     receipt.writeln(divider);
     receipt.write(ESC_BOLD_ON);
     receipt.writeln('BOOKING CLOSING');
@@ -778,8 +814,6 @@ class ReceiptService {
     }
     receipt.writeln(dashLine);
 
-    final balance = booking.balance < 0 ? 0.0 : booking.balance;
-
     // GST on the booking fare (booking = true) — shared calc
     final gst = await GstService.compute(amount: booking.totalFare, isBooking: true);
     if (gst.applies) {
@@ -792,6 +826,9 @@ class ReceiptService {
     } else {
       receipt.writeln('Total Fare: Rs. ${booking.totalFare.toStringAsFixed(0)}');
     }
+    // Balance on the GST-inclusive grand total (what the customer pays)
+    final grandTotal = gst.applies ? gst.total : booking.totalFare;
+    final balance = (grandTotal - booking.amountPaid) < 0 ? 0.0 : (grandTotal - booking.amountPaid);
     receipt.writeln('Paid:       Rs. ${booking.amountPaid.toStringAsFixed(0)}');
     receipt.write(ESC_BOLD_ON);
     receipt.writeln('Balance:    Rs. ${balance.toStringAsFixed(0)}');
