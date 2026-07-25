@@ -26,7 +26,7 @@ class LocalDatabaseService {
 
     return await openDatabase(
       path,
-      version: 7,
+      version: 8,
       onCreate: (db, version) async {
         print('🗄️ Creating local database...');
 
@@ -131,6 +131,11 @@ class LocalDatabaseService {
           // Bookings module — separate tables
           try { await _createBookingsTable(db); } catch (_) {}
         }
+
+        if (oldVersion < 8) {
+          // Per-booking inter-state (IGST) flag
+          try { await db.execute('ALTER TABLE bookings ADD COLUMN is_interstate INTEGER DEFAULT 0'); } catch (_) {}
+        }
       },
     );
   }
@@ -155,6 +160,7 @@ class LocalDatabaseService {
         status TEXT DEFAULT 'partial',
         remarks TEXT,
         booking_date TEXT,
+        is_interstate INTEGER DEFAULT 0,
         synced INTEGER DEFAULT 0,
         created_at TEXT,
         updated_at TEXT
@@ -579,6 +585,7 @@ class LocalDatabaseService {
         'status': booking.status,
         'remarks': booking.remarks,
         'booking_date': booking.bookingDate.toIso8601String(),
+        'is_interstate': booking.interState ? 1 : 0,
         'synced': synced ? 1 : 0,
         'created_at': now,
         'updated_at': now,
@@ -612,6 +619,7 @@ class LocalDatabaseService {
           'status': b.status,
           'remarks': b.remarks,
           'booking_date': b.bookingDate.toIso8601String(),
+          'is_interstate': b.interState ? 1 : 0,
           'synced': synced ? 1 : 0,
           'created_at': now,
           'updated_at': now,
@@ -631,6 +639,7 @@ class LocalDatabaseService {
         'total_fare': booking.totalFare,
         'amount_paid': booking.amountPaid,
         'status': booking.status,
+        'is_interstate': booking.interState ? 1 : 0,
         'synced': synced ? 1 : 0,
         'updated_at': DateTime.now().toIso8601String(),
       },
@@ -730,6 +739,7 @@ class LocalDatabaseService {
       bookingDate: m['booking_date'] != null
           ? DateTime.parse(m['booking_date'])
           : DateTime.now(),
+      interState: (m['is_interstate'] as num?)?.toInt() == 1,
     );
   }
 

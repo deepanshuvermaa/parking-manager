@@ -37,6 +37,7 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
   bool _enableGst = false;
   bool _gstOnParking = true;
   bool _gstOnBooking = true;
+  bool _gstInterstateDefault = false;
   double _gstRate = 18.0;
   final _gstinCtrl = TextEditingController();
   final _gstRateCtrl = TextEditingController(text: '18');
@@ -81,6 +82,7 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
       _enableGst = p.getBool('enable_gst') ?? false;
       _gstOnParking = p.getBool('gst_on_parking') ?? true;
       _gstOnBooking = p.getBool('gst_on_booking') ?? true;
+      _gstInterstateDefault = p.getBool('gst_interstate_default') ?? false;
       _gstRate = _safeDouble(p, 'gst_rate', 18.0);
       _gstRateCtrl.text = _gstRate.toStringAsFixed(_gstRate == _gstRate.roundToDouble() ? 0 : 1);
       _gstinCtrl.text = p.getString('gstin_number') ?? '';
@@ -104,6 +106,7 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
     await p.setBool('enable_gst', _enableGst);
     await p.setBool('gst_on_parking', _gstOnParking);
     await p.setBool('gst_on_booking', _gstOnBooking);
+    await p.setBool('gst_interstate_default', _gstInterstateDefault);
     await p.setDouble('gst_rate', _gstRate);
     await p.setString('gstin_number', _gstinCtrl.text.trim());
     SettingsSyncService.syncToBackend(widget.token);
@@ -241,6 +244,14 @@ class _SimpleSettingsScreenState extends State<SimpleSettingsScreen> {
                 subtitle: const Text('GST on booking fare'),
                 value: _gstOnBooking,
                 onChanged: (v) { setState(() => _gstOnBooking = v); _save(); },
+              ),
+              const Divider(height: 1),
+              SwitchListTile(
+                dense: true, activeColor: Go2Colors.primary,
+                title: const Text('Inter-state (IGST) by default'),
+                subtitle: const Text('For parking charges; bookings set per-trip'),
+                value: _gstInterstateDefault,
+                onChanged: (v) { setState(() => _gstInterstateDefault = v); _save(); },
               ),
               const Divider(height: 1),
               Padding(

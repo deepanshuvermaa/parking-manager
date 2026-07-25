@@ -51,6 +51,17 @@ class ReceiptService {
     return '$ESC_BOLD_ON$text$ESC_BOLD_OFF';
   }
 
+  /// Write the GST breakdown lines (between Subtotal and Total).
+  /// Inter-state -> single IGST line. Intra-state -> CGST + SGST (each half rate).
+  static void _writeGstBreakdown(StringBuffer receipt, GstBreakdown gst) {
+    if (gst.interState) {
+      receipt.writeln('IGST @${gst.rateLabel}%: Rs. ${gst.igst.toStringAsFixed(2)}');
+    } else {
+      receipt.writeln('CGST @${gst.halfRateLabel}%: Rs. ${gst.cgst.toStringAsFixed(2)}');
+      receipt.writeln('SGST @${gst.halfRateLabel}%: Rs. ${gst.sgst.toStringAsFixed(2)}');
+    }
+  }
+
   // Generate entry receipt
   static Future<String> generateEntryReceipt(SimpleVehicle vehicle) async {
     final prefs = await SharedPreferences.getInstance();
@@ -222,14 +233,14 @@ class ReceiptService {
     final gst = await GstService.compute(
       amount: vehicle.fare ?? 0,
       isBooking: vehicle.fare != null && vehicle.fare! > 0,
+      interState: prefs.getBool('gst_interstate_default') ?? false,
     );
     if (gst.applies) {
       receipt.writeln('Subtotal: Rs. ${gst.subtotal.toStringAsFixed(0)}');
-      receipt.writeln('GST @${gst.rateLabel}%: Rs. ${gst.gstAmount.toStringAsFixed(2)}');
+      _writeGstBreakdown(receipt, gst);
       receipt.write(ESC_BOLD_ON);
       receipt.writeln('Total: Rs. ${gst.total.toStringAsFixed(0)}');
       receipt.write(ESC_BOLD_OFF);
-      if (gst.gstin.isNotEmpty) receipt.writeln('GSTIN: ${gst.gstin}');
       receipt.writeln('-' * paperWidth);
     }
 
@@ -378,16 +389,16 @@ class ReceiptService {
     final gst = await GstService.compute(
       amount: amount,
       isBooking: vehicle.fare != null && vehicle.fare! > 0,
+      interState: prefs.getBool('gst_interstate_default') ?? false,
     );
 
     if (gst.applies) {
       receipt.writeln('');
       receipt.writeln('Subtotal: Rs. ${gst.subtotal.toStringAsFixed(0)}');
-      receipt.writeln('GST @${gst.rateLabel}%: Rs. ${gst.gstAmount.toStringAsFixed(2)}');
+      _writeGstBreakdown(receipt, gst);
       receipt.write(getSizeCommand(amountSize, amountBold));
       receipt.writeln('TOTAL: Rs. ${gst.total.toStringAsFixed(0)}');
       receipt.write(ESC_NORMAL);
-      if (gst.gstin.isNotEmpty) receipt.writeln('GSTIN: ${gst.gstin}');
     } else {
       receipt.writeln('');
       receipt.write(getSizeCommand(amountSize, amountBold));
@@ -611,17 +622,20 @@ class ReceiptService {
     receipt.writeln(divider);
 
     // Fare - prominent display with optional GST (taxi = booking) — shared calc
-    final gst = await GstService.compute(amount: booking.fareAmount.toDouble(), isBooking: true);
+    final gst = await GstService.compute(
+      amount: booking.fareAmount.toDouble(),
+      isBooking: true,
+      interState: prefs.getBool('gst_interstate_default') ?? false,
+    );
 
     receipt.writeln('');
     receipt.writeln(doubleDivider);
     if (gst.applies) {
       receipt.writeln('Subtotal: ${Helpers.formatCurrency(booking.fareAmount)}');
-      receipt.writeln('GST @${gst.rateLabel}%: Rs. ${gst.gstAmount.toStringAsFixed(2)}');
+      _writeGstBreakdown(receipt, gst);
       receipt.write(getSizeCommand(amountSize, amountBold));
       receipt.writeln('TOTAL: Rs. ${gst.total.toStringAsFixed(0)}');
       receipt.write(ESC_NORMAL);
-      if (gst.gstin.isNotEmpty) receipt.writeln('GSTIN: ${gst.gstin}');
     } else {
       receipt.write(getSizeCommand(amountSize, amountBold));
       receipt.writeln('FARE: ${Helpers.formatCurrency(booking.fareAmount)}');
@@ -734,14 +748,17 @@ class ReceiptService {
     receipt.writeln(dashLine);
 
     // GST on the booking fare (booking = true) — shared calc
-    final gst = await GstService.compute(amount: booking.totalFare, isBooking: true);
+    final gst = await GstService.compute(
+      amount: booking.totalFare,
+      isBooking: true,
+      interState: booking.interState,
+    );
     if (gst.applies) {
       receipt.writeln('Subtotal:   Rs. ${gst.subtotal.toStringAsFixed(0)}');
-      receipt.writeln('GST @${gst.rateLabel}%: Rs. ${gst.gstAmount.toStringAsFixed(2)}');
+      _writeGstBreakdown(receipt, gst);
       receipt.write(ESC_BOLD_ON);
       receipt.writeln('Total Fare: Rs. ${gst.total.toStringAsFixed(0)}');
       receipt.write(ESC_BOLD_OFF);
-      if (gst.gstin.isNotEmpty) receipt.writeln('GSTIN: ${gst.gstin}');
     } else {
       receipt.writeln('Total Fare: Rs. ${booking.totalFare.toStringAsFixed(0)}');
     }
@@ -814,14 +831,17 @@ class ReceiptService {
     receipt.writeln(dashLine);
 
     // GST on the booking fare (booking = true) — shared calc
-    final gst = await GstService.compute(amount: booking.totalFare, isBooking: true);
+    final gst = await GstService.compute(
+      amount: booking.totalFare,
+      isBooking: true,
+      interState: booking.interState,
+    );
     if (gst.applies) {
       receipt.writeln('Subtotal:   Rs. ${gst.subtotal.toStringAsFixed(0)}');
-      receipt.writeln('GST @${gst.rateLabel}%: Rs. ${gst.gstAmount.toStringAsFixed(2)}');
+      _writeGstBreakdown(receipt, gst);
       receipt.write(ESC_BOLD_ON);
       receipt.writeln('Total Fare: Rs. ${gst.total.toStringAsFixed(0)}');
       receipt.write(ESC_BOLD_OFF);
-      if (gst.gstin.isNotEmpty) receipt.writeln('GSTIN: ${gst.gstin}');
     } else {
       receipt.writeln('Total Fare: Rs. ${booking.totalFare.toStringAsFixed(0)}');
     }

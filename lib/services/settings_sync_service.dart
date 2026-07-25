@@ -20,7 +20,7 @@ class SettingsSyncService {
     'show_extra_fields', 'show_driver_name', 'show_driver_mobile', 'show_fare',
     // GST / Tax
     'enable_gst', 'gst_rate', 'gstin_number',
-    'gst_on_parking', 'gst_on_booking',
+    'gst_on_parking', 'gst_on_booking', 'gst_interstate_default',
     // Receipt customization toggles
     'bill_show_business_name', 'bill_show_business_address', 'bill_show_business_phone',
     'bill_show_gst_number', 'bill_show_rate_info', 'bill_show_notes',

@@ -18,6 +18,9 @@ class Booking {
   final String? remarks;
   final DateTime bookingDate;
 
+  /// Inter-state trip — bills GST as IGST instead of CGST+SGST. Per-booking.
+  final bool interState;
+
   Booking({
     required this.id,
     this.userId,
@@ -35,6 +38,7 @@ class Booking {
     this.status = 'partial',
     this.remarks,
     required this.bookingDate,
+    this.interState = false,
   });
 
   // GST-inclusive grand total — what the customer actually pays.
@@ -70,7 +74,17 @@ class Booking {
       status: json['status'] ?? 'partial',
       remarks: json['remarks'],
       bookingDate: _parseTime(json['booking_date'] ?? json['bookingDate']),
+      interState: _toBool(json['is_interstate'] ?? json['isInterstate']),
     );
+  }
+
+  // Parse a bool that may arrive as bool, int (0/1), string, or null.
+  static bool _toBool(dynamic v) {
+    if (v == null) return false;
+    if (v is bool) return v;
+    if (v is num) return v != 0;
+    if (v is String) return v == 'true' || v == '1';
+    return false;
   }
 
   // Parse time — always returns local time regardless of whether input is UTC or local
@@ -104,5 +118,6 @@ class Booking {
         'status': status,
         'remarks': remarks,
         'booking_date': bookingDate.toUtc().toIso8601String(),
+        'is_interstate': interState,
       };
 }

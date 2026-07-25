@@ -657,6 +657,7 @@ app.post('/api/bookings', verifyToken, checkTrialExpiry, async (req, res) => {
       status: b.status || rb.status || 'partial',
       remarks: b.remarks || rb.remarks || null,
       bookingDate: b.bookingDate || rb.booking_date || new Date(),
+      isInterstate: (b.isInterstate === true || b.isInterstate === 1 || rb.is_interstate === true || rb.is_interstate === 1),
     };
 
     if (!data.customerName) {
@@ -671,8 +672,8 @@ app.post('/api/bookings', verifyToken, checkTrialExpiry, async (req, res) => {
       await client.query('BEGIN');
 
       const result = await client.query(
-        `INSERT INTO bookings (user_id, booking_number, customer_name, customer_mobile, vehicle_number, vehicle_type, driver_name, driver_mobile, from_location, to_location, total_fare, amount_paid, status, remarks, booking_date)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        `INSERT INTO bookings (user_id, booking_number, customer_name, customer_mobile, vehicle_number, vehicle_type, driver_name, driver_mobile, from_location, to_location, total_fare, amount_paid, status, remarks, booking_date, is_interstate)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
          RETURNING *`,
         [
           req.userId,
@@ -690,6 +691,7 @@ app.post('/api/bookings', verifyToken, checkTrialExpiry, async (req, res) => {
           data.status,
           data.remarks,
           data.bookingDate,
+          data.isInterstate,
         ]
       );
 

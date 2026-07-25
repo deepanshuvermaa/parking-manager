@@ -9,6 +9,7 @@ class GstService {
   static Future<GstBreakdown> compute({
     required double amount,
     required bool isBooking,
+    bool interState = false,
   }) async {
     final p = await SharedPreferences.getInstance();
     final enabled = p.getBool('enable_gst') ?? false;
@@ -20,6 +21,13 @@ class GstService {
     final applies = enabled && amount > 0 && (isBooking ? onBooking : onParking);
     final gstAmount = applies ? amount * rate / 100 : 0.0;
 
+    // CGST/SGST/IGST split. Total tax (gstAmount) is identical either way:
+    //   inter-state -> single IGST at full rate
+    //   intra-state -> CGST + SGST, each at half the rate
+    final igst = interState ? gstAmount : 0.0;
+    final cgst = interState ? 0.0 : gstAmount / 2;
+    final sgst = interState ? 0.0 : gstAmount / 2;
+
     return GstBreakdown(
       applies: applies,
       rate: rate,
@@ -27,6 +35,11 @@ class GstService {
       gstAmount: gstAmount,
       total: amount + gstAmount,
       gstin: gstin,
+      interState: interState,
+      cgst: cgst,
+      sgst: sgst,
+      igst: igst,
+      halfRate: rate / 2,
     );
   }
 
@@ -68,6 +81,16 @@ class GstBreakdown {
   final double total;
   final String gstin;
 
+  /// When true the charge is billed as a single IGST line (inter-state supply).
+  /// When false it is split into CGST + SGST (intra-state supply).
+  final bool interState;
+  final double cgst;
+  final double sgst;
+  final double igst;
+
+  /// Half of [rate] — the per-component rate used for CGST and SGST.
+  final double halfRate;
+
   const GstBreakdown({
     required this.applies,
     required this.rate,
@@ -75,8 +98,18 @@ class GstBreakdown {
     required this.gstAmount,
     required this.total,
     required this.gstin,
+    this.interState = false,
+    this.cgst = 0,
+    this.sgst = 0,
+    this.igst = 0,
+    this.halfRate = 0,
   });
 
   /// "18" or "18.5" — no trailing .0 on whole rates.
-  String get rateLabel => rate.toStringAsFixed(rate == rate.roundToDouble() ? 0 : 1);
+  String get rateLabel => _label(rate);
+
+  /// "9" or "2.5" — the CGST/SGST per-component rate, no trailing .0.
+  String get halfRateLabel => _label(halfRate);
+
+  static String _label(double r) => r.toStringAsFixed(r == r.roundToDouble() ? 0 : 1);
 }

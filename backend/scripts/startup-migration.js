@@ -510,6 +510,19 @@ async function runStartupMigrations(pool) {
       console.log('✅ Bookings tables created');
     }
 
+    // ========================================
+    // MIGRATION 11: Add per-booking inter-state (IGST) flag
+    // ========================================
+    const bookingInterstateCheck = await pool.query(
+      "SELECT * FROM schema_migrations WHERE migration_name = 'add_booking_interstate'"
+    );
+    if (bookingInterstateCheck.rows.length === 0) {
+      console.log('📦 Adding is_interstate column to bookings...');
+      await pool.query('ALTER TABLE bookings ADD COLUMN IF NOT EXISTS is_interstate BOOLEAN DEFAULT false');
+      await pool.query("INSERT INTO schema_migrations (migration_name) VALUES ('add_booking_interstate')");
+      console.log('✅ Booking inter-state column added');
+    }
+
   } catch (error) {
     console.error('❌ Migration error:', error);
     console.error('⚠️ Server will continue without new features');

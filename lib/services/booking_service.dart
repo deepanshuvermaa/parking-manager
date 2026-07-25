@@ -220,6 +220,7 @@ class BookingService {
     required double totalFare,
     double advance = 0,
     String? remarks,
+    bool interState = false,
   }) async {
     await GstService.refreshBookingGst();
     final paid = advance < 0 ? 0.0 : advance;
@@ -240,6 +241,7 @@ class BookingService {
       status: paid >= totalFare && totalFare > 0 ? 'paid' : 'partial',
       remarks: remarks?.trim().isNotEmpty == true ? remarks!.trim() : null,
       bookingDate: DateTime.now(),
+      interState: interState,
     );
 
     // 1. Save locally first
@@ -288,6 +290,7 @@ class BookingService {
           'status': booking.status,
           'remarks': booking.remarks,
           'bookingDate': booking.bookingDate.toUtc().toIso8601String(),
+          'isInterstate': booking.interState,
         }),
       ).timeout(const Duration(seconds: 10));
 

@@ -248,6 +248,7 @@ class _BookingsScreenState extends State<BookingsScreen> {
     final advanceCtl = TextEditingController();
     String vehicleType = _vehicleTypes.first;
     bool saving = false;
+    bool interState = false;
 
     showModalBottomSheet(
       context: context,
@@ -291,6 +292,15 @@ class _BookingsScreenState extends State<BookingsScreen> {
                     _field(toCtl, 'To', TextInputType.text),
                     _field(fareCtl, 'Total Fare *', TextInputType.number, decimal: true),
                     _field(advanceCtl, 'Advance', TextInputType.number, decimal: true),
+                    SwitchListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      activeColor: Go2Colors.primary,
+                      title: const Text('Inter-state trip (IGST)'),
+                      subtitle: const Text('Tax as IGST instead of CGST+SGST'),
+                      value: interState,
+                      onChanged: (v) => setSheet(() => interState = v),
+                    ),
                     const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,
@@ -325,6 +335,7 @@ class _BookingsScreenState extends State<BookingsScreen> {
                                   toLocation: toCtl.text,
                                   totalFare: fare,
                                   advance: advance,
+                                  interState: interState,
                                 );
                                 if (booking != null) {
                                   final receipt =
