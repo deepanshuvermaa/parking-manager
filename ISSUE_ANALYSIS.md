@@ -185,7 +185,7 @@ curl -X POST https://parkease-production-6679.up.railway.app/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{
     "username": "test@example.com",
-    "password": "password123",
+    "password": "$TEST_PASSWORD",
     "deviceId": "test-device-123",
     "deviceName": "Test Device",
     "platform": "Android"

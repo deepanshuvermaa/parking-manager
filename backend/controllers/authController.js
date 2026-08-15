@@ -68,16 +68,14 @@ class AuthController {
           });
         }
 
-        // Check if user has password
+        // Legacy accounts without a password must complete an explicit setup/reset flow.
+        // Never create or assign a shared default password during login.
         if (!user.password_hash) {
-          // Set a default password for old users
-          const defaultPassword = 'password123';
-          const hashedPassword = await bcrypt.hash(defaultPassword, 10);
-          await this.pool.query(
-            'UPDATE users SET password_hash = $1 WHERE id = $2',
-            [hashedPassword, user.id]
-          );
-          user.password_hash = hashedPassword;
+          return res.status(409).json({
+            success: false,
+            error: 'Password setup required',
+            code: 'PASSWORD_SETUP_REQUIRED'
+          });
         }
 
         const isValidPassword = await bcrypt.compare(password, user.password_hash);

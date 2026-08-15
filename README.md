@@ -1,6 +1,8 @@
-# ParkEase Manager - Smart Parking Management System
+# ParkEase Manager
 
-A comprehensive parking management solution with Flutter mobile app and Node.js backend.
+**Working product demo — offline-first parking operations for real-world operators.**
+
+ParkEase is a Flutter mobile app plus Node.js/PostgreSQL backend for vehicle entry and exit, receipts, occupancy, analytics, multi-device sessions, and multi-location operations. The system is designed for environments where connectivity, printers, and operator workflows cannot be assumed to be perfect.
 
 ## 🚀 Features
 
@@ -21,6 +23,20 @@ A comprehensive parking management solution with Flutter mobile app and Node.js 
 - 🔄 Data synchronization with conflict resolution
 - 📊 Analytics and dashboard APIs
 - 🛡️ Role-based access control
+
+## Product workflow
+
+```text
+Open shift → record vehicle entry → issue receipt → handle offline or printer failure → record exit → reconcile sync → review occupancy and revenue
+```
+
+The product’s differentiator is operational resilience: local capture, cloud synchronization, explicit conflict handling, device/session management, and a manual recovery path when a printer or network is unavailable.
+
+## Verification status
+
+- **Implemented product surface:** Flutter mobile workflow, Node.js APIs, PostgreSQL integration, authentication/session handling, printing integration, analytics, and sync-related components.
+- **Founder-demo ready:** the entry-to-exit workflow can be demonstrated with a simulated offline period, a printer failure, and a later sync/reconciliation step.
+- **Before production use:** complete authentication hardening, run the full test suite on supported devices, verify tenant and role isolation, configure production secrets, review database migrations, and complete an operational security review.
 
 ## 🛠️ Tech Stack
 
@@ -93,11 +109,18 @@ npm run setup-db
 npm start
 ```
 
-## 📝 Default Credentials
+## Local development authentication
 
-### Admin User
-- **Username**: admin
-- **Password**: password
+Use environment-backed seed configuration for local development only. Do not commit real credentials or ship a shared default password. A production deployment must require a first-run administrator setup or one-time password initialization before any account can log in.
+
+## Demo walkthrough
+
+1. Start a shift and record a vehicle entry.
+2. Print or preview a receipt.
+3. Simulate offline mode and record another entry.
+4. Restore connectivity and show sync/reconciliation.
+5. Trigger a permission-denied or printer-unavailable state and show the recovery path.
+6. Close the shift and inspect occupancy and revenue analytics.
 
 ## 👨‍💻 Developer
 

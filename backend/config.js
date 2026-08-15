@@ -5,6 +5,16 @@
 
 require('dotenv').config();
 
+const corsOrigins = (process.env.CORS_ORIGINS || process.env.FRONTEND_URL || 'http://localhost:3000')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const jwtSecret = process.env.JWT_SECRET;
+if (process.env.NODE_ENV === 'production' && !jwtSecret) {
+  throw new Error('JWT_SECRET must be set when NODE_ENV=production');
+}
+
 const config = {
   // Environment
   env: process.env.NODE_ENV || 'development',
@@ -22,14 +32,21 @@ const config = {
 
   // JWT
   jwt: {
-    secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
+    // Development may use a local-only value; production must provide JWT_SECRET.
+    secret: jwtSecret || 'development-only-secret-change-me',
     expiresIn: '7d',
     refreshExpiresIn: '30d',
   },
 
   // CORS
   cors: {
-    origin: true, // Allow all origins
+    origin(origin, callback) {
+      // Allow non-browser clients without an Origin header, but restrict browsers.
+      if (!origin || corsOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error('Origin is not allowed by CORS'));
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'X-Admin-Key'],

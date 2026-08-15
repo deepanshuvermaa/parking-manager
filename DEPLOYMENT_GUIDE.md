@@ -188,12 +188,12 @@ SELECT * FROM sessions WHERE user_id = '<user_id_from_above>';
 # First login (should succeed)
 curl -X POST https://parkease-production-6679.up.railway.app/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"test@example.com","password":"password123","deviceId":"device-1","deviceName":"Phone 1","platform":"Android"}'
+  -d '{"username":"$TEST_USERNAME","password":"$TEST_PASSWORD","deviceId":"device-1","deviceName":"Phone 1","platform":"Android"}'
 
 # Second login from different device (should fail with 403)
 curl -X POST https://parkease-production-6679.up.railway.app/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"test@example.com","password":"password123","deviceId":"device-2","deviceName":"Phone 2","platform":"Android"}'
+  -d '{"username":"$TEST_USERNAME","password":"$TEST_PASSWORD","deviceId":"device-2","deviceName":"Phone 2","platform":"Android"}'
 ```
 
 ---
