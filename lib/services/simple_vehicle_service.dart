@@ -404,6 +404,57 @@ class SimpleVehicleService {
   // BACKGROUND SYNC — PUSH UNSYNCED TO BACKEND
   // ============================================
 
+  /// Create a never-synced vehicle on the backend and return its server id.
+  ///
+  /// Used when an offline entry is exited before it ever reached the backend:
+  /// the exit endpoint needs a row that exists server-side. Returns null if the
+  /// create fails, leaving the record queued for the next cycle.
+  static Future<String?> _createEntryOnBackend(
+      String token, SimpleVehicle vehicle) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/api/vehicles'),
+            headers: ApiConfig.authHeaders(token),
+            body: jsonEncode({
+              'vehicleNumber': vehicle.vehicleNumber,
+              'vehicleType': vehicle.vehicleType,
+              'entryTime': vehicle.entryTime.toUtc().toIso8601String(),
+              'hourlyRate': vehicle.hourlyRate,
+              'minimumRate': vehicle.minimumRate,
+              'notes': vehicle.notes,
+              'ticketId': vehicle.ticketId,
+              'fromLocation': vehicle.fromLocation,
+              'toLocation': vehicle.toLocation,
+              'bookedBy': vehicle.bookedBy,
+              'bookedByMobile': vehicle.bookedByMobile,
+              'driverName': vehicle.driverName,
+              'driverMobile': vehicle.driverMobile,
+              'fare': vehicle.fare,
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final created = data['data']?['vehicle'];
+        if (data['success'] == true && created != null) {
+          return created['id']?.toString();
+        }
+      }
+
+      if (response.statusCode == 401 || response.statusCode == 403) {
+        await _renewOrGiveUp();
+      }
+      DebugLogger.log(
+          '⚠️ Backfill create failed for ${vehicle.vehicleNumber}: HTTP ${response.statusCode}');
+      return null;
+    } catch (e) {
+      DebugLogger.log('⚠️ Backfill create error for ${vehicle.vehicleNumber}: $e');
+      return null;
+    }
+  }
+
   /// Push all unsynced local changes to backend (called by periodic timer)
   static Future<void> syncPendingChanges(String token) async {
     if (token.isEmpty || token == 'offline_local_token') return;
@@ -424,8 +475,23 @@ class SimpleVehicleService {
       if (AuthTokenService.refreshRejected) break;
       try {
         if (vehicle.status == 'exited' && vehicle.exitTime != null) {
+          // A vehicle parked AND exited while offline still carries its local
+          // id, so the backend has no row to apply the exit to and the PUT
+          // 404s forever — the record could never sync and its revenue never
+          // reached the server. Create the entry first, then exit the row the
+          // backend just gave us.
+          var remoteId = vehicle.id;
+          if (remoteId.startsWith('local_')) {
+            final createdId = await _createEntryOnBackend(token, vehicle);
+            if (createdId == null) {
+              failed++;
+              continue;
+            }
+            remoteId = createdId;
+          }
+
           final response = await http.put(
-            Uri.parse('$baseUrl/api/vehicles/${vehicle.id}/exit'),
+            Uri.parse('$baseUrl/api/vehicles/$remoteId/exit'),
             headers: ApiConfig.authHeaders(token),
             body: jsonEncode({
               'exitTime': vehicle.exitTime!.toIso8601String(),
@@ -443,6 +509,11 @@ class SimpleVehicleService {
               // abandoning it. Give up only if the refresh token is dead too.
               if (!await _renewOrGiveUp()) break;
             }
+            // A silent failed++ made a permanently-stuck record impossible to
+            // diagnose from the field. Say which record and why.
+            DebugLogger.log(
+                '⚠️ Sync failed ${vehicle.vehicleNumber} (${vehicle.status}) '
+                'HTTP ${response.statusCode}: ${response.body}');
             failed++;
           }
         } else {
@@ -482,10 +553,16 @@ class SimpleVehicleService {
               // abandoning it. Give up only if the refresh token is dead too.
               if (!await _renewOrGiveUp()) break;
             }
+            // A silent failed++ made a permanently-stuck record impossible to
+            // diagnose from the field. Say which record and why.
+            DebugLogger.log(
+                '⚠️ Sync failed ${vehicle.vehicleNumber} (${vehicle.status}) '
+                'HTTP ${response.statusCode}: ${response.body}');
             failed++;
           }
         }
       } catch (e) {
+        DebugLogger.log('⚠️ Sync error ${vehicle.vehicleNumber}: $e');
         failed++;
       }
     }
