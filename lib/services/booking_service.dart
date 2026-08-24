@@ -191,10 +191,13 @@ class BookingService {
   static Future<void> _pushUnsyncedPayments(String token, String bookingId) async {
     final payments = await LocalDatabaseService.getUnsyncedPaymentsForBooking(bookingId);
     for (final p in payments) {
-      final ok = await _postPayment(token, bookingId, (p['amount'] as num).toDouble(), p['note'] as String?);
-      if (ok) {
-        await LocalDatabaseService.markPaymentSynced(p['id'] as String);
-      }
+      await pushPaymentOnce(
+        token,
+        bookingId,
+        p['id'] as String,
+        (p['amount'] as num).toDouble(),
+        p['note'] as String?,
+      );
     }
     // If nothing is left unsynced for this booking, mark the booking synced too.
     final remaining = await LocalDatabaseService.getUnsyncedPaymentsForBooking(bookingId);
@@ -385,26 +388,52 @@ class BookingService {
     return booking;
   }
 
-  static Future<void> _syncPaymentToBackend(
+  /// Ledger rows currently being pushed, so the fire-and-forget send from
+  /// addPayment and the periodic replay cannot post the same payment twice.
+  /// The backend key makes a duplicate harmless; this stops it being sent.
+  static final Set<String> _inFlightPayments = <String>{};
+
+  static Future<bool> pushPaymentOnce(
       String token, String bookingId, String paymentId, double amount, String? note) async {
-    final ok = await _postPayment(token, bookingId, amount, note);
-    if (ok) {
-      await LocalDatabaseService.markPaymentSynced(paymentId);
-      // Mark the booking synced only if no other unsynced payments remain.
-      final remaining = await LocalDatabaseService.getUnsyncedPaymentsForBooking(bookingId);
-      if (remaining.isEmpty) {
-        await LocalDatabaseService.markBookingSynced(bookingId);
+    if (!_inFlightPayments.add(paymentId)) return false;
+    try {
+      final ok = await _postPayment(token, bookingId, amount, note,
+          clientPaymentId: paymentId);
+      if (ok) {
+        await LocalDatabaseService.markPaymentSynced(paymentId);
+        // Mark the booking synced only if no other unsynced payments remain.
+        final remaining =
+            await LocalDatabaseService.getUnsyncedPaymentsForBooking(bookingId);
+        if (remaining.isEmpty) {
+          await LocalDatabaseService.markBookingSynced(bookingId);
+        }
       }
+      return ok;
+    } finally {
+      _inFlightPayments.remove(paymentId);
     }
   }
 
+  static Future<void> _syncPaymentToBackend(
+      String token, String bookingId, String paymentId, double amount, String? note) async {
+    await pushPaymentOnce(token, bookingId, paymentId, amount, note);
+  }
+
   /// POST a single payment to the backend. Returns true on success.
-  static Future<bool> _postPayment(String token, String bookingId, double amount, String? note) async {
+  static Future<bool> _postPayment(String token, String bookingId, double amount,
+      String? note, {String? clientPaymentId}) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/api/bookings/$bookingId/payments'),
         headers: ApiConfig.authHeaders(token),
-        body: jsonEncode({'amount': amount, 'note': note}),
+        body: jsonEncode({
+          'amount': amount,
+          'note': note,
+          // Idempotency key: our own ledger row id. A replayed push carries the
+          // same value and the backend skips the duplicate insert instead of
+          // recording the customer's money twice.
+          'clientPaymentId': clientPaymentId,
+        }),
       ).timeout(const Duration(seconds: 10));
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {

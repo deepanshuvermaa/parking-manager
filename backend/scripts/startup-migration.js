@@ -640,6 +640,88 @@ async function runStartupMigrations(pool) {
       }
     }
 
+    // ========================================
+    // MIGRATION 13: Idempotency key for booking payments
+    //
+    // addPayment writes the ledger row locally as unsynced and fires the POST
+    // without awaiting it. The periodic push scans for unsynced payments, so
+    // it could find that same row before the first response marked it synced
+    // and post it a second time — recording the customer's money twice. Seen
+    // in production: one "Balance settled" tap produced two 1250.00 rows
+    // 637ms apart, pushing amount_paid above total_fare.
+    //
+    // A uniqueness rule on (booking_id, amount) would be wrong: a customer can
+    // legitimately pay the same amount twice. What makes a payment the SAME
+    // payment is that it is the same client-side row, so carry that id and
+    // dedupe on it. Rows written before this column exists stay NULL and are
+    // exempt via a partial index.
+    // ========================================
+    const paymentIdemCheck = await pool.query(
+      "SELECT * FROM schema_migrations WHERE migration_name = 'booking_payment_idempotency'"
+    );
+    if (paymentIdemCheck.rows.length === 0) {
+      console.log('📦 Adding payment idempotency key...');
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query(
+          'ALTER TABLE booking_payments ADD COLUMN IF NOT EXISTS client_payment_id VARCHAR(64)'
+        );
+
+        // Repair rows already double-recorded by the race: identical booking,
+        // amount and note landing within five seconds of each other is the
+        // signature of a replayed push, not two real payments.
+        const repaired = await client.query(`
+          WITH ranked AS (
+            SELECT p.id,
+                   ROW_NUMBER() OVER (
+                     PARTITION BY p.booking_id, p.amount, COALESCE(p.note, ''),
+                                  FLOOR(EXTRACT(EPOCH FROM p.paid_at) / 5)
+                     ORDER BY p.paid_at ASC, p.id ASC
+                   ) AS rn
+            FROM booking_payments p
+          )
+          DELETE FROM booking_payments
+          WHERE id IN (SELECT id FROM ranked WHERE rn > 1)
+          RETURNING id
+        `);
+        if (repaired.rowCount > 0) {
+          console.log(`   ↳ removed ${repaired.rowCount} double-recorded payment row(s)`);
+        }
+
+        // Re-derive amount_paid/status from the corrected ledger.
+        await client.query(`
+          UPDATE bookings b
+          SET amount_paid = COALESCE((
+                SELECT SUM(p.amount) FROM booking_payments p WHERE p.booking_id = b.id
+              ), 0),
+              status = CASE
+                WHEN b.total_fare > 0 AND COALESCE((
+                  SELECT SUM(p.amount) FROM booking_payments p WHERE p.booking_id = b.id
+                ), 0) >= b.total_fare THEN 'paid' ELSE 'partial' END,
+              updated_at = NOW()
+          WHERE EXISTS (SELECT 1 FROM booking_payments p WHERE p.booking_id = b.id)
+        `);
+
+        await client.query(`
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_bpay_client_id_unique
+          ON booking_payments (client_payment_id)
+          WHERE client_payment_id IS NOT NULL
+        `);
+
+        await client.query(
+          "INSERT INTO schema_migrations (migration_name) VALUES ('booking_payment_idempotency')"
+        );
+        await client.query('COMMIT');
+        console.log('✅ Payment idempotency key in place');
+      } catch (e) {
+        await client.query('ROLLBACK');
+        console.error('❌ Payment idempotency migration failed, rolled back:', e.message);
+      } finally {
+        client.release();
+      }
+    }
+
   } catch (error) {
     console.error('❌ Migration error:', error);
     console.error('⚠️ Server will continue without new features');

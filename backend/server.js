@@ -777,11 +777,32 @@ app.post('/api/bookings/:id/payments', verifyToken, checkTrialExpiry, async (req
     try {
       await client.query('BEGIN');
 
-      // Insert payment row
-      await client.query(
-        'INSERT INTO booking_payments (booking_id, amount, note) VALUES ($1, $2, $3)',
-        [id, amount, note]
+      // Insert payment row. clientPaymentId is the app's own ledger row id and
+      // makes this idempotent: a replayed push carries the same key, so the
+      // second insert is skipped rather than recording the money twice. Older
+      // clients send nothing and keep the previous behaviour.
+      const clientPaymentId = b.clientPaymentId || rb.client_payment_id || null;
+      const inserted = await client.query(
+        `INSERT INTO booking_payments (booking_id, amount, note, client_payment_id)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (client_payment_id) WHERE client_payment_id IS NOT NULL
+         DO NOTHING
+         RETURNING id`,
+        [id, amount, note, clientPaymentId]
       );
+
+      if (inserted.rowCount === 0) {
+        // Already recorded under this key — report success without touching
+        // amount_paid, so a retry is safe.
+        await client.query('COMMIT');
+        const current = await pool.query('SELECT * FROM bookings WHERE id = $1', [id]);
+        client.release();
+        return res.json({
+          success: true,
+          data: { booking: current.rows[0] },
+          message: 'Payment already recorded'
+        });
+      }
 
       // Increment amount_paid and recompute status
       const result = await client.query(
