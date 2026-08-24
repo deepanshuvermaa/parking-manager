@@ -8,6 +8,7 @@ import '../config/api_config.dart';
 import 'local_database_service.dart';
 import 'vehicle_rate_service.dart';
 import 'ticket_id_service.dart';
+import 'auth_token_service.dart';
 
 class SimpleVehicleService {
   static String get baseUrl => ApiConfig.baseUrl.replaceAll('/api', '');
@@ -22,11 +23,10 @@ class SimpleVehicleService {
   static String? lastSyncError;
   static int unsyncedCount = 0;
 
-  /// Set when the backend rejects our credentials (401/403). A bad token will
-  /// never succeed by retrying, so we stop the sync loop instead of hammering
-  /// the server every 2 minutes forever. Distinct from being offline — the UI
-  /// must tell the operator to sign in again rather than showing "Offline".
-  static bool authExpired = false;
+  /// True only when the *refresh* token is dead too, i.e. no automatic recovery
+  /// is possible and the operator must sign in again. An expired access token
+  /// alone is not this — it gets renewed transparently.
+  static bool get authExpired => AuthTokenService.refreshRejected;
 
   /// Cap on how many pending records one sync pass will push. The loop awaits
   /// each request serially, so an unbounded backlog turns into minutes of
@@ -53,7 +53,7 @@ class SimpleVehicleService {
   /// Initialize service, load local data, start background sync
   static Future<void> initialize(String token) async {
     // A fresh sign-in must clear a previous session's auth failure.
-    authExpired = false;
+    AuthTokenService.refreshRejected = false;
     if (_isInitialized) return;
 
     // Always load from local DB first (instant)
@@ -73,24 +73,42 @@ class SimpleVehicleService {
   /// Start periodic background sync timer
   static void _startPeriodicSync(String token) {
     _syncTimer?.cancel();
-    _syncTimer = Timer.periodic(const Duration(minutes: 2), (_) {
-      if (authExpired) {
-        // Credentials are dead — retrying cannot help. Stop the loop; a fresh
-        // login calls initialize() again and clears the flag.
-        stopPeriodicSync();
-        return;
-      }
-      if (!_isSyncing) _fullSync(token);
+    _syncTimer = Timer.periodic(const Duration(minutes: 2), (_) async {
+      if (_isSyncing) return;
+      // Renew ahead of expiry so a token never dies mid-cycle. Only a rejected
+      // REFRESH token stops the loop — an expired access token is routine and
+      // gets replaced transparently, which is what keeps queued bills flowing.
+      await AuthTokenService.ensureFresh();
+      if (AuthTokenService.refreshRejected) return; // keep timer alive for re-login
+      await _fullSync(_token);
     });
   }
 
-  /// Raised by any sync step that sees a 401/403 so the caller can abort the
-  /// whole cycle instead of continuing to push doomed requests.
-  static void _markAuthExpired() {
-    authExpired = true;
-    lastSyncError = 'Session expired — please sign in again';
-    DebugLogger.log('🔒 Backend rejected credentials; sync halted');
+  /// Handle a 401 from any sync step: renew the access token and tell the
+  /// caller whether to retry. Only when the refresh token is ALSO rejected do
+  /// we give up — that is the one case a restart cannot fix.
+  ///
+  /// This replaces the old behaviour of halting sync on the first 401, which
+  /// stranded every unsynced bill on the device until someone re-logged in.
+  static Future<bool> _renewOrGiveUp() async {
+    final renewed = await AuthTokenService.handleUnauthorized();
+    if (renewed) {
+      lastSyncError = null;
+      return true;
+    }
+    if (AuthTokenService.refreshRejected) {
+      lastSyncError = 'Session expired — please sign in again';
+      DebugLogger.log('🔒 Refresh token rejected; sync needs a fresh sign-in');
+    }
+    return false;
   }
+
+  /// The live access token. Never cache the string across an await — a renewal
+  /// may have rotated it.
+  static String get _token => AuthTokenService.token;
+
+  /// Guards the single 401 replay so a server stuck on 401 cannot recurse.
+  static bool _retrying = false;
 
   /// Stop periodic sync (call on logout)
   static void stopPeriodicSync() {
@@ -156,7 +174,15 @@ class SimpleVehicleService {
     }
 
     if (response.statusCode == 401 || response.statusCode == 403) {
-      _markAuthExpired();
+      if (!_retrying && await _renewOrGiveUp()) {
+        // Renewed — replay this pull once with the new token.
+        _retrying = true;
+        try {
+          return await _pullFromBackend(_token);
+        } finally {
+          _retrying = false;
+        }
+      }
       throw Exception('Pull failed: not authorised (HTTP ${response.statusCode})');
     }
 
@@ -395,7 +421,7 @@ class SimpleVehicleService {
     int failed = 0;
 
     for (var vehicle in unsyncedVehicles) {
-      if (authExpired) break;
+      if (AuthTokenService.refreshRejected) break;
       try {
         if (vehicle.status == 'exited' && vehicle.exitTime != null) {
           final response = await http.put(
@@ -413,7 +439,9 @@ class SimpleVehicleService {
             synced++;
           } else {
             if (response.statusCode == 401 || response.statusCode == 403) {
-              _markAuthExpired();
+              // Renew and let the next cycle replay this record rather than
+              // abandoning it. Give up only if the refresh token is dead too.
+              if (!await _renewOrGiveUp()) break;
             }
             failed++;
           }
@@ -450,7 +478,9 @@ class SimpleVehicleService {
             }
           } else {
             if (response.statusCode == 401 || response.statusCode == 403) {
-              _markAuthExpired();
+              // Renew and let the next cycle replay this record rather than
+              // abandoning it. Give up only if the refresh token is dead too.
+              if (!await _renewOrGiveUp()) break;
             }
             failed++;
           }

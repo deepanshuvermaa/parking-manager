@@ -7,6 +7,7 @@ import '../services/device_service.dart';
 import '../services/simple_vehicle_service.dart';
 import '../services/booking_service.dart';
 import '../services/settings_sync_service.dart';
+import '../services/auth_token_service.dart';
 
 enum AuthStatus { uninitialized, authenticated, unauthenticated, loading }
 
@@ -41,55 +42,21 @@ class AuthProvider extends ChangeNotifier {
   bool get trialExpired => isGuest && trialDaysLeft <= 0 && _trialExpires != null;
 
   /// Initialize - check stored credentials
-  /// Exchange the stored refresh token for a fresh access token.
+  /// Renew the access token via [AuthTokenService].
   ///
-  /// Returns true when the session is usable afterwards. A 401 here means the
-  /// refresh token itself has expired (30 days) and the operator genuinely has
-  /// to sign in again — callers surface that rather than reporting "offline".
+  /// Returns true when the session is usable afterwards. False with
+  /// [AuthTokenService.refreshRejected] set means the refresh token is spent
+  /// too (30 days) and the operator genuinely has to sign in again; false
+  /// without it just means the network was down, which is not an auth failure.
   Future<bool> refreshAccessToken() async {
-    if (_refreshToken == null || _refreshToken!.isEmpty) return false;
-
-    try {
-      final response = await http
-          .post(
-            Uri.parse(ApiConfig.refreshTokenUrl),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'refreshToken': _refreshToken}),
-          )
-          .timeout(const Duration(seconds: 15));
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['success'] == true && data['data'] != null) {
-          _token = data['data']['accessToken'] ?? _token;
-          _refreshToken = data['data']['refreshToken'] ?? _refreshToken;
-
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('auth_token', _token ?? '');
-          await prefs.setString('refresh_token', _refreshToken ?? '');
-
-          // A working token clears any prior auth failure so the halted sync
-          // loops restart on the next initialize().
-          SimpleVehicleService.authExpired = false;
-          BookingService.authExpired = false;
-          _isOffline = false;
-          notifyListeners();
-          return true;
-        }
-      }
-
-      if (response.statusCode == 401) {
-        // Refresh token is dead too — nothing left but a real sign-in.
-        SimpleVehicleService.authExpired = true;
-        BookingService.authExpired = true;
-        notifyListeners();
-      }
-      return false;
-    } catch (_) {
-      // Network failure is not an auth failure; leave the flags alone so the
-      // UI keeps saying "offline" rather than "session expired".
-      return false;
+    AuthTokenService.seed(accessToken: _token, refreshToken: _refreshToken);
+    final ok = await AuthTokenService.refresh();
+    if (ok) {
+      _token = AuthTokenService.token;
+      _isOffline = false;
     }
+    notifyListeners();
+    return ok;
   }
 
   Future<void> initialize() async {
@@ -138,11 +105,13 @@ class AuthProvider extends ChangeNotifier {
     _status = AuthStatus.authenticated;
     notifyListeners();
 
-    // Access tokens expire after 7 days. The refresh token was being saved but
-    // never spent, so a device left running for a week went permanently
-    // unauthorised — every sync returned 401 and the dashboard blamed the
-    // network. Redeem it before the services start syncing.
-    await refreshAccessToken();
+    // Hand the token pair to the service that owns renewal, then top it up if
+    // it is near the 7-day expiry. Background syncs renew themselves from here
+    // on, so a handheld left running for weeks keeps pushing bills instead of
+    // silently 401-ing until someone reinstalls.
+    AuthTokenService.seed(accessToken: _token, refreshToken: _refreshToken);
+    await AuthTokenService.ensureFresh();
+    _token = AuthTokenService.token.isNotEmpty ? AuthTokenService.token : _token;
 
     // Initialize vehicle service (loads from local DB first, syncs in background)
     await SimpleVehicleService.initialize(_token!);
@@ -233,6 +202,8 @@ class AuthProvider extends ChangeNotifier {
         final userData = data['data']['user'];
         _token = data['data']['token'];
         _refreshToken = data['data']['refreshToken'];
+        // Hand the fresh pair to the renewal service straight away.
+        AuthTokenService.seed(accessToken: _token, refreshToken: _refreshToken);
         _userId = userData['id'] ?? '';
         _userName = userData['fullName'] ?? userData['username'] ?? '';
         _userEmail = userData['email'] ?? userData['username'] ?? '';
@@ -317,6 +288,8 @@ class AuthProvider extends ChangeNotifier {
         final userData = data['data']['user'];
         _token = data['data']['token'];
         _refreshToken = data['data']['refreshToken'];
+        // Hand the fresh pair to the renewal service straight away.
+        AuthTokenService.seed(accessToken: _token, refreshToken: _refreshToken);
         _userId = userData['id'] ?? '';
         _userName = userData['fullName'] ?? name;
         _userEmail = userData['email'] ?? emailToUse;
@@ -362,6 +335,7 @@ class AuthProvider extends ChangeNotifier {
     await _clearCredentials();
     _token = null;
     _refreshToken = null;
+    AuthTokenService.clear();
     _userId = null;
     _userName = '';
     _userEmail = '';

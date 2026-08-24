@@ -8,6 +8,7 @@ import '../config/api_config.dart';
 import 'local_database_service.dart';
 import 'ticket_id_service.dart';
 import 'gst_service.dart';
+import 'auth_token_service.dart';
 
 /// Offline-first Bookings service.
 /// Mirrors SimpleVehicleService: save locally first, then fire-and-forget
@@ -20,10 +21,9 @@ class BookingService {
   static bool _isSyncing = false;
   static Timer? _syncTimer;
 
-  /// Set when the backend rejects our credentials. Retrying a dead token can
-  /// never succeed, so the periodic loop stops instead of failing every 2
-  /// minutes forever. Cleared by a fresh initialize() after sign-in.
-  static bool authExpired = false;
+  /// True only when the *refresh* token is dead too. An expired access token
+  /// alone is renewed transparently and never stops the loop.
+  static bool get authExpired => AuthTokenService.refreshRejected;
 
   /// Generate a collision-safe local ID (UUID v4 style)
   static String _generateLocalId() {
@@ -91,7 +91,7 @@ class BookingService {
 
   static Future<void> initialize(String token) async {
     // A fresh sign-in must clear a previous session's auth failure.
-    authExpired = false;
+    AuthTokenService.refreshRejected = false;
     if (_isInitialized) return;
     await GstService.refreshBookingGst();
     await _loadFromLocal();
@@ -107,11 +107,10 @@ class BookingService {
   static void _startPeriodicSync(String token) {
     _syncTimer?.cancel();
     if (token.isEmpty || token == 'offline_local_token') return;
-    _syncTimer = Timer.periodic(const Duration(minutes: 2), (_) {
-      if (authExpired) {
-        stopPeriodicSync();
-        return;
-      }
+    _syncTimer = Timer.periodic(const Duration(minutes: 2), (_) async {
+      // Renew ahead of expiry; only a dead refresh token pauses the cycle.
+      await AuthTokenService.ensureFresh();
+      if (AuthTokenService.refreshRejected) return;
       if (!_isSyncing) _fullSync(token);
     });
   }
@@ -162,7 +161,8 @@ class BookingService {
       }
     }
     if (response.statusCode == 401 || response.statusCode == 403) {
-      authExpired = true;
+      // Renew once; the next tick replays the pull with the new token.
+      await AuthTokenService.handleUnauthorized();
       throw Exception(
           'Pull bookings failed: not authorised (HTTP ${response.statusCode})');
     }

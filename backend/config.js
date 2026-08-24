@@ -5,9 +5,20 @@
 
 require('dotenv').config();
 
-const corsOrigins = (process.env.CORS_ORIGINS || process.env.FRONTEND_URL || 'http://localhost:3000')
+// Browser origins allowed to call this API. ADMIN_PANEL_URL is folded in so the
+// admin console keeps working without having to repeat itself in CORS_ORIGINS.
+// Trailing slashes are stripped: browsers send the Origin header without one,
+// and the comparison is exact.
+const corsOrigins = [
+  process.env.CORS_ORIGINS,
+  process.env.FRONTEND_URL,
+  process.env.ADMIN_PANEL_URL,
+  'http://localhost:3000',
+]
+  .filter(Boolean)
+  .join(',')
   .split(',')
-  .map((origin) => origin.trim())
+  .map((origin) => origin.trim().replace(/\/+$/, ''))
   .filter(Boolean);
 
 const jwtSecret = process.env.JWT_SECRET;
@@ -42,10 +53,15 @@ const config = {
   cors: {
     origin(origin, callback) {
       // Allow non-browser clients without an Origin header, but restrict browsers.
-      if (!origin || corsOrigins.includes(origin)) {
+      if (!origin || corsOrigins.includes(origin.replace(/\/+$/, ''))) {
         return callback(null, true);
       }
-      return callback(new Error('Origin is not allowed by CORS'));
+      // Deny without throwing. Passing an Error here makes the cors middleware
+      // hand it to Express, which answers 500 and logs "Unhandled error" for
+      // what is a routine rejection. Returning false omits the
+      // Access-Control-Allow-Origin header instead: the browser still blocks
+      // the call, but the server stays quiet and returns a normal response.
+      return callback(null, false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
