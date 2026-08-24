@@ -721,6 +721,28 @@ app.post('/api/bookings', verifyToken, checkTrialExpiry, async (req, res) => {
       message: 'Booking created successfully'
     });
   } catch (error) {
+    // 23505 = unique_violation on (user_id, booking_number). A retry or a
+    // racing duplicate push reached us for a booking we already hold. Creating
+    // it twice is what inflated the revenue figures, so treat the create as
+    // idempotent: hand back the row we already have and let the client adopt
+    // that id instead of erroring or inserting again.
+    if (error && error.code === '23505') {
+      try {
+        const existing = await pool.query(
+          'SELECT * FROM bookings WHERE user_id = $1 AND booking_number = $2 LIMIT 1',
+          [req.userId, (req.originalBody || req.body).bookingNumber || (req.body || {}).booking_number]
+        );
+        if (existing.rows.length > 0) {
+          return res.status(200).json({
+            success: true,
+            data: { booking: existing.rows[0] },
+            message: 'Booking already existed'
+          });
+        }
+      } catch (lookupError) {
+        console.error('Duplicate booking lookup failed:', lookupError);
+      }
+    }
     console.error('Create booking error:', error);
     res.status(500).json({ success: false, error: 'Internal server error' });
   }

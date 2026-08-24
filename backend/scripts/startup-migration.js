@@ -523,6 +523,123 @@ async function runStartupMigrations(pool) {
       console.log('✅ Booking inter-state column added');
     }
 
+    // ========================================
+    // MIGRATION 12: De-duplicate bookings, then enforce uniqueness
+    //
+    // The app fired createBooking's sync without awaiting it, so the periodic
+    // push could POST the same booking a second time before the first response
+    // swapped the local_ id. That produced two rows sharing one booking_number,
+    // which the next cold start pulled back as two bookings — double-counting
+    // the fare in Booked/Collected/Outstanding.
+    //
+    // The client-side race is fixed, but rows already written have to be
+    // reconciled and the hole closed at the data layer.
+    //
+    // Merge rule: each duplicate POST inserted its OWN 'Advance' payment row,
+    // so the ledgers are clones, not complements — moving payments onto a
+    // keeper would double-count the advance. Instead keep the row the app
+    // actually went on using (the one with the most payments; earliest
+    // created_at breaks ties) and drop the rest, letting ON DELETE CASCADE
+    // take their phantom ledger rows with them. Removed rows are archived
+    // first so the operation is auditable and reversible.
+    // ========================================
+    const bookingDedupeCheck = await pool.query(
+      "SELECT * FROM schema_migrations WHERE migration_name = 'dedupe_bookings_unique'"
+    );
+    if (bookingDedupeCheck.rows.length === 0) {
+      console.log('📦 De-duplicating bookings and adding unique constraint...');
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS bookings_dedupe_archive (
+            archived_at TIMESTAMP DEFAULT NOW(),
+            kept_booking_id UUID,
+            row_data JSONB
+          )
+        `);
+
+        // Rank duplicates within (user_id, booking_number): most payments wins,
+        // then the oldest row. Rank 1 is the keeper; everything else goes.
+        const doomed = await client.query(`
+          WITH ranked AS (
+            SELECT b.id,
+                   b.user_id,
+                   b.booking_number,
+                   ROW_NUMBER() OVER (
+                     PARTITION BY b.user_id, b.booking_number
+                     ORDER BY (SELECT COUNT(*) FROM booking_payments p WHERE p.booking_id = b.id) DESC,
+                              b.created_at ASC,
+                              b.id ASC
+                   ) AS rn
+            FROM bookings b
+            WHERE b.booking_number IS NOT NULL
+          )
+          SELECT id, user_id, booking_number FROM ranked WHERE rn > 1
+        `);
+
+        if (doomed.rows.length > 0) {
+          await client.query(`
+            INSERT INTO bookings_dedupe_archive (kept_booking_id, row_data)
+            SELECT keeper.id, to_jsonb(dup)
+            FROM bookings dup
+            JOIN LATERAL (
+              SELECT b2.id FROM bookings b2
+              WHERE b2.user_id = dup.user_id
+                AND b2.booking_number = dup.booking_number
+                AND b2.id <> dup.id
+              ORDER BY (SELECT COUNT(*) FROM booking_payments p WHERE p.booking_id = b2.id) DESC,
+                       b2.created_at ASC, b2.id ASC
+              LIMIT 1
+            ) keeper ON TRUE
+            WHERE dup.id = ANY($1::uuid[])
+          `, [doomed.rows.map((r) => r.id)]);
+
+          await client.query('DELETE FROM bookings WHERE id = ANY($1::uuid[])',
+            [doomed.rows.map((r) => r.id)]);
+          console.log(`   ↳ archived and removed ${doomed.rows.length} duplicate booking(s)`);
+        }
+
+        // Re-derive amount_paid from the surviving ledger so the totals cannot
+        // stay inflated by a partially-applied earlier state.
+        await client.query(`
+          UPDATE bookings b
+          SET amount_paid = COALESCE((
+                SELECT SUM(p.amount) FROM booking_payments p WHERE p.booking_id = b.id
+              ), 0),
+              status = CASE
+                WHEN COALESCE((SELECT SUM(p.amount) FROM booking_payments p WHERE p.booking_id = b.id), 0)
+                     >= b.total_fare THEN 'paid'
+                ELSE 'partial'
+              END,
+              updated_at = NOW()
+          WHERE EXISTS (SELECT 1 FROM booking_payments p WHERE p.booking_id = b.id)
+        `);
+
+        // Partial index: rows with a NULL booking_number predate the numbering
+        // scheme and must stay exempt rather than collapse into one another.
+        await client.query(`
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_bookings_user_number_unique
+          ON bookings (user_id, booking_number)
+          WHERE booking_number IS NOT NULL
+        `);
+
+        await client.query(
+          "INSERT INTO schema_migrations (migration_name) VALUES ('dedupe_bookings_unique')"
+        );
+        await client.query('COMMIT');
+        console.log('✅ Bookings de-duplicated; unique index in place');
+      } catch (e) {
+        await client.query('ROLLBACK');
+        // Leave the migration unrecorded so it retries on the next boot rather
+        // than silently leaving duplicates behind.
+        console.error('❌ Booking de-duplication failed, rolled back:', e.message);
+      } finally {
+        client.release();
+      }
+    }
+
   } catch (error) {
     console.error('❌ Migration error:', error);
     console.error('⚠️ Server will continue without new features');
