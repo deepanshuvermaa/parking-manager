@@ -14,6 +14,8 @@ import '../services/gst_service.dart';
 import '../services/upi_qr_service.dart';
 import '../models/simple_vehicle.dart';
 import '../theme/app_theme.dart';
+import '../widgets/tab_visibility.dart';
+import '../utils/plate.dart';
 
 class VehicleExitScreen extends StatefulWidget {
   const VehicleExitScreen({super.key});
@@ -22,7 +24,13 @@ class VehicleExitScreen extends StatefulWidget {
   State<VehicleExitScreen> createState() => _VehicleExitScreenState();
 }
 
-class _VehicleExitScreenState extends State<VehicleExitScreen> {
+class _VehicleExitScreenState extends State<VehicleExitScreen> with RefreshOnTabVisible<VehicleExitScreen> {
+
+  /// The shell keeps this screen alive between tab switches, so reload when it
+  /// comes back into view instead of relying on initState re-running.
+  @override
+  void onTabVisible() => _loadVehicles();
+
   final _searchController = TextEditingController();
   List<SimpleVehicle> _allVehicles = [];
   List<SimpleVehicle> _filtered = [];
@@ -68,7 +76,7 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
         } else {
           final q = query.toLowerCase();
           _filtered = _allVehicles.where((v) =>
-              v.vehicleNumber.toLowerCase().contains(q) ||
+              plateContains(v.vehicleNumber, q) ||
               (v.ticketId?.toLowerCase().contains(q) ?? false) ||
               v.vehicleType.toLowerCase().contains(q)).toList();
         }

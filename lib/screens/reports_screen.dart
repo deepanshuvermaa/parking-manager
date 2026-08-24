@@ -9,6 +9,7 @@ import '../services/receipt_service.dart';
 import '../models/simple_vehicle.dart';
 import '../models/booking.dart';
 import '../theme/app_theme.dart';
+import '../widgets/tab_visibility.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -17,8 +18,13 @@ class ReportsScreen extends StatefulWidget {
   State<ReportsScreen> createState() => _ReportsScreenState();
 }
 
-class _ReportsScreenState extends State<ReportsScreen>
-    with SingleTickerProviderStateMixin {
+class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProviderStateMixin, RefreshOnTabVisible<ReportsScreen> {
+
+  /// The shell keeps this screen alive between tab switches, so reload when it
+  /// comes back into view instead of relying on initState re-running.
+  @override
+  void onTabVisible() => _loadData();
+
   late TabController _tabController;
   List<SimpleVehicle> _vehicles = [];
   List<Booking> _bookings = [];

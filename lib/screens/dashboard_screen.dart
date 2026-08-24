@@ -9,6 +9,7 @@ import '../services/receipt_service.dart';
 import '../services/gst_service.dart';
 import '../models/simple_vehicle.dart';
 import '../theme/app_theme.dart';
+import '../widgets/tab_visibility.dart';
 
 class DashboardScreen extends StatefulWidget {
   final void Function(int)? onTabSwitch;
@@ -18,7 +19,13 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState extends State<DashboardScreen> with RefreshOnTabVisible<DashboardScreen> {
+
+  /// The shell keeps this screen alive between tab switches, so reload when it
+  /// comes back into view instead of relying on initState re-running.
+  @override
+  void onTabVisible() => _loadData();
+
   @override
   void initState() {
     super.initState();

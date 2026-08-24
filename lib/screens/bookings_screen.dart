@@ -7,6 +7,8 @@ import '../services/receipt_service.dart';
 import '../services/platform_printer_service.dart';
 import '../models/booking.dart';
 import '../theme/app_theme.dart';
+import '../widgets/tab_visibility.dart';
+import '../utils/plate.dart';
 
 class BookingsScreen extends StatefulWidget {
   const BookingsScreen({super.key});
@@ -15,7 +17,13 @@ class BookingsScreen extends StatefulWidget {
   State<BookingsScreen> createState() => _BookingsScreenState();
 }
 
-class _BookingsScreenState extends State<BookingsScreen> {
+class _BookingsScreenState extends State<BookingsScreen> with RefreshOnTabVisible<BookingsScreen> {
+
+  /// The shell keeps this screen alive between tab switches, so reload when it
+  /// comes back into view instead of relying on initState re-running.
+  @override
+  void onTabVisible() => _loadData();
+
   List<Booking> _bookings = [];
   bool _isLoading = true;
 
@@ -277,7 +285,7 @@ class _BookingsScreenState extends State<BookingsScreen> {
                     const SizedBox(height: 12),
                     _field(customerCtl, 'Customer Name *', TextInputType.name),
                     _field(mobileCtl, 'Customer Mobile', TextInputType.phone, digits: true),
-                    _field(vehicleCtl, 'Vehicle Number', TextInputType.text),
+                    _field(vehicleCtl, 'Vehicle Number', TextInputType.text, upperCase: true),
                     const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
                       initialValue: vehicleType,
@@ -364,7 +372,7 @@ class _BookingsScreenState extends State<BookingsScreen> {
   }
 
   Widget _field(TextEditingController ctl, String label, TextInputType type,
-      {bool digits = false, bool decimal = false}) {
+      {bool digits = false, bool decimal = false, bool upperCase = false}) {
     return Padding(
       padding: const EdgeInsets.only(top: 8),
       child: TextField(
@@ -376,7 +384,9 @@ class _BookingsScreenState extends State<BookingsScreen> {
             ? [FilteringTextInputFormatter.digitsOnly]
             : decimal
                 ? [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))]
-                : null,
+                : upperCase
+                    ? const [UpperCaseTextFormatter()]
+                    : null,
         decoration: InputDecoration(labelText: label),
       ),
     );

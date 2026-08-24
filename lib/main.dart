@@ -19,6 +19,7 @@ import 'screens/bookings_screen.dart';
 import 'screens/subscription_screen.dart';
 import 'screens/simple_settings_screen.dart';
 import 'screens/simple_printer_settings_screen.dart';
+import 'widgets/tab_visibility.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -82,6 +83,10 @@ class MainNavScreen extends StatefulWidget {
 class MainNavScreenState extends State<MainNavScreen> {
   int _currentIndex = 0;
 
+  /// Broadcasts the visible tab to the subtree so screens kept alive by the
+  /// IndexedStack can refresh when they come back into view.
+  final ValueNotifier<int> _activeIndex = ValueNotifier<int>(0);
+
   @override
   void initState() {
     super.initState();
@@ -93,6 +98,13 @@ class MainNavScreenState extends State<MainNavScreen> {
 
   void switchToTab(int index) {
     setState(() => _currentIndex = index);
+    _activeIndex.value = index;
+  }
+
+  @override
+  void dispose() {
+    _activeIndex.dispose();
+    super.dispose();
   }
 
   @override
@@ -119,7 +131,25 @@ class MainNavScreenState extends State<MainNavScreen> {
     ];
 
     final safeIndex = _currentIndex.clamp(0, screens.length - 1);
-    final Widget body = screens[safeIndex];
+    // Keep the tab count in sync when the role change resizes the list, so a
+    // staff user demoted out of Reports does not leave _activeIndex dangling.
+    if (_activeIndex.value != safeIndex) _activeIndex.value = safeIndex;
+
+    // IndexedStack, not screens[safeIndex]: rebuilding the selected screen on
+    // every switch destroyed its State, silently discarding a half-typed plate
+    // and the last-receipt reprint. Each child is scoped so data-driven screens
+    // can reload when they become visible again.
+    final Widget body = IndexedStack(
+      index: safeIndex,
+      children: [
+        for (var i = 0; i < screens.length; i++)
+          TabIndexScope(
+            index: i,
+            activeIndex: _activeIndex,
+            child: screens[i],
+          ),
+      ],
+    );
 
     return Scaffold(
       body: body,
