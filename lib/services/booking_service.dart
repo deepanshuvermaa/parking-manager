@@ -20,6 +20,11 @@ class BookingService {
   static bool _isSyncing = false;
   static Timer? _syncTimer;
 
+  /// Set when the backend rejects our credentials. Retrying a dead token can
+  /// never succeed, so the periodic loop stops instead of failing every 2
+  /// minutes forever. Cleared by a fresh initialize() after sign-in.
+  static bool authExpired = false;
+
   /// Generate a collision-safe local ID (UUID v4 style)
   static String _generateLocalId() {
     final rng = Random.secure();
@@ -85,6 +90,8 @@ class BookingService {
   // ============================================
 
   static Future<void> initialize(String token) async {
+    // A fresh sign-in must clear a previous session's auth failure.
+    authExpired = false;
     if (_isInitialized) return;
     await GstService.refreshBookingGst();
     await _loadFromLocal();
@@ -101,6 +108,10 @@ class BookingService {
     _syncTimer?.cancel();
     if (token.isEmpty || token == 'offline_local_token') return;
     _syncTimer = Timer.periodic(const Duration(minutes: 2), (_) {
+      if (authExpired) {
+        stopPeriodicSync();
+        return;
+      }
       if (!_isSyncing) _fullSync(token);
     });
   }
@@ -150,6 +161,12 @@ class BookingService {
         return;
       }
     }
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      authExpired = true;
+      throw Exception(
+          'Pull bookings failed: not authorised (HTTP ${response.statusCode})');
+    }
+
     throw Exception('Pull bookings failed: HTTP ${response.statusCode}');
   }
 

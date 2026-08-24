@@ -22,6 +22,20 @@ class SimpleVehicleService {
   static String? lastSyncError;
   static int unsyncedCount = 0;
 
+  /// Set when the backend rejects our credentials (401/403). A bad token will
+  /// never succeed by retrying, so we stop the sync loop instead of hammering
+  /// the server every 2 minutes forever. Distinct from being offline — the UI
+  /// must tell the operator to sign in again rather than showing "Offline".
+  static bool authExpired = false;
+
+  /// Cap on how many pending records one sync pass will push. The loop awaits
+  /// each request serially, so an unbounded backlog turns into minutes of
+  /// blocked work on low-end hardware.
+  static const int maxPushPerCycle = 25;
+
+  /// True when the backend is unreachable rather than rejecting us.
+  static bool get isOffline => syncErrorCount > 0 && !authExpired;
+
   /// Generate a collision-safe local ID using random hex (UUID v4)
   static String _generateLocalId() {
     final rng = Random.secure();
@@ -38,6 +52,8 @@ class SimpleVehicleService {
 
   /// Initialize service, load local data, start background sync
   static Future<void> initialize(String token) async {
+    // A fresh sign-in must clear a previous session's auth failure.
+    authExpired = false;
     if (_isInitialized) return;
 
     // Always load from local DB first (instant)
@@ -58,8 +74,22 @@ class SimpleVehicleService {
   static void _startPeriodicSync(String token) {
     _syncTimer?.cancel();
     _syncTimer = Timer.periodic(const Duration(minutes: 2), (_) {
+      if (authExpired) {
+        // Credentials are dead — retrying cannot help. Stop the loop; a fresh
+        // login calls initialize() again and clears the flag.
+        stopPeriodicSync();
+        return;
+      }
       if (!_isSyncing) _fullSync(token);
     });
+  }
+
+  /// Raised by any sync step that sees a 401/403 so the caller can abort the
+  /// whole cycle instead of continuing to push doomed requests.
+  static void _markAuthExpired() {
+    authExpired = true;
+    lastSyncError = 'Session expired — please sign in again';
+    DebugLogger.log('🔒 Backend rejected credentials; sync halted');
   }
 
   /// Stop periodic sync (call on logout)
@@ -70,12 +100,13 @@ class SimpleVehicleService {
 
   /// Full bidirectional sync: push local unsynced → pull from backend
   static Future<void> _fullSync(String token) async {
-    if (_isSyncing) return;
+    if (_isSyncing || authExpired) return;
     _isSyncing = true;
 
     try {
       // STEP 1: Push unsynced local vehicles to backend
       await syncPendingChanges(token);
+      if (authExpired) return;
 
       // STEP 2: Pull from backend and batch-save to local DB
       await _pullFromBackend(token);
@@ -122,6 +153,11 @@ class SimpleVehicleService {
         await loadFromLocalDatabase();
         return;
       }
+    }
+
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      _markAuthExpired();
+      throw Exception('Pull failed: not authorised (HTTP ${response.statusCode})');
     }
 
     throw Exception('Pull failed: HTTP ${response.statusCode}');
@@ -346,16 +382,20 @@ class SimpleVehicleService {
   static Future<void> syncPendingChanges(String token) async {
     if (token.isEmpty || token == 'offline_local_token') return;
 
-    final unsyncedVehicles = await LocalDatabaseService.getUnsyncedVehicles();
-    if (unsyncedVehicles.isEmpty) {
-      unsyncedCount = 0;
-      return;
-    }
+    final allUnsynced = await LocalDatabaseService.getUnsyncedVehicles();
+    unsyncedCount = allUnsynced.length;
+    if (allUnsynced.isEmpty) return;
+
+    // Each request is awaited serially, so an unbounded backlog would block for
+    // minutes on low-end hardware. Push a bounded slice per cycle; the rest is
+    // picked up on the next pass.
+    final unsyncedVehicles = allUnsynced.take(maxPushPerCycle).toList();
 
     int synced = 0;
     int failed = 0;
 
     for (var vehicle in unsyncedVehicles) {
+      if (authExpired) break;
       try {
         if (vehicle.status == 'exited' && vehicle.exitTime != null) {
           final response = await http.put(
@@ -372,6 +412,9 @@ class SimpleVehicleService {
             await LocalDatabaseService.markAsSynced(vehicle.id);
             synced++;
           } else {
+            if (response.statusCode == 401 || response.statusCode == 403) {
+              _markAuthExpired();
+            }
             failed++;
           }
         } else {
@@ -406,6 +449,9 @@ class SimpleVehicleService {
               synced++;
             }
           } else {
+            if (response.statusCode == 401 || response.statusCode == 403) {
+              _markAuthExpired();
+            }
             failed++;
           }
         }
@@ -414,7 +460,8 @@ class SimpleVehicleService {
       }
     }
 
-    unsyncedCount = failed;
+    // Reflect the true remaining backlog, not just this batch's failures.
+    unsyncedCount = (allUnsynced.length - synced).clamp(0, allUnsynced.length);
     if (synced > 0) print('✅ Synced $synced pending vehicles ($failed failed)');
   }
 

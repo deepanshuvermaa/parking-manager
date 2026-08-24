@@ -61,14 +61,19 @@ class PlatformPrinterService {
     return false;
   }
 
-  /// Check if printer is connected
+  /// Whether printing is expected to work.
+  ///
+  /// On Android/Bluetooth this reports whether a printer is *configured*, not
+  /// whether a socket is currently open: sockets are now opened per print and
+  /// closed immediately, because holding one open busy-waits a CPU core and
+  /// starves the platform channel on low-end POS hardware.
   static Future<bool> isConnected() async {
     if (isMobile) {
       final connectionType = await _getPrinterConnectionType();
       if (connectionType == 'usb' && Platform.isAndroid) {
         return NativeUsbPrinterService.isConnected;
       }
-      return SimpleBluetoothService.isConnected;
+      return await SimpleBluetoothService.isPrinterConfigured();
     } else if (Platform.isWindows) {
       return WindowsNativePrinterService.isConnected;
     } else if (isDesktop) {
@@ -145,8 +150,9 @@ class PlatformPrinterService {
           'connection_type': 'usb',
         };
       }
-      final connected = SimpleBluetoothService.isConnected;
-      final deviceName = SimpleBluetoothService.connectedDeviceName;
+      final connected = await SimpleBluetoothService.isPrinterConfigured();
+      final prefs = await SharedPreferences.getInstance();
+      final deviceName = prefs.getString(SimpleBluetoothService.PREF_PRINTER_NAME);
       return {
         'connected': connected,
         'printer_name': deviceName ?? 'Not connected',

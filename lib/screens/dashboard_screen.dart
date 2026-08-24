@@ -47,7 +47,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
         actions: [
-          if (auth.isOffline)
+          // A rejected token is not the same as no network. Showing "Offline"
+          // for an expired session sent operators chasing the Wi-Fi instead of
+          // signing in again.
+          if (SimpleVehicleService.authExpired)
+            Container(
+              margin: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: Go2Colors.error.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(Go2Radius.full),
+              ),
+              child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.lock_outline_rounded, size: 12, color: Go2Colors.error),
+                SizedBox(width: 4),
+                Text('Session expired', style: TextStyle(fontSize: 10, color: Go2Colors.error, fontWeight: FontWeight.w500)),
+              ]),
+            )
+          else if (auth.isOffline)
             Container(
               margin: const EdgeInsets.only(right: 8),
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),

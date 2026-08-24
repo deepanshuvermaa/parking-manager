@@ -29,6 +29,10 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
   bool _isLoading = true;
   Timer? _debounce;
 
+  /// Hard ceiling on printing. The exit is recorded before printing runs, so
+  /// exceeding this costs a receipt, never the exit record.
+  static const _printBudget = Duration(seconds: 12);
+
   @override
   void initState() {
     super.initState();
@@ -211,14 +215,17 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: () async {
-                  final connected = await PlatformPrinterService.isConnected();
-                  if (connected) {
-                    final receipt = await ReceiptService.generateEntryReceipt(vehicle);
-                    await PlatformPrinterService.printText(receipt);
-                    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✓ Entry receipt reprinted'), backgroundColor: Go2Colors.success));
-                  } else {
-                    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Printer not connected'), backgroundColor: Go2Colors.error));
-                  }
+                  final receipt = await ReceiptService.generateEntryReceipt(vehicle);
+                  final printed = await PlatformPrinterService.printText(receipt)
+                      .timeout(_printBudget, onTimeout: () => false);
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text(printed
+                        ? '✓ Entry receipt reprinted'
+                        : 'Printer not reachable'),
+                    backgroundColor:
+                        printed ? Go2Colors.success : Go2Colors.error,
+                  ));
                 },
                 icon: const Icon(Icons.print_rounded, size: 16),
                 label: const Text('Reprint Entry Receipt'),
@@ -260,22 +267,23 @@ class _VehicleExitScreenState extends State<VehicleExitScreen> {
         context.read<ParkingProvider>().recordExit(amount);
         HapticFeedback.mediumImpact();
 
-        // Auto-print exit receipt using global printer
-        final printerConnected = await PlatformPrinterService.isConnected();
-        if (printerConnected) {
-          try {
-            vehicle.exitTime = DateTime.now();
-            vehicle.amount = amount;
-            final duration = vehicle.exitTime!.difference(vehicle.entryTime);
-            final receipt = await ReceiptService.generateExitReceipt(vehicle, amount, duration);
-            await PlatformPrinterService.printText(receipt);
-          } catch (_) {}
-        }
+        // Auto-print exit receipt. The exit is already recorded, so printing is
+        // bounded and its failure only downgrades the message.
+        bool printed = false;
+        try {
+          vehicle.exitTime = DateTime.now();
+          vehicle.amount = amount;
+          final duration = vehicle.exitTime!.difference(vehicle.entryTime);
+          final receipt = await ReceiptService.generateExitReceipt(vehicle, amount, duration);
+          printed = await PlatformPrinterService.printText(receipt)
+              .timeout(_printBudget, onTimeout: () => false);
+        } catch (_) {}
 
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-                '✓ ${vehicle.vehicleNumber} exited • ₹${amount.toStringAsFixed(0)}${printerConnected ? ' • Receipt printed' : ''}'),
+                '✓ ${vehicle.vehicleNumber} exited • ₹${amount.toStringAsFixed(0)}${printed ? ' • Receipt printed' : ' • Print failed'}'),
             backgroundColor: Go2Colors.success,
           ),
         );

@@ -12,6 +12,21 @@ class SimpleBluetoothService {
   static StreamSubscription<BluetoothDiscoveryResult>? _discoverySubscription;
   static bool _isDiscovering = false;
 
+  /// Drains the RFCOMM input stream. flutter_bluetooth_serial pushes every byte
+  /// the printer sends over an EventChannel whether or not anyone listens. With
+  /// no subscriber those events queue on the platform channel and starve it —
+  /// on low-end POS hardware that delays/never delivers TextInput.show, so the
+  /// soft keyboard stops opening. We subscribe purely to discard.
+  static StreamSubscription<Uint8List>? _inputDrain;
+
+  /// Serialises writes so two receipts can never interleave on the socket.
+  static Future<void> _writeChain = Future<void>.value();
+
+  /// A stalled RFCOMM socket must never hang a bill submit. Every write is
+  /// bounded; on timeout we tear the socket down so the next print reconnects.
+  static const Duration printTimeout = Duration(seconds: 8);
+  static const Duration connectTimeout = Duration(seconds: 10);
+
   // Printer settings
   static const String PREF_PRINTER_MAC = 'printer_mac_address';
   static const String PREF_PRINTER_NAME = 'printer_name';
@@ -232,8 +247,25 @@ class SimpleBluetoothService {
       await disconnect();
 
       // Connect to the device
-      _connection = await BluetoothConnection.toAddress(device.address);
+      _connection = await BluetoothConnection.toAddress(device.address)
+          .timeout(connectTimeout);
       _connectedDevice = device;
+
+      // Drain the input stream. Printers emit status bytes unprompted; if
+      // nothing consumes them they pile up on the platform channel and block
+      // unrelated channel traffic (notably the keyboard show request).
+      _inputDrain = _connection!.input?.listen(
+        (_) {},
+        onError: (e) {
+          DebugLogger.log('Bluetooth input error: $e');
+          _handleSocketLoss();
+        },
+        onDone: () {
+          DebugLogger.log('Bluetooth socket closed by peer');
+          _handleSocketLoss();
+        },
+        cancelOnError: true,
+      );
 
       DebugLogger.log('✅ Connected successfully!');
 
@@ -251,22 +283,60 @@ class SimpleBluetoothService {
     }
   }
 
+  /// Drop local socket state without awaiting anything. Safe to call from a
+  /// stream callback or after a timeout, where awaiting close() could itself
+  /// hang on the same wedged socket.
+  static void _handleSocketLoss() {
+    _inputDrain?.cancel();
+    _inputDrain = null;
+    try {
+      _connection?.close();
+    } catch (_) {}
+    _connection = null;
+    _connectedDevice = null;
+  }
+
   /// Disconnect from current device
   static Future<void> disconnect() async {
     try {
+      await _inputDrain?.cancel();
+      _inputDrain = null;
       if (_connection != null) {
-        await _connection!.close();
+        await _connection!.close().timeout(
+              const Duration(seconds: 3),
+              onTimeout: () {},
+            );
         _connection = null;
         _connectedDevice = null;
         DebugLogger.log('Disconnected from device');
       }
     } catch (e) {
       DebugLogger.log('Error disconnecting: $e');
+      _handleSocketLoss();
     }
   }
 
-  /// Check if connected
+  /// Reconnect to the saved printer if the socket dropped. Returns true when a
+  /// usable connection exists. Called before every print so a socket lost while
+  /// idle heals silently instead of failing the bill.
+  static Future<bool> ensureConnected() async {
+    if (isConnected) return true;
+    _handleSocketLoss();
+    return await autoConnect();
+  }
+
+  /// True only while a socket is actually open — which, by design, is now just
+  /// the moment of a print. UI should ask [isPrinterConfigured] instead.
   static bool get isConnected => _connection != null && _connection!.isConnected;
+
+  /// True when a printer has been paired and saved, i.e. printing will work.
+  /// This is what status UI wants: we no longer hold a socket open between
+  /// prints, so a live-socket check would read "disconnected" almost always.
+  static Future<bool> isPrinterConfigured() async {
+    final prefs = await SharedPreferences.getInstance();
+    final mac = prefs.getString(PREF_PRINTER_MAC);
+    return mac != null && mac.isNotEmpty;
+  }
 
   /// Get connected device info
   static String? get connectedDeviceName => _connectedDevice?.name;
@@ -300,28 +370,52 @@ class SimpleBluetoothService {
     }
   }
 
-  /// Print raw bytes to connected printer
-  static Future<bool> printBytes(Uint8List bytes) async {
-    if (!isConnected || _connection == null) {
-      throw Exception('No printer connected');
+  /// Print raw bytes to connected printer.
+  ///
+  /// Never throws and never hangs: writes are serialised, bounded by
+  /// [printTimeout], and a timeout tears the socket down so the next call
+  /// reconnects rather than queueing behind a dead one. Returns false on
+  /// failure so callers can save the bill and report the print separately.
+  static Future<bool> printBytes(Uint8List bytes) {
+    final result = _writeChain.then((_) => _printBytesLocked(bytes));
+    // Keep the chain alive even if this write fails.
+    _writeChain = result.then((_) {}, onError: (_) {});
+    return result;
+  }
+
+  static Future<bool> _printBytesLocked(Uint8List bytes) async {
+    if (!await ensureConnected()) {
+      DebugLogger.log('❌ Print aborted: no printer connected');
+      return false;
     }
 
     try {
       _connection!.output.add(bytes);
-      await _connection!.output.allSent;
+      await _connection!.output.allSent.timeout(printTimeout);
+      // Give the printer a moment to drain its buffer before we tear the
+      // socket down, otherwise the tail of a long receipt can be truncated.
+      await Future<void>.delayed(const Duration(milliseconds: 400));
       return true;
+    } on TimeoutException {
+      DebugLogger.log('❌ Print timed out after ${printTimeout.inSeconds}s');
+      return false;
     } catch (e) {
       DebugLogger.log('❌ Print error: $e');
       return false;
+    } finally {
+      // ALWAYS drop the socket. flutter_bluetooth_serial's RFCOMM read loop is
+      // a busy-wait spin in the plugin's Java layer: an open connection pegs a
+      // core at 100% and drags the platform thread to ~55%, which starves the
+      // channel that carries TextInput.show — the soft keyboard then never
+      // opens. Measured on a Unisoc SC9863A POS handheld. Holding the socket
+      // open for the process lifetime is not survivable on this hardware, so
+      // we connect per print and release immediately.
+      _handleSocketLoss();
     }
   }
 
   /// Print text data
   static Future<bool> printText(String text) async {
-    if (!isConnected || _connection == null) {
-      throw Exception('No printer connected');
-    }
-
     try {
       final bytes = Uint8List.fromList(utf8.encode(text));
       return await printBytes(bytes);

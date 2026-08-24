@@ -85,7 +85,10 @@ class MainNavScreenState extends State<MainNavScreen> {
   @override
   void initState() {
     super.initState();
-    PlatformPrinterService.autoConnect();
+    // Deliberately NOT connecting the printer here. flutter_bluetooth_serial's
+    // read loop busy-waits, so an idle open socket pegs a CPU core and starves
+    // the platform channel (the soft keyboard stops opening on low-end POS
+    // hardware). The printer is connected on demand per print instead.
   }
 
   void switchToTab(int index) {

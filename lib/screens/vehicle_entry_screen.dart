@@ -35,6 +35,10 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
   SharedPreferences? _prefs;
   bool _showExtra = false;
 
+  /// Hard ceiling on receipt generation + printing. The bill is saved before
+  /// this runs, so exceeding it costs a receipt, never the parking record.
+  static const _printBudget = Duration(seconds: 12);
+
   static const _types = [
     ('Car', Icons.directions_car_rounded),
     ('Bike', Icons.two_wheeler_rounded),
@@ -115,6 +119,9 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
         context.read<ParkingProvider>().recordEntry();
         HapticFeedback.mediumImpact();
 
+        // The vehicle is already saved locally at this point. Receipt
+        // generation and printing must never be able to hold the submit open —
+        // a wedged printer socket used to leave the button spinning forever.
         String msg = '✓ $plate parked';
         try {
           final receipt = await ReceiptService.generateEntryReceipt(vehicle);
@@ -122,12 +129,16 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
           _lastReceipt = receipt;
           final prefs = _prefs ?? await SharedPreferences.getInstance();
           final autoPrint = prefs.getBool('auto_print') ?? true;
-          final connected = await PlatformPrinterService.isConnected();
-          if (connected && autoPrint) {
-            await PlatformPrinterService.printText(receipt);
-            msg = '✓ $plate parked • Receipt printed';
+          if (autoPrint) {
+            final printed = await PlatformPrinterService.printText(receipt)
+                .timeout(_printBudget, onTimeout: () => false);
+            msg = printed
+                ? '✓ $plate parked • Receipt printed'
+                : '✓ $plate parked • Print failed — use Reprint';
           }
-        } catch (_) {}
+        } catch (e) {
+          msg = '✓ $plate parked • Print failed — use Reprint';
+        }
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg, style: const TextStyle(fontSize: 15)), backgroundColor: Go2Colors.success));
@@ -146,13 +157,13 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
 
   Future<void> _reprint() async {
     if (_lastReceipt == null) return;
-    final connected = await PlatformPrinterService.isConnected();
-    if (connected) {
-      await PlatformPrinterService.printText(_lastReceipt!);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Receipt reprinted'), backgroundColor: Go2Colors.success));
-    } else {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Printer not connected'), backgroundColor: Go2Colors.error));
-    }
+    final printed = await PlatformPrinterService.printText(_lastReceipt!)
+        .timeout(_printBudget, onTimeout: () => false);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(printed ? 'Receipt reprinted' : 'Printer not reachable'),
+      backgroundColor: printed ? Go2Colors.success : Go2Colors.error,
+    ));
   }
 
   Widget _field(TextEditingController ctrl, String hint, IconData icon, {TextInputType? keyboard, TextCapitalization cap = TextCapitalization.none}) {
