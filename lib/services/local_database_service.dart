@@ -671,6 +671,39 @@ class LocalDatabaseService {
   }
 
   /// Delete a booking (used when swapping local id → backend id)
+  /// Remove synced rows the server no longer has.
+  ///
+  /// The pull was a pure upsert, so anything deleted server-side lingered on
+  /// the device forever. That is not cosmetic: a payment recorded against an
+  /// orphan targets a booking id the backend has never heard of, so it can
+  /// never sync and the money is silently lost. Seen after de-duplicating
+  /// bookings on the server — devices kept both copies and a payment landed on
+  /// the dead one.
+  ///
+  /// Only rows marked synced are eligible. A booking still waiting to be
+  /// pushed is absent from the server precisely because it has not been sent
+  /// yet, and deleting it would destroy the operator's work.
+  static Future<int> pruneBookingsAbsentFromServer(Set<String> serverIds) async {
+    final db = await database;
+    final rows = await db.query('bookings',
+        columns: ['id'], where: 'synced = 1');
+    final stale = rows
+        .map((r) => r['id'] as String)
+        .where((id) => !serverIds.contains(id))
+        .toList();
+    if (stale.isEmpty) return 0;
+
+    final batch = db.batch();
+    for (final id in stale) {
+      // booking_payments rows go with it; they belong to a booking that no
+      // longer exists anywhere.
+      batch.delete('booking_payments', where: 'booking_id = ?', whereArgs: [id]);
+      batch.delete('bookings', where: 'id = ?', whereArgs: [id]);
+    }
+    await batch.commit(noResult: true);
+    return stale.length;
+  }
+
   static Future<void> deleteBooking(String bookingId) async {
     final db = await database;
     await db.delete('bookings', where: 'id = ?', whereArgs: [bookingId]);

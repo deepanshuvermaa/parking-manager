@@ -156,6 +156,16 @@ class BookingService {
             .map((b) => Booking.fromJson(b))
             .toList();
         await LocalDatabaseService.batchSaveBookings(list, synced: true);
+        // The pull is authoritative for rows that have already been synced, so
+        // reconcile deletions too. Without this, anything removed server-side
+        // (an admin deleting a booking, or the de-duplication migration) stayed
+        // on the device, and a payment recorded against that orphan could never
+        // sync — the money just vanished.
+        final removed = await LocalDatabaseService
+            .pruneBookingsAbsentFromServer(list.map((b) => b.id).toSet());
+        if (removed > 0) {
+          print('🧹 Removed $removed booking(s) deleted on the server');
+        }
         await _loadFromLocal();
         return;
       }
