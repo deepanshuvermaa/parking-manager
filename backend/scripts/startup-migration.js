@@ -722,6 +722,88 @@ async function runStartupMigrations(pool) {
       }
     }
 
+    // ========================================
+    // MIGRATION 14: Correct the double-payment repair
+    //
+    // Migration 13 bucketed timestamps with FLOOR(epoch / 5) to spot replayed
+    // pushes. Fixed windows have edges: the pair seen in production sat at
+    // ...44.970 and ...45.607 — 637ms apart but on opposite sides of a bucket
+    // boundary, so they were never compared and the duplicate survived.
+    //
+    // Compare each row against the previous identical one instead. LAG has no
+    // boundary to fall off, and chains correctly if a payment was replayed
+    // more than once. Deleted rows are archived first — this is money.
+    // ========================================
+    const paymentRepairCheck = await pool.query(
+      "SELECT * FROM schema_migrations WHERE migration_name = 'repair_double_payments_v2'"
+    );
+    if (paymentRepairCheck.rows.length === 0) {
+      console.log('📦 Repairing double-recorded payments...');
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS booking_payments_repair_archive (
+            archived_at TIMESTAMP DEFAULT NOW(),
+            row_data JSONB
+          )
+        `);
+
+        // Only rows predating the idempotency key can have been duplicated by
+        // the race; anything carrying a key is already protected.
+        const dupes = await client.query(`
+          WITH ordered AS (
+            SELECT p.id,
+                   LAG(p.paid_at) OVER (
+                     PARTITION BY p.booking_id, p.amount, COALESCE(p.note, '')
+                     ORDER BY p.paid_at, p.id
+                   ) AS prev_at,
+                   p.paid_at
+            FROM booking_payments p
+            WHERE p.client_payment_id IS NULL
+          )
+          SELECT id FROM ordered
+          WHERE prev_at IS NOT NULL
+            AND paid_at - prev_at < INTERVAL '5 seconds'
+        `);
+
+        if (dupes.rows.length > 0) {
+          const ids = dupes.rows.map((r) => r.id);
+          await client.query(`
+            INSERT INTO booking_payments_repair_archive (row_data)
+            SELECT to_jsonb(p) FROM booking_payments p WHERE p.id = ANY($1::uuid[])
+          `, [ids]);
+          await client.query('DELETE FROM booking_payments WHERE id = ANY($1::uuid[])', [ids]);
+          console.log(`   ↳ archived and removed ${ids.length} replayed payment row(s)`);
+        }
+
+        await client.query(`
+          UPDATE bookings b
+          SET amount_paid = COALESCE((
+                SELECT SUM(p.amount) FROM booking_payments p WHERE p.booking_id = b.id
+              ), 0),
+              status = CASE
+                WHEN b.total_fare > 0 AND COALESCE((
+                  SELECT SUM(p.amount) FROM booking_payments p WHERE p.booking_id = b.id
+                ), 0) >= b.total_fare THEN 'paid' ELSE 'partial' END,
+              updated_at = NOW()
+          WHERE EXISTS (SELECT 1 FROM booking_payments p WHERE p.booking_id = b.id)
+        `);
+
+        await client.query(
+          "INSERT INTO schema_migrations (migration_name) VALUES ('repair_double_payments_v2')"
+        );
+        await client.query('COMMIT');
+        console.log('✅ Double-recorded payments repaired');
+      } catch (e) {
+        await client.query('ROLLBACK');
+        console.error('❌ Payment repair failed, rolled back:', e.message);
+      } finally {
+        client.release();
+      }
+    }
+
   } catch (error) {
     console.error('❌ Migration error:', error);
     console.error('⚠️ Server will continue without new features');
