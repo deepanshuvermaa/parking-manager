@@ -9,6 +9,7 @@ import '../services/platform_printer_service.dart';
 import '../services/receipt_service.dart';
 import '../models/simple_vehicle.dart';
 import '../theme/app_theme.dart';
+import '../utils/plate.dart';
 
 class VehicleEntryScreen extends StatefulWidget {
   const VehicleEntryScreen({super.key});
@@ -78,7 +79,18 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
 
   Future<void> _submit() async {
     final plate = _plateController.text.trim().toUpperCase();
-    if (plate.isEmpty) return;
+
+    // Catch a mis-tap or half-finished entry before it becomes a parked
+    // vehicle. Kept loose on purpose — see validatePlate for why.
+    final problem = validatePlate(plate);
+    if (problem != null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(problem), backgroundColor: Go2Colors.error),
+        );
+      }
+      return;
+    }
 
     if (SimpleVehicleService.isVehicleParked(plate)) {
       if (mounted) {
@@ -252,7 +264,7 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
               prefixIcon: const Icon(Icons.pin_outlined, size: 24),
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
             ),
-            inputFormatters: [UpperCaseTextFormatter(), LengthLimitingTextInputFormatter(14)],
+            inputFormatters: [const UpperCaseTextFormatter(), LengthLimitingTextInputFormatter(14)],
             onFieldSubmitted: (_) => _submit(),
           ),
 
@@ -392,12 +404,5 @@ class _VehicleEntryScreenState extends State<VehicleEntryScreen> {
       ),
     );
     return fullWidth ? field : Expanded(child: field);
-  }
-}
-
-class UpperCaseTextFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
-    return TextEditingValue(text: newValue.text.toUpperCase(), selection: newValue.selection);
   }
 }

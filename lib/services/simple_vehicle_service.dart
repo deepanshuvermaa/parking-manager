@@ -9,6 +9,7 @@ import 'local_database_service.dart';
 import 'vehicle_rate_service.dart';
 import 'ticket_id_service.dart';
 import 'auth_token_service.dart';
+import '../utils/plate.dart';
 
 class SimpleVehicleService {
   static String get baseUrl => ApiConfig.baseUrl.replaceAll('/api', '');
@@ -224,9 +225,10 @@ class SimpleVehicleService {
 
   /// Check if a vehicle plate is already parked (duplicate detection)
   static bool isVehicleParked(String plateNumber) {
-    final plate = plateNumber.toUpperCase().trim();
+    // Compare canonically: 'UP 32 AB 1234' and 'UP32AB1234' are one car, and
+    // exact string equality used to let the second one park as a new vehicle.
     return _cachedVehicles.any(
-      (v) => v.vehicleNumber == plate && v.status == 'parked',
+      (v) => v.status == 'parked' && isSamePlate(v.vehicleNumber, plateNumber),
     );
   }
 
