@@ -287,7 +287,21 @@ class BookingService {
     return booking;
   }
 
+  /// Booking ids currently being POSTed. createBooking() fires the sync without
+  /// awaiting it, so the periodic _pushUnsynced() could find the same booking
+  /// still carrying its local_ id and POST it a second time — producing two
+  /// backend rows with the same bookingNumber. Unlike vehicles there is no
+  /// UNIQUE index on booking_number to catch it, so the duplicate survived and
+  /// double-counted the revenue on the next cold start.
+  static final Set<String> _inFlightBookings = <String>{};
+
   static Future<void> _syncSingleBooking(String token, Booking booking) async {
+    // Key on the booking number: the local id is swapped for the backend id
+    // mid-flight, so it is not stable enough to dedupe on.
+    final key = booking.bookingNumber ?? booking.id;
+    if (!_inFlightBookings.add(key)) {
+      return; // already being pushed by another caller
+    }
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/api/bookings'),
@@ -326,6 +340,8 @@ class BookingService {
       }
     } catch (e) {
       print('⚠️ Booking sync will retry: $e');
+    } finally {
+      _inFlightBookings.remove(key);
     }
   }
 
